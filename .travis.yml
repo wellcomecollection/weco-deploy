@@ -1,37 +1,27 @@
 language: python
 sudo: false
-
 python: 3.7
-
 branches:
-  only:
-    master
-
+  only: master
 install:
-  - pip install --upgrade pip setuptools
-  - pip install --upgrade tox
-
+- pip install --upgrade pip setuptools
+- pip install --upgrade tox
 env:
   global:
-    - PYPI_USERNAME=wellcomedigitalplatform
-
-    # This contains the following variables:
-    #  - PYPI_PASSWORD
-    - secure: "Eyiuy7LZDKCXga5jNfkCg55OJ9nvxUdEamJj/EkG7VgfgXfx9ETxAUpDIzHmv5xRW+CvWbSJUrWxtqzHpW/gBbNFK+Gfth1h6CG1NgYo4GzrvhY89OSd2nH23S631kx0oE0V97fN5XK6onn6szSaJBGknYo98OYt/aFmN9W+pcgLaQVosHiDlTyguX1UPgsVC9ivm2QIoeb1+MhsOT0G4fMGsL1SYMx9ZYk60EYsT0XiWzWznFDFUKV2bg8NrpCW7FkyQzshWGtr4FHXr+8gwtIS6zvkdiTxHVHQa6dHli8noejxwzH1k7MPYUfmsvOPZPm3OFcT0pUeOnmKN5rmw59Nlo/bQZ6yCnzJ7yVwVHt9s1MDoMyVpRBTt+jaaxKtENPIAoPeuZ2YoBzFoQaqyCEIgTgUCMAQn/CNR4e3IlwPitphtJa5V/0mpx/0JP7XVnWPCwRb3ylRbQnSmeGs0L17b5PVd/tXwQCzcXXc0r6WfgRmDZY/UoEYG+A3nrfAgTJeZ8kt+M17WjI/zExknRk0Cay0jz5YA+lcYnGXJTDNT7iHQ+T+1f8a2ytSOty6OMXvEdX45NlytnBVlZIevqZmk9kk2cVcjttYAUacuVYIZp0TqmUPKaLB2zw1bFEnrrxQ5XOyXY2Peil3jlGA7/a3wmv/qCx6hYXIynuxkbg="
-
-
+  - PYPI_USERNAME=wellcomedigitalplatform
+  # This contains the following variables:
+  #  - PYPI_PASSWORD
+  - secure: "fhiogZWjNrz3o/PRbcB/0Qtpk5bN2eiLwNWFlVbJRcMJJ6Z7aiBMzJyrVBE/bS7O87MxWRScvGnGcEydZe7OMeCckc+gkyuwrfVj5bGgs8wYj6w5GZheuVskWXNcOPHYuPms3NKU9CXpWo06Qbvv/RL9ydI3N+QfSm8Ph0s1S0nOTTPsc1IqVZ5eP8C/XaNLPXN4IExkIx4XluizmcYjnYEbExAvbZp4ZsqrPK5INk9TKFJ2pvfeQjGFjtq54XsDtfOTouexnNJmDWWxKgeaEq5IbuZuMby5mUjevx0Yar0JqMx9eWYfYoxBH34piQ3Tf9CWQmqlRfixtUfyKxm0PvkLM0NFSpJCU8I9N0cF6okMRNep2JUNngoARis68EAWVJ9dfQ7hT2I2FO5XYuFhBDv0dldZ+1YpVOAEdTLfRICpIg504Lx921KbCjG/I6Pcn5lDCYqPwsf0FUXfs+ZERUfv9XRL340LbmiVKt3rdLrXZtBpUkFAOwjL0lefyWZIdumPQqiMLqa6XobxAeLdC1cpGjZ8i5cHqJft9rpXzDJKn/d6M29qOhfR2NhyYBU+V5lPuvRXlkX3B4UyFeBLvufCE5QNPj+e4zICTYdR01lPtV8SyJs2m6mbm5EKSQXr68uYStQSXzkPbM+qxKX1VrEwnPloZf143L1VsSUxCUI="
 jobs:
   include:
-    - env: TOXENV=lint
-    - env: TOXENV=check_release_file
-    - env: TOXENV=py37
-    - env: TOXENV=deploy
-      stage: deploy
-
+  - env: TOXENV=lint
+  - env: TOXENV=check_release_file
+  - env: TOXENV=py37
+  - env: TOXENV=deploy
+    stage: deploy
 stages:
-  - test
-  - name: deploy
-    if: type = push
-
+- test
+- name: deploy
+  if: type = push
 script:
-  - tox
+- tox
