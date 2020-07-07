@@ -62,15 +62,15 @@ subprocess.check_call([
 
 if not on_master:
     print('Not deploying due to not being on master')
-sys.exit(0)
+    sys.exit(0)
 
 if not has_release:
     print('Not deploying due to no release')
-sys.exit(0)
+    sys.exit(0)
 
 if os.environ.get('TRAVIS_SECURE_ENV_VARS', None) != 'true':
     print("But we don't have the keys to do it")
-sys.exit(1)
+    sys.exit(1)
 
 print('Decrypting secrets')
 
