@@ -62,15 +62,15 @@ subprocess.check_call([
 
 if not on_master:
     print('Not deploying due to not being on master')
-sys.exit(0)
+    sys.exit(0)
 
 if not has_release:
     print('Not deploying due to no release')
-sys.exit(0)
+    sys.exit(0)
 
 if os.environ.get('TRAVIS_SECURE_ENV_VARS', None) != 'true':
     print("But we don't have the keys to do it")
-sys.exit(1)
+    sys.exit(1)
 
 print('Decrypting secrets')
 
@@ -82,8 +82,8 @@ print('Decrypting secrets')
 # extensive use of environment variables in it), so we're making an
 # exception here.
 subprocess.check_call(
-    'openssl aes-256-cbc -K $encrypted_83630750896a_key '
-    '-iv $encrypted_83630750896a_iv -in deploy_key.enc -out deploy_key -d',
+    'openssl aes-256-cbc -K $encrypted_12c8071d2874_key '
+    '-iv $encrypted_12c8071d2874_iv -in deploy_key.enc -out deploy_key -d',
     shell=True
 )
 subprocess.check_call(['chmod', '400', 'deploy_key'])
