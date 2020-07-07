@@ -1,0 +1,36 @@
+language: python
+sudo: false
+
+python: 3.7
+
+branches:
+  only:
+    master
+
+install:
+  - pip install --upgrade pip setuptools
+  - pip install --upgrade tox
+
+env:
+  global:
+    - PYPI_USERNAME=wellcomedigitalplatform
+
+    # This contains the following variables:
+    #  - PYPI_PASSWORD
+    - secure: "nope"
+
+jobs:
+  include:
+    - env: TOXENV=lint
+    - env: TOXENV=check_release_file
+    - env: TOXENV=py36
+    - env: TOXENV=deploy
+      stage: deploy
+
+stages:
+  - test
+  - name: deploy
+    if: type = push
+
+script:
+  - tox
