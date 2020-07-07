@@ -1,0 +1,37 @@
+language: python
+sudo: false
+
+python: 3.7
+
+branches:
+  only:
+    master
+
+install:
+  - pip install --upgrade pip setuptools
+  - pip install --upgrade tox
+
+env:
+  global:
+    - PYPI_USERNAME=wellcomedigitalplatform
+
+    # This contains the following variables:
+    #  - PYPI_PASSWORD
+    - secure: "Eyiuy7LZDKCXga5jNfkCg55OJ9nvxUdEamJj/EkG7VgfgXfx9ETxAUpDIzHmv5xRW+CvWbSJUrWxtqzHpW/gBbNFK+Gfth1h6CG1NgYo4GzrvhY89OSd2nH23S631kx0oE0V97fN5XK6onn6szSaJBGknYo98OYt/aFmN9W+pcgLaQVosHiDlTyguX1UPgsVC9ivm2QIoeb1+MhsOT0G4fMGsL1SYMx9ZYk60EYsT0XiWzWznFDFUKV2bg8NrpCW7FkyQzshWGtr4FHXr+8gwtIS6zvkdiTxHVHQa6dHli8noejxwzH1k7MPYUfmsvOPZPm3OFcT0pUeOnmKN5rmw59Nlo/bQZ6yCnzJ7yVwVHt9s1MDoMyVpRBTt+jaaxKtENPIAoPeuZ2YoBzFoQaqyCEIgTgUCMAQn/CNR4e3IlwPitphtJa5V/0mpx/0JP7XVnWPCwRb3ylRbQnSmeGs0L17b5PVd/tXwQCzcXXc0r6WfgRmDZY/UoEYG+A3nrfAgTJeZ8kt+M17WjI/zExknRk0Cay0jz5YA+lcYnGXJTDNT7iHQ+T+1f8a2ytSOty6OMXvEdX45NlytnBVlZIevqZmk9kk2cVcjttYAUacuVYIZp0TqmUPKaLB2zw1bFEnrrxQ5XOyXY2Peil3jlGA7/a3wmv/qCx6hYXIynuxkbg="
+
+
+jobs:
+  include:
+    - env: TOXENV=lint
+    - env: TOXENV=check_release_file
+    - env: TOXENV=py37
+    - env: TOXENV=deploy
+      stage: deploy
+
+stages:
+  - test
+  - name: deploy
+    if: type = push
+
+script:
+  - tox

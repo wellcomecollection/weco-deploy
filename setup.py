@@ -15,7 +15,9 @@ README = local_file('README.md')
 
 long_description = open(README).read()
 
-version = '0.0.1'
+# Assignment to placate pyflakes. The actual version is from the exec that
+# follows.
+__version__ = None
 
 install_requires = [
     'click >= 7.1.2',
@@ -23,7 +25,7 @@ install_requires = [
 
 setup(
     name='weco-deploy',
-    version=version,
+    version=__version__,
     description='A tool for deploying ECS services at the Wellcome Collection',
     long_description=long_description,
     url='https://github.com/wellcomecollection/weco-deploy',
