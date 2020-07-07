@@ -1,3 +1,3 @@
-RELEASE_TYPE:minor
+RELEASE_TYPE: minor
 
 Bump for release
