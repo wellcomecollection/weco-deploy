@@ -60,7 +60,10 @@ if __name__ == '__main__':
             tools.git('fetch')
             image_name = "wellcome/%s:%s" % (NAME, tools.latest_version())
 
-            subprocess.check_call(["docker", "build", "--tag", image_name, ROOT])
+            subprocess.check_call([
+                "docker", "build",
+                "--tag", image_name, ROOT
+            ])
             subprocess.check_call(["docker", "push", image_name])
     except subprocess.CalledProcessError as err:
         print("ERROR: %r" % err)
