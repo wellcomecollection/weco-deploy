@@ -18,6 +18,6 @@ def ensure(command):
 
 
 def configure_aws_profile(role_arn, profile_name):
-    cmd('aws', 'configure', 'set', 'region', "eu-west-1", '--profile', profile_name)
-    cmd('aws', 'configure', 'set', 'role_arn', role_arn, '--profile', profile_name)
-    cmd('aws', 'configure', 'set', 'source_profile', 'default', '--profile', profile_name)
+    cmd('aws', 'configure', 'set', 'region', "eu-west-1", '--profile', profile_name)  # noqa: E501
+    cmd('aws', 'configure', 'set', 'role_arn', role_arn, '--profile', profile_name)   # noqa: E501
+    cmd('aws', 'configure', 'set', 'source_profile', 'default', '--profile', profile_name)  # noqa: E501

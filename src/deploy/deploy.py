@@ -17,7 +17,7 @@ def cli():
 @click.option("--namespace", required=True)
 @click.option("--label", default="latest")
 @click.option("--role_arn")
-def publish(project_id, service_id, account_id, region_id, namespace, label, role_arn):
+def publish(project_id, service_id, account_id, region_id, namespace, label, role_arn):  # noqa: E501
     print(f"*** Attempting to publish {project_id}/{service_id}")
 
     profile_name = None

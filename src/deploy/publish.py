@@ -27,19 +27,22 @@ def publish_image(account_id, namespace, service_id, label, region_id):
     label_image_name = f"{service_id}:{label}"
     tag_image_name = f"{service_id}:{image_tag}"
 
-    base_remote_image_name = f"{account_id}.dkr.ecr.{region_id}.amazonaws.com/{namespace}"
+    base_remote_image_name = (
+        f"{account_id}.dkr.ecr.{region_id}.amazonaws.com/{namespace}"
+    )
 
     remote_label_image_name = f"{base_remote_image_name}/{label_image_name}"
     remote_tag_image_name = f"{base_remote_image_name}/{tag_image_name}"
 
-    print(f"*** Pushing {tag_image_name} to {remote_label_image_name}, {remote_tag_image_name}")
-
     try:
+        print(f"*** Pushing {tag_image_name} to {remote_label_image_name}")
         cmd('docker', 'tag', label_image_name, remote_label_image_name)
+        cmd('docker', 'push', remote_label_image_name)
+
+        print(f"*** Pushing {tag_image_name} to {remote_tag_image_name}")
+        cmd('docker', 'push', remote_tag_image_name)
         cmd('docker', 'tag', tag_image_name, remote_tag_image_name)
 
-        cmd('docker', 'push', remote_label_image_name)
-        cmd('docker', 'push', remote_tag_image_name)
     finally:
         cmd('docker', 'rmi', remote_label_image_name)
         cmd('docker', 'rmi', remote_tag_image_name)
@@ -51,7 +54,7 @@ def ecr_login(account_id, profile_name):
     print(f"*** Authenticating {account_id} for `docker push` with ECR")
 
     base = ['aws', 'ecr', 'get-login']
-    login_options = ['--no-include-email','--registry-ids', account_id]
+    login_options = ['--no-include-email', '--registry-ids', account_id]
     profile_options = ['--profile', profile_name]
 
     if profile_name:
