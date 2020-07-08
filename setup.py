@@ -31,6 +31,7 @@ setup(
     version=__version__,
     description='A tool for deploying ECS services at the Wellcome Collection',
     long_description=open(README).read(),
+    long_description_content_type='text/x-rst',
     url='https://github.com/wellcomecollection/weco-deploy',
     author='Wellcome Collection',
     author_email='wellcomedigitalplatform@wellcome.ac.uk',
