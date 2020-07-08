@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+0.14.0 - 2020-07-08
+-------------------
+
+Fix dockerfile
+
+-------------------
 0.13.0 - 2020-07-08
 -------------------
 
