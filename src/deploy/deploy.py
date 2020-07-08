@@ -47,5 +47,5 @@ def publish(project_id, service_id, account_id, region_id, namespace, label, rol
 
 
 def main():
-    cli.add_command(publish_service)
+    cli.add_command(publish)
     cli()
