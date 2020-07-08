@@ -11,7 +11,7 @@ def local_file(name):
 
 
 SOURCE = local_file('src')
-README = local_file('README.md')
+README = local_file('README.rst')
 
 long_description = open(README).read()
 
