@@ -6,6 +6,8 @@ LABEL description = "A Docker image for deploying our Docker images to AWS"
 RUN apk update && \
     apk add docker git
 
+RUN pip install awscli
+
 ADD . /weco-deploy
 RUN pip install -e /weco-deploy
 
