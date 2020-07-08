@@ -17,6 +17,9 @@ import os
 import subprocess
 import sys
 
+import hypothesistooling as tools
+
+
 ROOT = subprocess.check_output([
     "git", "rev-parse", "--show-toplevel"]).decode("utf8").strip()
 NAME = "weco-deploy"
@@ -48,7 +51,7 @@ if __name__ == '__main__':
     # Images get tagged with their Travis build number -- which should be
     # a monotonically increasing sequence, so we can easily see which image
     # is "newest".
-    build_number = os.getenv("TRAVIS_BUILD_NUMBER", "latest")
+    build_tag = tools.__version__
 
     results = {}
 
@@ -65,7 +68,7 @@ if __name__ == '__main__':
         except subprocess.CalledProcessError as err:
             sys.exit("Error trying to authenticate with Docker Hub: %r" % err)
 
-    image_name = "wellcome/%s:%s" % (NAME, build_number)
+    image_name = "wellcome/%s:%s" % (NAME, build_tag)
 
     try:
         subprocess.check_call(["docker", "build", "--tag", image_name, ROOT])
