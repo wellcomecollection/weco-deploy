@@ -28,77 +28,80 @@ import hypothesistooling as tools
 
 sys.path.append(os.path.dirname(__file__))  # noqa
 
+
 DIST = os.path.join(tools.ROOT, 'dist')
 
+
 PENDING_STATUS = ('started', 'created')
+
 
 if __name__ == '__main__':
     last_release = tools.latest_version()
 
-print('Current version: %s. Latest released version: %s' % (
-    tools.__version__, last_release
-))
+    print('Current version: %s. Latest released version: %s' % (
+        tools.__version__, last_release
+    ))
 
-HEAD = tools.hash_for_name('HEAD')
-MASTER = tools.hash_for_name('origin/master')
-print('Current head:', HEAD)
-print('Current master:', MASTER)
+    HEAD = tools.hash_for_name('HEAD')
+    MASTER = tools.hash_for_name('origin/master')
+    print('Current head:', HEAD)
+    print('Current master:', MASTER)
 
-on_master = tools.is_ancestor(HEAD, MASTER)
-has_release = tools.has_release()
+    on_master = tools.is_ancestor(HEAD, MASTER)
+    has_release = tools.has_release()
 
-if has_release:
-    print('Updating changelog and version')
-tools.update_for_pending_release()
+    if has_release:
+        print('Updating changelog and version')
+        tools.update_for_pending_release()
 
-print('Building an sdist...')
+    print('Building an sdist...')
 
-if os.path.exists(DIST):
-    shutil.rmtree(DIST)
+    if os.path.exists(DIST):
+        shutil.rmtree(DIST)
 
-subprocess.check_call([
-    sys.executable, 'setup.py', 'sdist', '--dist-dir', DIST,
-])
+    subprocess.check_call([
+        sys.executable, 'setup.py', 'sdist', '--dist-dir', DIST,
+    ])
 
-if not on_master:
-    print('Not deploying due to not being on master')
+    if not on_master:
+        print('Not deploying due to not being on master')
+        sys.exit(0)
+
+    if not has_release:
+        print('Not deploying due to no release')
+        sys.exit(0)
+
+    if os.environ.get('TRAVIS_SECURE_ENV_VARS', None) != 'true':
+        print("But we don't have the keys to do it")
+        sys.exit(1)
+
+    print('Decrypting secrets')
+
+    # We'd normally avoid the use of shell=True, but this is more or less
+    # intended as an opaque string that was given to us by Travis that happens
+    # to be a shell command that we run, and there are a number of good reasons
+    # this particular instance is harmless and would be high effort to
+    # convert (principally: Lack of programmatic generation of the string and
+    # extensive use of environment variables in it), so we're making an
+    # exception here.
+    subprocess.check_call(
+        'openssl aes-256-cbc -K $encrypted_12c8071d2874_key '
+        '-iv $encrypted_12c8071d2874_iv -in deploy_key.enc -out deploy_key -d',
+        shell=True
+    )
+    subprocess.check_call(['chmod', '400', 'deploy_key'])
+
+    print('Release seems good. Pushing to GitHub now.')
+
+    tools.create_tag_and_push()
+
+    print('Now uploading to pypi.')
+
+    subprocess.check_call([
+        sys.executable, '-m', 'twine', 'upload',
+        '--username', os.environ['PYPI_USERNAME'],
+        '--password', os.environ['PYPI_PASSWORD'],
+        os.path.join(DIST, '*'),
+    ])
+
     sys.exit(0)
-
-if not has_release:
-    print('Not deploying due to no release')
-    sys.exit(0)
-
-if os.environ.get('TRAVIS_SECURE_ENV_VARS', None) != 'true':
-    print("But we don't have the keys to do it")
-    sys.exit(1)
-
-print('Decrypting secrets')
-
-# We'd normally avoid the use of shell=True, but this is more or less
-# intended as an opaque string that was given to us by Travis that happens
-# to be a shell command that we run, and there are a number of good reasons
-# this particular instance is harmless and would be high effort to
-# convert (principally: Lack of programmatic generation of the string and
-# extensive use of environment variables in it), so we're making an
-# exception here.
-subprocess.check_call(
-    'openssl aes-256-cbc -K $encrypted_12c8071d2874_key '
-    '-iv $encrypted_12c8071d2874_iv -in deploy_key.enc -out deploy_key -d',
-    shell=True
-)
-subprocess.check_call(['chmod', '400', 'deploy_key'])
-
-print('Release seems good. Pushing to GitHub now.')
-
-tools.create_tag_and_push()
-
-print('Now uploading to pypi.')
-
-subprocess.check_call([
-    sys.executable, '-m', 'twine', 'upload',
-    '--username', os.environ['PYPI_USERNAME'],
-    '--password', os.environ['PYPI_PASSWORD'],
-    os.path.join(DIST, '*'),
-])
-
-sys.exit(0)
