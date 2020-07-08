@@ -13,11 +13,14 @@ def local_file(name):
 SOURCE = local_file('src')
 README = local_file('README.rst')
 
-long_description = open(README).read()
-
 # Assignment to placate pyflakes. The actual version is from the exec that
 # follows.
 __version__ = None
+
+with open(local_file('src/deploy/version.py')) as o:
+    exec(o.read())
+
+assert __version__ is not None
 
 install_requires = [
     'click >= 7.1.2',
@@ -27,7 +30,7 @@ setup(
     name='weco-deploy',
     version=__version__,
     description='A tool for deploying ECS services at the Wellcome Collection',
-    long_description=long_description,
+    long_description=open(README).read(),
     url='https://github.com/wellcomecollection/weco-deploy',
     author='Wellcome Collection',
     author_email='wellcomedigitalplatform@wellcome.ac.uk',
