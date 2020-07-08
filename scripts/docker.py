@@ -39,21 +39,8 @@ if __name__ == '__main__':
 
     if os.getenv("TRAVIS_EVENT_TYPE", "unset") == "push":
         task = "publish"
-    elif publish_in_dev != "unset":
-        task = "local_publish"
-
-        local_publish = dict.fromkeys(
-            publish_in_dev.split(","), 1
-        )
     else:
         task = "build"
-
-    # Images get tagged with their Travis build number -- which should be
-    # a monotonically increasing sequence, so we can easily see which image
-    # is "newest".
-    build_tag = tools.__version__
-
-    results = {}
 
     # Log in to Docker Hub.  Be careful about this subprocess call -- if it
     # errors, the default exception would print our password to stderr.
@@ -68,13 +55,12 @@ if __name__ == '__main__':
         except subprocess.CalledProcessError as err:
             sys.exit("Error trying to authenticate with Docker Hub: %r" % err)
 
-    image_name = "wellcome/%s:%s" % (NAME, build_tag)
-
     try:
-        subprocess.check_call(["docker", "build", "--tag", image_name, ROOT])
-        do_local_publish = task == "local_publish"
+        if task == "publish" and tools.has_release():
+            tools.git('fetch')
+            image_name = "wellcome/%s:%s" % (NAME, tools.latest_version())
 
-        if task == "publish" or do_local_publish:
+            subprocess.check_call(["docker", "build", "--tag", image_name, ROOT])
             subprocess.check_call(["docker", "push", image_name])
     except subprocess.CalledProcessError as err:
         print("ERROR: %r" % err)

@@ -44,7 +44,6 @@ def publish_image(account_id, namespace, service_id, label, region_id):
         cmd('docker', 'tag', tag_image_name, remote_tag_image_name)
 
     finally:
-        cmd('docker', 'rmi', remote_label_image_name)
         cmd('docker', 'rmi', remote_tag_image_name)
 
     return tag_image_name
