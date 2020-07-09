@@ -1,3 +1,3 @@
-RELEASE_TYPE: minor
+RELEASE_TYPE: major 
 
-Bump for release
+Incorporate release tooling commands
