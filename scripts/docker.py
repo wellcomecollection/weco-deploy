@@ -22,21 +22,11 @@ import hypothesistooling as tools
 
 ROOT = subprocess.check_output([
     "git", "rev-parse", "--show-toplevel"]).decode("utf8").strip()
+
 NAME = "weco-deploy"
 
 
-def print_banner(action, name):
-    """
-    Prints a coloured banner to stdout.
-    """
-    # The escape codes \033[92m and \033[0m are for printing in colour.
-    # See: https://stackoverflow.com/a/287944/1558022
-    print("\033[92m*** %s %s ***\033[0m" % ((action + ":").ljust(10), name))
-
-
 if __name__ == '__main__':
-    publish_in_dev = os.getenv("PUBLISH", "unset")
-
     if os.getenv("TRAVIS_EVENT_TYPE", "unset") == "push":
         task = "publish"
     else:
@@ -55,16 +45,28 @@ if __name__ == '__main__':
         except subprocess.CalledProcessError as err:
             sys.exit("Error trying to authenticate with Docker Hub: %r" % err)
 
+    image_name = "wellcome/%s:%s" % (NAME, tools.latest_version())
+
+    subprocess.check_call([
+        "docker", "build",
+        "--tag", image_name, ROOT
+    ])
+
+    if not tools.has_release():
+        print('Not deploying due to no release')
+        sys.exit(0)
+
     try:
-        if task == "publish" and tools.has_release():
+        if task == "publish":
             tools.git('fetch')
-            image_name = "wellcome/%s:%s" % (NAME, tools.latest_version())
 
             subprocess.check_call([
                 "docker", "build",
                 "--tag", image_name, ROOT
             ])
             subprocess.check_call(["docker", "push", image_name])
+        else:
+            print("Not publishing!")
     except subprocess.CalledProcessError as err:
         print("ERROR: %r" % err)
         sys.exit(1)
