@@ -45,6 +45,7 @@ if __name__ == '__main__':
         except subprocess.CalledProcessError as err:
             sys.exit("Error trying to authenticate with Docker Hub: %r" % err)
 
+    tools.git('fetch')
     image_name = "wellcome/%s:%s" % (NAME, tools.latest_version())
 
     subprocess.check_call([
@@ -58,8 +59,6 @@ if __name__ == '__main__':
 
     try:
         if task == "publish":
-            tools.git('fetch')
-
             subprocess.check_call([
                 "docker", "build",
                 "--tag", image_name, ROOT
