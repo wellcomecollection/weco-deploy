@@ -35,16 +35,17 @@ def publish_image(account_id, namespace, service_id, label, region_id):
     remote_tag_image_name = f"{base_remote_image_name}/{tag_image_name}"
 
     try:
-        print(f"*** Pushing {tag_image_name} to {remote_label_image_name}")
+        print(f"*** Pushing {label_image_name} to {remote_label_image_name}")
         cmd('docker', 'tag', label_image_name, remote_label_image_name)
         cmd('docker', 'push', remote_label_image_name)
 
         print(f"*** Pushing {tag_image_name} to {remote_tag_image_name}")
-        cmd('docker', 'push', remote_tag_image_name)
         cmd('docker', 'tag', tag_image_name, remote_tag_image_name)
+        cmd('docker', 'push', remote_tag_image_name)
 
     finally:
-        cmd('docker', 'rmi', remote_tag_image_name)
+        cmd('docker', 'rmi', label_image_name)
+        cmd('docker', 'rmi', tag_image_name)
 
     return tag_image_name
 
