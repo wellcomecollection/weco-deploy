@@ -22,15 +22,18 @@ jobs:
   - env: TOXENV=check_release_file
     name: check_release_file
   - env: TOXENV=py37
-    name: build_python_package
-  - stage: deploy
+    name: test
+  - stage: deploy_package
     env: TOXENV=deploy
     name: deploy_to_pypi
-  - env: TOXENV=docker_build
+  - stage: deploy_docker_image
+    env: TOXENV=docker_build
     name: docker_build
 stages:
 - test
-- name: deploy
+- name: deploy_package
+  if: type = push
+- name: deploy_docker_image
   if: type = push
 script:
 - tox
