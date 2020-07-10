@@ -1,26 +1,15 @@
-import boto3
+from .iam import Iam
 
 
 class SsmParameterStore:
     def __init__(self, project_id, role_arn=None):
         self.project_id = project_id
-
-        if role_arn:
-            client = boto3.client('sts')
-            response = client.assume_role(
-                RoleArn=role_arn,
-                RoleSessionName="ReleaseToolSsmParameterStore"
-            )
-
-            self.session = boto3.session.Session(
-                aws_access_key_id=response['Credentials']['AccessKeyId'],
-                aws_secret_access_key=response['Credentials']['SecretAccessKey'],
-                aws_session_token=response['Credentials']['SessionToken']
-            )
-        else:
-            self.session = boto3.session.Session()
-
+        self.session = Iam.get_session("ReleaseToolSsmParameterStore", role_arn)
         self.ssm = self.session.client('ssm')
+
+    @staticmethod
+    def _image_to_service_name(image):
+        return image.rsplit("/")[-1]
 
     def get_parameters_by_path(self, *args, **kwargs):
         paginator = self.ssm.get_paginator("get_parameters_by_path")
@@ -48,17 +37,14 @@ class SsmParameterStore:
                           for d in self.get_images(label)}
 
         return {
-            self._image_to_service_name(key): value for key, value in ssm_parameters.items()
+            SsmParameterStore._image_to_service_name(key): value for key, value in ssm_parameters.items()
         }
 
     def get_service_to_image(self, label, service):
         image_path = self.create_ssm_key(label, service)
         parameter = self.ssm.get_parameter(Name=image_path)
 
-        return {self._image_to_service_name(parameter["Parameter"]["Name"]): parameter["Parameter"]["Value"]}
-
-    def _image_to_service_name(self, image):
-        return image.rsplit("/")[-1]
+        return {SsmParameterStore._image_to_service_name(parameter["Parameter"]["Name"]): parameter["Parameter"]["Value"]}
 
     def put_services_to_images(self, label, services_to_images):
         for service, image in services_to_images.items():
@@ -76,10 +62,16 @@ class SsmParameterStore:
         ssm_key = "/".join(ssm_key_parts)
         return ssm_key
 
+    def update_ssm(self, service_id, label, remote_image_name, dry_run):
+        ssm_path = f"/{self.project_id}/images/{label}/{service_id}"
 
-def parse_ssm_key(ssm_key):
-    _, project_id, images_token, label, service = ssm_key.split("/")
-    if images_token != 'images':
-        raise ValueError(
-            f"'images' token expected in 2nd position in {ssm_key}")
-    return project_id, label, service
+        print(f"*** Updating SSM path {ssm_path} to {remote_image_name}")
+
+        if not dry_run:
+            self.ssm.put_parameter(
+                Name=f"/{self.project_id}/images/{label}/{service_id}",
+                Description=f"Docker image URL; auto-managed by {__file__}",
+                Value=remote_image_name,
+                Type="String",
+                Overwrite=True
+            )

@@ -1,5 +1,3 @@
-# -*- encoding: utf-8
-
 
 def pprint_nested_tree(tree, indent=0):
     lines = []

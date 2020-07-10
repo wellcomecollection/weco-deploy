@@ -1,31 +1,16 @@
-import boto3
 from botocore.exceptions import ClientError
 from boto3.dynamodb.conditions import Key
+
+from .iam import Iam
 
 
 class DynamoDbReleaseStore:
     def __init__(self, project_id, role_arn=None):
         self.project_id = project_id
         self.table_name = f"wellcome-releases-{project_id}"
-
-        if role_arn:
-            client = boto3.client('sts')
-
-            response = client.assume_role(
-                RoleArn=role_arn,
-                RoleSessionName="ReleaseToolDynamoDbReleaseStore"
-            )
-
-            self.session = boto3.session.Session(
-                aws_access_key_id=response['Credentials']['AccessKeyId'],
-                aws_secret_access_key=response['Credentials']['SecretAccessKey'],
-                aws_session_token=response['Credentials']['SessionToken']
-            )
-        else:
-            self.session = boto3.session.Session()
-
-        self.dynamodb = self.session.resource("dynamodb")
-        self.table = self.dynamodb.Table(self.table_name)
+        self.session = Iam.get_session("ReleaseToolDynamoDbReleaseStore", role_arn)
+        self.dynamo_db = self.session.resource("dynamodb")
+        self.table = self.dynamo_db.Table(self.table_name)
 
     def describe_initialisation(self):
         return f"Create DynamoDb table {self.table_name}"
@@ -99,7 +84,7 @@ class DynamoDbReleaseStore:
         )
 
     def _create_table(self):
-        self.dynamodb.create_table(
+        self.dynamo_db.create_table(
             TableName=self.table_name,
             KeySchema=[
                 {

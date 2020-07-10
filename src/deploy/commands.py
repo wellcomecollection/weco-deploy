@@ -5,6 +5,8 @@ import shlex
 import subprocess
 import sys
 
+import boto3
+
 
 def cmd(*args):
     return subprocess.check_output(list(args)).decode("utf8").strip()
