@@ -44,7 +44,9 @@ class SsmParameterStore:
         image_path = self.create_ssm_key(label, service)
         parameter = self.ssm.get_parameter(Name=image_path)
 
-        return {SsmParameterStore._image_to_service_name(parameter["Parameter"]["Name"]): parameter["Parameter"]["Value"]}
+        return {
+            SsmParameterStore._image_to_service_name(parameter["Parameter"]["Name"]): parameter["Parameter"]["Value"]
+        }
 
     def put_services_to_images(self, label, services_to_images):
         for service, image in services_to_images.items():
