@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+2.0.0 - 2020-07-10
+------------------
+
+Clean up a bit, simplify piublish command and fix a bug where full repo was not written to SSM.
+
+------------------
 1.0.0 - 2020-07-10
 ------------------
 
