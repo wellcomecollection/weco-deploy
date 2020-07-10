@@ -4,6 +4,12 @@ Changelog
 
 This is a record of all releases of weco-deploy.
 
+------------------
+1.0.0 - 2020-07-10
+------------------
+
+Incorporate release tooling commands
+
 -------------------
 0.19.0 - 2020-07-09
 -------------------
