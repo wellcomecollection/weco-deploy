@@ -48,32 +48,26 @@ class SsmParameterStore:
             SsmParameterStore._image_to_service_name(parameter["Parameter"]["Name"]): parameter["Parameter"]["Value"]
         }
 
-    def put_services_to_images(self, label, services_to_images):
-        for service, image in services_to_images.items():
-            ssm_key = self.create_ssm_key(label, service)
-            self.ssm.put_parameter(
-                Name=ssm_key, Value=image, Type='String', Overwrite=True)
-
-    def create_ssm_key(self, label=None, service=None):
+    def create_ssm_key(self, label=None, service_id=None):
         # https://github.com/wellcomecollection/platform/tree/master/docs/rfcs/013-release_deployment_tracking#build-artefacts-ssm-parameters
         # Keys are referenced with the following paths:
         #   /{project_id}/images/{label}/{service_id}
         ssm_key_parts = filter(
             lambda part: part is not None,
-            ['', self.project_id, 'images', label, service])
+            ['', self.project_id, 'images', label, service_id])
         ssm_key = "/".join(ssm_key_parts)
         return ssm_key
 
-    def update_ssm(self, service_id, label, remote_image_name, dry_run):
-        ssm_path = f"/{self.project_id}/images/{label}/{service_id}"
-
-        print(f"*** Updating SSM path {ssm_path} to {remote_image_name}")
+    def update_ssm(self, service_id, label, image_name, dry_run=False):
+        ssm_path = self.create_ssm_key(label, service_id)
 
         if not dry_run:
             self.ssm.put_parameter(
-                Name=f"/{self.project_id}/images/{label}/{service_id}",
+                Name=ssm_path,
                 Description=f"Docker image URL; auto-managed by {__file__}",
-                Value=remote_image_name,
+                Value=image_name,
                 Type="String",
                 Overwrite=True
             )
+
+        return ssm_path

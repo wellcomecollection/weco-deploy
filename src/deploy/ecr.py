@@ -1,12 +1,15 @@
 import os
 
+from botocore.exceptions import ClientError
+
 from .iam import Iam
 from .commands import cmd, ensure
 
 
 class Ecr:
-    def __init__(self, account_id, role_arn=None):
+    def __init__(self, account_id, region_id, role_arn=None):
         self.account_id = account_id
+        self.region_id = region_id
         self.session = Iam.get_session("ReleaseToolEcr", role_arn)
         self.ecr = self.session.client('ecr')
 
@@ -19,7 +22,7 @@ class Ecr:
 
         return open(release_file).read().strip()
 
-    def publish_image(self, namespace, service_id, label, region_id, dry_run=False):
+    def publish_image(self, namespace, service_id, label, dry_run=False):
         # some terminology as label & tag are confusing
         # - label is a given label relating to deployment e.g. latest, prod, stage
         # - image_tag is usually the git ref, denoting a particular build artifact
@@ -30,7 +33,7 @@ class Ecr:
         tag_image_name = f"{service_id}:{image_tag}"
 
         base_remote_image_name = (
-            f"{self.account_id}.dkr.ecr.{region_id}.amazonaws.com/{namespace}"
+            f"{self.account_id}.dkr.ecr.{self.region_id}.amazonaws.com/{namespace}"
         )
 
         remote_label_image_name = f"{base_remote_image_name}/{label_image_name}"
@@ -52,9 +55,39 @@ class Ecr:
 
         return remote_tag_image_name
 
-    def login(self, profile_name=None):
-        print(f"*** Authenticating {self.account_id} for `docker push` with ECR")
+    def retag_image(self, namespace, service_id, tag, new_tag, dry_run=False):
+        repository_name = f"{namespace}/{service_id}"
 
+        result = self.ecr.batch_get_image(
+            registryId=self.account_id,
+            repositoryName=repository_name,
+            imageIds=[
+                {"imageTag": tag}
+            ]
+        )
+
+        if len(result["images"]) == 0:
+            raise RuntimeError(f"No matching images found for {repository_name}:{tag}!")
+
+        if len(result["images"]) > 1:
+            raise RuntimeError(f"Multiple matching images found for {repository_name}:{tag}!")
+
+        image = result["images"][0]
+
+        if not dry_run:
+            try:
+                self.ecr.put_image(
+                    registryId=self.account_id,
+                    repositoryName=repository_name,
+                    imageTag=new_tag,
+                    imageManifest=image['imageManifest']
+                )
+            except ClientError as e:
+                # Matching tag & digest already exists (nothing to do)
+                if not e.response['Error']['Code'] == 'ImageAlreadyExistsException':
+                    raise e
+
+    def login(self, profile_name=None):
         base = ['aws', 'ecr', 'get-login']
         login_options = ['--no-include-email', '--registry-ids', self.account_id]
         profile_options = ['--profile', profile_name]

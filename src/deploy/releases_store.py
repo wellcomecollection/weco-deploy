@@ -60,28 +60,32 @@ class DynamoDbReleaseStore:
                                  Limit=limit)
         return items['Items']
 
-    def add_deployment(self, release_id, deployment):
-        self.table.update_item(
-            Key={
-                'release_id': release_id
-            },
-            UpdateExpression="SET #deployments = list_append(#deployments, :d)",
-            ExpressionAttributeNames={
-                '#deployments': 'deployments',
-            },
-            ExpressionAttributeValues={
-                ':d': [deployment],
-            }
-        )
-        self.table.update_item(
-            Key={
-                'release_id': release_id
-            },
-            UpdateExpression="SET last_date_deployed = :d",
-            ExpressionAttributeValues={
-                ':d': deployment['date_created'],
-            }
-        )
+    def add_deployment(self, release_id, deployment, dry_run=False):
+        if not dry_run:
+            self.table.update_item(
+                Key={
+                    'release_id': release_id
+                },
+                UpdateExpression="SET #deployments = list_append(#deployments, :d)",
+                ExpressionAttributeNames={
+                    '#deployments': 'deployments',
+                },
+                ExpressionAttributeValues={
+                    ':d': [deployment],
+                }
+            )
+
+            self.table.update_item(
+                Key={
+                    'release_id': release_id
+                },
+                UpdateExpression="SET last_date_deployed = :d",
+                ExpressionAttributeValues={
+                    ':d': deployment['date_created'],
+                }
+            )
+
+        return release_id
 
     def _create_table(self):
         self.dynamo_db.create_table(
