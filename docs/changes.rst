@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+3.0.0 - 2020-07-13
+------------------
+
+Adds tagging ECR images wiht enviroment
+
+------------------
 2.0.0 - 2020-07-10
 ------------------
 
