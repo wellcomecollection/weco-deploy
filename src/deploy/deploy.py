@@ -157,31 +157,44 @@ def publish(ctx, service_id, namespace, label):
     ecr = Ecr(account_id, region_id, role_arn)
     parameter_store = SsmParameterStore(project['id'], role_arn)
 
-    print(f"*** Attempting to publish {project['id']}/{service_id}")
+    click.echo(click.style(f"Attempting to publish {project['id']}/{service_id}", fg="blue"))
 
     profile_name = None
     if role_arn:
         profile_name = 'service_publisher'
         configure_aws_profile(role_arn, profile_name)
 
-    print(f"*** Authenticating {account_id} for `docker push` with ECR")
+    click.echo(click.style(f"Authenticating {account_id} for `docker push` with ECR", fg="yellow"))
+
     ecr.login(profile_name)
 
-    remote_image_name = ecr.publish_image(
+    remote_image_name, image_tag = ecr.publish_image(
         namespace,
         service_id,
-        label,
         dry_run
     )
 
-    parameter_store.update_ssm(
+    click.echo(click.style(f"Published Image {image_tag} to {remote_image_name}", fg="yellow"))
+
+    ecr.retag_image(
+        namespace,
+        service_id,
+        image_tag,
+        label
+    )
+
+    click.echo(click.style(f"Tagged {remote_image_name} to {remote_image_name}", fg="yellow"))
+
+    ssm_path = parameter_store.update_ssm(
         service_id,
         label,
         remote_image_name,
         dry_run
     )
 
-    print(f"*** Done publishing {project['id']}/{service_id}")
+    click.echo(click.style(f"Updated SSM path {ssm_path} to {remote_image_name}", fg="yellow"))
+
+    click.echo(click.style(f"Done publishing {project['id']}/{service_id}", fg="green"))
 
 
 @cli.command()
@@ -233,16 +246,16 @@ def initialise(ctx, project_name, environment_id, environment_name):
 @click.option('--release-id', prompt="Release ID to deploy", default="latest", show_default=True,
               help="The ID of the release to be deployed, or the latest release if unspecified")
 @click.option('--environment-id', prompt="Environment ID to deploy release to",
+              default="stage", show_default=True,
               help="The target environment of this deployment")
-@click.option("--namespace", required=True, default=DEFAULT_ECR_NAMESPACE)
+@click.option("--namespace", default=DEFAULT_ECR_NAMESPACE, show_default=True)
 @click.option('--description', prompt="Enter a description for this deployment",
-              help="A description of this deployment", default="No description given.")
+              help="A description of this deployment", default="No description provided")
 @click.pass_context
 def deploy(ctx, release_id, environment_id, namespace, description):
     project = ctx.obj['project']
     role_arn = ctx.obj['role_arn']
     dry_run = ctx.obj['dry_run']
-    verbose = ctx.obj['verbose']
 
     releases_store = DynamoDbReleaseStore(project['id'], role_arn)
     parameter_store = SsmParameterStore(project['id'], role_arn)
@@ -265,17 +278,24 @@ def deploy(ctx, release_id, environment_id, namespace, description):
     else:
         release = releases_store.get_release(release_id)
 
-    click.echo(click.style("Release to deploy:", fg="blue"))
-    click.echo(click.style(f"Release ID: {release['release_id']}", fg="green"))
+    click.echo("")
+    click.echo(click.style(f"Deploying release {release['release_id']}", fg="blue"))
     click.echo(click.style(f"Requested by: {release['requested_by']}", fg="yellow"))
     click.echo(click.style(f"Date created: {release['date_created']}", fg="yellow"))
-    click.echo(pprint(release['images']))
-    click.confirm(click.style("create deployment?", fg="green", bold=True), abort=True)
+
+    click.echo("")
+    for service, image in release['images'].items():
+        click.echo(click.style(f"{service}: {image}", fg="bright_yellow"))
+
+    click.echo("")
+    click.confirm(click.style("Create deployment?", fg="green", bold=True), abort=True)
 
     caller_identity = user_details.caller_identity(underlying=True)
     deployment = create_deployment(environment, caller_identity['arn'], description)
 
-    click.echo(click.style("Created deployment:", fg="blue"))
+    click.echo("")
+    click.echo(click.style("Created deployment.", fg="green"))
+    click.echo("")
     click.echo(click.style(f"Requested by: {deployment['requested_by']}", fg="yellow"))
     click.echo(click.style(f"Date created: {deployment['date_created']}", fg="yellow"))
 
@@ -293,8 +313,8 @@ def deploy(ctx, release_id, environment_id, namespace, description):
             dry_run=dry_run
         )
 
-        if verbose:
-            click.echo(f"*** Updated SSM path {ssm_path} to {image_name}")
+        click.echo("")
+        click.echo(click.style(f"*** {service_id}: Updated SSM path {ssm_path} to {image_name}", fg="yellow"))
 
         old_tag = image_name.split(":")[-1]
         new_tag = environment_id
@@ -307,11 +327,14 @@ def deploy(ctx, release_id, environment_id, namespace, description):
             dry_run=dry_run
         )
 
-        if verbose:
-            click.echo(f"*** Retagged image {service_id}:{old_tag} to {service_id}:{new_tag} ")
+        click.echo(click.style(f"*** {service_id}: Retagged image {service_id}:{old_tag} to {service_id}:{new_tag}", fg="yellow"))
+        click.echo("")
 
     if dry_run:
         click.echo("dry-run, not created.")
+
+    click.echo(click.style(f"Deployed {service_id} to {new_tag}", fg="green"))
+
 
 
 @cli.command()
@@ -319,7 +342,7 @@ def deploy(ctx, release_id, environment_id, namespace, description):
               help="The existing label upon which this release will be based", default="latest", show_default=True)
 @click.option('--service-id', prompt="Service to update", default="all", show_default=True,
               help="The service to update with a (prompted for) new image")
-@click.option('--release-description', prompt="Description for this release", default="No description given.")
+@click.option('--release-description', prompt="Description for this release", default="No description provided")
 @click.pass_context
 def prepare(ctx, from_label, service_id, release_description):
     project = ctx.obj['project']
@@ -354,11 +377,22 @@ def prepare(ctx, from_label, service_id, release_description):
         release_description,
         release_images)
 
+    click.echo("")
     if service_id == "all":
-        click.echo(f"Prepared release from images in {from_label}")
+        click.echo(click.style(f"Prepared release from images in {from_label}", fg="blue"))
     else:
-        click.echo(f"Prepared release from images in {from_label} with {service_id} from {service_source}")
-    click.echo(pprint(release))
+        click.echo(click.style(f"Prepared release from images in {from_label} with {service_id} from {service_source}", fg="blue"))
+
+    click.echo(click.style(f"Requested by: {release['requested_by']}", fg="yellow"))
+    click.echo(click.style(f"Date created: {release['date_created']}", fg="yellow"))
+    click.echo("")
+
+    for service, image in release['images'].items():
+        click.echo(click.style(f"{service}: {image}", fg="bright_yellow"))
+
+    click.echo("")
+
+    click.echo(click.style(f"Created release {release['release_id']}", fg="green"))
 
     if not dry_run:
         releases_store.put_release(release)

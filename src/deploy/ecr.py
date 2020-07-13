@@ -13,6 +13,10 @@ class Ecr:
         self.session = Iam.get_session("ReleaseToolEcr", role_arn)
         self.ecr = self.session.client('ecr')
 
+        self.ecr_base_uri = (
+            f"{self.account_id}.dkr.ecr.{self.region_id}.amazonaws.com"
+        )
+
     @staticmethod
     def _get_release_image_tag(service_id):
         repo_root = cmd("git", "rev-parse", "--show-toplevel")
@@ -22,41 +26,29 @@ class Ecr:
 
         return open(release_file).read().strip()
 
-    def publish_image(self, namespace, service_id, label, dry_run=False):
-        # some terminology as label & tag are confusing
-        # - label is a given label relating to deployment e.g. latest, prod, stage
-        # - image_tag is usually the git ref, denoting a particular build artifact
+    @staticmethod
+    def _get_repository_name(namespace, service_id):
+        return f"{namespace}/{service_id}"
 
+    def publish_image(self, namespace, service_id, dry_run=False):
         image_tag = Ecr._get_release_image_tag(service_id)
+        repository_name = Ecr._get_repository_name(namespace, service_id)
 
-        label_image_name = f"{service_id}:{label}"
-        tag_image_name = f"{service_id}:{image_tag}"
-
-        base_remote_image_name = (
-            f"{self.account_id}.dkr.ecr.{self.region_id}.amazonaws.com/{namespace}"
-        )
-
-        remote_label_image_name = f"{base_remote_image_name}/{label_image_name}"
-        remote_tag_image_name = f"{base_remote_image_name}/{tag_image_name}"
+        local_image_name = f"{service_id}:{image_tag}"
+        remote_image_name = f"{self.ecr_base_uri}/{repository_name}:{image_tag}"
 
         if not dry_run:
             try:
-                print(f"*** Pushing {label_image_name} to {remote_label_image_name}")
-                cmd('docker', 'tag', label_image_name, remote_label_image_name)
-                cmd('docker', 'push', remote_label_image_name)
-
-                print(f"*** Pushing {tag_image_name} to {remote_tag_image_name}")
-                cmd('docker', 'tag', tag_image_name, remote_tag_image_name)
-                cmd('docker', 'push', remote_tag_image_name)
+                cmd('docker', 'tag', local_image_name, remote_image_name)
+                cmd('docker', 'push', remote_image_name)
 
             finally:
-                cmd('docker', 'rmi', label_image_name)
-                cmd('docker', 'rmi', tag_image_name)
+                cmd('docker', 'rmi', remote_image_name)
 
-        return remote_tag_image_name
+        return remote_image_name, image_tag
 
     def retag_image(self, namespace, service_id, tag, new_tag, dry_run=False):
-        repository_name = f"{namespace}/{service_id}"
+        repository_name = Ecr._get_repository_name(namespace, service_id)
 
         result = self.ecr.batch_get_image(
             registryId=self.account_id,
@@ -76,7 +68,7 @@ class Ecr:
 
         if not dry_run:
             try:
-                self.ecr.put_image(
+                result = self.ecr.put_image(
                     registryId=self.account_id,
                     repositoryName=repository_name,
                     imageTag=new_tag,
