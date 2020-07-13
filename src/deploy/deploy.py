@@ -154,7 +154,7 @@ def publish(ctx, service_id, namespace, label):
     account_id = project['account_id']
     region_id = project['aws_region_name']
 
-    ecr = Ecr(account_id, role_arn)
+    ecr = Ecr(account_id, region_id, role_arn)
     parameter_store = SsmParameterStore(project['id'], role_arn)
 
     print(f"*** Attempting to publish {project['id']}/{service_id}")
@@ -164,13 +164,13 @@ def publish(ctx, service_id, namespace, label):
         profile_name = 'service_publisher'
         configure_aws_profile(role_arn, profile_name)
 
+    print(f"*** Authenticating {account_id} for `docker push` with ECR")
     ecr.login(profile_name)
 
     remote_image_name = ecr.publish_image(
         namespace,
         service_id,
         label,
-        region_id,
         dry_run
     )
 
@@ -185,24 +185,24 @@ def publish(ctx, service_id, namespace, label):
 
 
 @cli.command()
-@click.option('--project-id', '-i', prompt="Enter an id for this project", help="The project ID")
 @click.option('--project-name', '-n', prompt="Enter a descriptive name for this project",
               help="The name of the project")
 @click.option('--environment-id', '-e', prompt="Enter an id for an environment", help="The primary environment's ID")
 @click.option('--environment-name', '-a', prompt="Enter a descriptive name for this environment",
               help="The primary environment's name")
 @click.pass_context
-def initialise(ctx, project_id, project_name, environment_id, environment_name):
+def initialise(ctx, project_name, environment_id, environment_name):
     role_arn = ctx.obj['role_arn']
     verbose = ctx.obj['verbose']
     dry_run = ctx.obj['dry_run']
+    project = ctx.obj['project']
 
     project_filepath = ctx.obj['project_filepath']
 
-    releases_store = DynamoDbReleaseStore(project_id, role_arn)
+    releases_store = DynamoDbReleaseStore(project["id"], role_arn)
 
     project = {
-        'id': project_id,
+        'id': project["id"],
         'name': project_name,
         'role_arn': role_arn,
         'environments': [
@@ -234,16 +234,23 @@ def initialise(ctx, project_id, project_name, environment_id, environment_name):
               help="The ID of the release to be deployed, or the latest release if unspecified")
 @click.option('--environment-id', prompt="Environment ID to deploy release to",
               help="The target environment of this deployment")
+@click.option("--namespace", required=True, default=DEFAULT_ECR_NAMESPACE)
 @click.option('--description', prompt="Enter a description for this deployment",
               help="A description of this deployment", default="No description given.")
 @click.pass_context
-def deploy(ctx, release_id, environment_id, description):
+def deploy(ctx, release_id, environment_id, namespace, description):
     project = ctx.obj['project']
     role_arn = ctx.obj['role_arn']
     dry_run = ctx.obj['dry_run']
+    verbose = ctx.obj['verbose']
 
     releases_store = DynamoDbReleaseStore(project['id'], role_arn)
     parameter_store = SsmParameterStore(project['id'], role_arn)
+    account_id = project['account_id']
+    region_id = project['aws_region_name']
+
+    ecr = Ecr(account_id, region_id, role_arn)
+
     user_details = Iam(role_arn)
 
     environments = get_environments_lookup(project)
@@ -259,21 +266,52 @@ def deploy(ctx, release_id, environment_id, description):
         release = releases_store.get_release(release_id)
 
     click.echo(click.style("Release to deploy:", fg="blue"))
-    click.echo(pprint(release))
+    click.echo(click.style(f"Release ID: {release['release_id']}", fg="green"))
+    click.echo(click.style(f"Requested by: {release['requested_by']}", fg="yellow"))
+    click.echo(click.style(f"Date created: {release['date_created']}", fg="yellow"))
+    click.echo(pprint(release['images']))
     click.confirm(click.style("create deployment?", fg="green", bold=True), abort=True)
 
     caller_identity = user_details.caller_identity(underlying=True)
     deployment = create_deployment(environment, caller_identity['arn'], description)
 
     click.echo(click.style("Created deployment:", fg="blue"))
-    click.echo(pprint(deployment))
+    click.echo(click.style(f"Requested by: {deployment['requested_by']}", fg="yellow"))
+    click.echo(click.style(f"Date created: {deployment['date_created']}", fg="yellow"))
 
-    if not dry_run:
-        releases_store.add_deployment(release['release_id'], deployment)
-        parameter_store.put_services_to_images(environment_id, release['images'])
-    else:
+    releases_store.add_deployment(
+        release_id=release['release_id'],
+        deployment=deployment,
+        dry_run=dry_run
+    )
+
+    for service_id, image_name in release['images'].items():
+        ssm_path = parameter_store.update_ssm(
+            service_id=service_id,
+            label=environment_id,
+            image_name=image_name,
+            dry_run=dry_run
+        )
+
+        if verbose:
+            click.echo(f"*** Updated SSM path {ssm_path} to {image_name}")
+
+        old_tag = image_name.split(":")[-1]
+        new_tag = environment_id
+
+        ecr.retag_image(
+            namespace=namespace,
+            service_id=service_id,
+            tag=old_tag,
+            new_tag=new_tag,
+            dry_run=dry_run
+        )
+
+        if verbose:
+            click.echo(f"*** Retagged image {service_id}:{old_tag} to {service_id}:{new_tag} ")
+
+    if dry_run:
         click.echo("dry-run, not created.")
-        return
 
 
 @cli.command()
