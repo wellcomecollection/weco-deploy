@@ -99,28 +99,15 @@ def cli(ctx, project_file, verbose, project_id, region_id, account_id, role_arn,
     project = projects.get(project_id)
     project['id'] = project_id
 
-    if verbose and project:
-        click.echo(f"Loaded {project_file} {project}")
-
     if role_arn:
         project['role_arn'] = role_arn
-        if verbose:
-            click.echo(f"Using role_arn {project['role_arn']}")
 
     if region_id:
         project['aws_region_name'] = region_id
-        if verbose:
-            click.echo(f"Using aws_region_name {project['aws_region_name']}")
 
     user_details = Iam(role_arn)
     caller_identity = user_details.caller_identity()
     underlying_caller_identity = user_details.caller_identity(underlying=True)
-
-    if verbose:
-        click.echo(f"Running as role {caller_identity['arn']}")
-        if caller_identity['arn'] != underlying_caller_identity['arn']:
-            click.echo(f"Underlying role {underlying_caller_identity['arn']}")
-        click.echo("")
 
     if account_id:
         project['account_id'] = account_id
@@ -128,7 +115,17 @@ def cli(ctx, project_file, verbose, project_id, region_id, account_id, role_arn,
         project['account_id'] = caller_identity['account_id']
 
     if verbose:
-        click.echo(f"Using account_id {project['account_id']}")
+        click.echo(click.style(f"Loaded {project_file}:", fg="cyan"))
+        pprint(project)
+        click.echo("")
+        click.echo(click.style(f"Using role_arn:         {project['role_arn']}", fg="cyan"))
+        click.echo(click.style(f"Using aws_region_name:  {project['aws_region_name']}", fg="cyan"))
+        click.echo(click.style(f"Running as role:        {caller_identity['arn']}", fg="cyan"))
+        if caller_identity['arn'] != underlying_caller_identity['arn']:
+            click.echo(click.style(f"Underlying role:        {underlying_caller_identity['arn']}", fg="cyan"))
+
+        click.echo(click.style(f"Using account_id:       {project['account_id']}", fg="cyan"))
+        click.echo("")
 
     ctx.obj = {
         'project_filepath': project_file,
@@ -168,18 +165,18 @@ def publish(ctx, service_id, namespace, label):
 
     ecr.login(profile_name)
 
-    remote_image_name, image_tag = ecr.publish_image(
+    remote_image_name, remote_image_tag, local_image_tag = ecr.publish_image(
         namespace,
         service_id,
         dry_run
     )
 
-    click.echo(click.style(f"Published Image {image_tag} to {remote_image_name}", fg="yellow"))
+    click.echo(click.style(f"Published Image {local_image_tag} to {remote_image_name}", fg="yellow"))
 
     ecr.retag_image(
         namespace,
         service_id,
-        image_tag,
+        remote_image_tag,
         label
     )
 
@@ -317,7 +314,7 @@ def deploy(ctx, release_id, environment_id, namespace, description):
         click.echo(click.style(f"*** {service_id}: Updated SSM path {ssm_path} to {image_name}", fg="yellow"))
 
         old_tag = image_name.split(":")[-1]
-        new_tag = environment_id
+        new_tag = f"env.{environment_id}"
 
         ecr.retag_image(
             namespace=namespace,
@@ -327,14 +324,15 @@ def deploy(ctx, release_id, environment_id, namespace, description):
             dry_run=dry_run
         )
 
-        click.echo(click.style(f"*** {service_id}: Retagged image {service_id}:{old_tag} to {service_id}:{new_tag}", fg="yellow"))
+        click.echo(click.style(
+            f"*** {service_id}: Retagged image {service_id}:{old_tag} to {service_id}:{new_tag}", fg="yellow")
+        )
         click.echo("")
 
     if dry_run:
         click.echo("dry-run, not created.")
 
     click.echo(click.style(f"Deployed {service_id} to {new_tag}", fg="green"))
-
 
 
 @cli.command()
@@ -346,14 +344,30 @@ def deploy(ctx, release_id, environment_id, namespace, description):
 @click.pass_context
 def prepare(ctx, from_label, service_id, release_description):
     project = ctx.obj['project']
+    account_id = project['account_id']
+    region_id = project['aws_region_name']
     role_arn = ctx.obj['role_arn']
     dry_run = ctx.obj['dry_run']
 
+    ecr = Ecr(account_id, region_id, role_arn)
     releases_store = DynamoDbReleaseStore(project['id'], role_arn)
     parameter_store = SsmParameterStore(project['id'], role_arn)
     user_details = Iam(role_arn)
 
-    from_images = parameter_store.get_services_to_images(from_label)
+    image_repositories = project.get('image_repositories')
+
+    from_images = {}
+    if image_repositories:
+        for image in image_repositories:
+            service_id = image['id']
+            account_id = image.get('account_id', account_id)
+            namespace = image.get('namespace', DEFAULT_ECR_NAMESPACE)
+
+            image_details = ecr.describe_image(namespace, service_id, from_label, account_id)
+            from_images[image_details['service_id']] = image_details['ref']
+    else:
+        from_images = parameter_store.get_services_to_images(from_label)
+
     service_source = "latest"
     if service_id == "all":
         release_image = {}
@@ -362,7 +376,12 @@ def prepare(ctx, from_label, service_id, release_description):
         if _is_url(service_source):
             release_image = {service_id: service_source}
         else:
-            release_image = parameter_store.get_service_to_image(service_source, service_id)
+            if image_repositories:
+                image_details = ecr.describe_image(namespace, service_id, service_source, account_id)
+                release_image = {image_details['service_id']: image_details['ref']}
+            else:
+                release_image = parameter_store.get_service_to_image(service_source, service_id)
+
     release_images = {**from_images, **release_image}
 
     if not release_images:
@@ -379,9 +398,13 @@ def prepare(ctx, from_label, service_id, release_description):
 
     click.echo("")
     if service_id == "all":
-        click.echo(click.style(f"Prepared release from images in {from_label}", fg="blue"))
+        click.echo(click.style(
+            f"Prepared release from images in {from_label}", fg="blue")
+        )
     else:
-        click.echo(click.style(f"Prepared release from images in {from_label} with {service_id} from {service_source}", fg="blue"))
+        click.echo(click.style(
+            f"Prepared release from images in {from_label} with {service_id} from {service_source}", fg="blue")
+        )
 
     click.echo(click.style(f"Requested by: {release['requested_by']}", fg="yellow"))
     click.echo(click.style(f"Date created: {release['date_created']}", fg="yellow"))
