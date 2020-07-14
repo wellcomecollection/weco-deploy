@@ -74,7 +74,12 @@ class Ecr:
         ref_tags = [image for image in image_details['imageTags'] if image.startswith("ref.")]
         env_tags = [image for image in image_details['imageTags'] if image.startswith("env.")]
 
-        envs = {env_tag.split('.')[-1]: self._get_full_repository_uri(namespace, service_id, env_tag) for env_tag in env_tags}
+        envs = {env_tag.split('.')[-1]: self._get_full_repository_uri(
+            namespace,
+            service_id,
+            env_tag
+        ) for env_tag in env_tags}
+
         refs = [self._get_full_repository_uri(namespace, service_id, ref_tag) for ref_tag in ref_tags]
 
         # It is possible multiple ref tags can occur if images are published at new git refs with

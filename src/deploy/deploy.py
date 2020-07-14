@@ -324,14 +324,15 @@ def deploy(ctx, release_id, environment_id, namespace, description):
             dry_run=dry_run
         )
 
-        click.echo(click.style(f"*** {service_id}: Retagged image {service_id}:{old_tag} to {service_id}:{new_tag}", fg="yellow"))
+        click.echo(click.style(
+            f"*** {service_id}: Retagged image {service_id}:{old_tag} to {service_id}:{new_tag}", fg="yellow")
+        )
         click.echo("")
 
     if dry_run:
         click.echo("dry-run, not created.")
 
     click.echo(click.style(f"Deployed {service_id} to {new_tag}", fg="green"))
-
 
 
 @cli.command()
@@ -397,9 +398,13 @@ def prepare(ctx, from_label, service_id, release_description):
 
     click.echo("")
     if service_id == "all":
-        click.echo(click.style(f"Prepared release from images in {from_label}", fg="blue"))
+        click.echo(click.style(
+            f"Prepared release from images in {from_label}", fg="blue")
+        )
     else:
-        click.echo(click.style(f"Prepared release from images in {from_label} with {service_id} from {service_source}", fg="blue"))
+        click.echo(click.style(
+            f"Prepared release from images in {from_label} with {service_id} from {service_source}", fg="blue")
+        )
 
     click.echo(click.style(f"Requested by: {release['requested_by']}", fg="yellow"))
     click.echo(click.style(f"Date created: {release['date_created']}", fg="yellow"))
