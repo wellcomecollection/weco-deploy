@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+3.1.0 - 2020-07-14
+------------------
+
+If provided images described in .wellcome-project will be used instead of referring to SSM.
+
+------------------
 3.0.0 - 2020-07-13
 ------------------
 
