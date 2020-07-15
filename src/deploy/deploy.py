@@ -249,8 +249,9 @@ def initialise(ctx, project_name, environment_id, environment_name):
 @click.option("--namespace", default=DEFAULT_ECR_NAMESPACE, show_default=True)
 @click.option('--description', prompt="Enter a description for this deployment",
               help="A description of this deployment", default="No description provided")
+@click.option('--confirm', '-y', is_flag=True, help="Non-interactive deployment confirmation")
 @click.pass_context
-def deploy(ctx, release_id, environment_id, namespace, description):
+def deploy(ctx, release_id, environment_id, namespace, description, confirm):
     project = ctx.obj['project']
     role_arn = ctx.obj['role_arn']
     dry_run = ctx.obj['dry_run']
@@ -283,11 +284,33 @@ def deploy(ctx, release_id, environment_id, namespace, description):
     click.echo(click.style(f"Date created: {release['date_created']}", fg="yellow"))
 
     click.echo("")
-    for service, image in release['images'].items():
-        click.echo(click.style(f"{service}: {image}", fg="bright_yellow"))
+    matched_services = {}
+    for image_id, image_uri in release['images'].items():
+        click.echo(click.style(f"{image_id}: {image_uri}", fg="bright_yellow"))
 
-    click.echo("")
-    click.confirm(click.style("Create deployment?", fg="green", bold=True), abort=True)
+        image_repositories = project.get('image_repositories')
+
+        # Naively assume service name matches image id
+        service_ids = [image_id]
+
+        # Attempt to match deployment image id to config and override service_ids
+        if image_repositories:
+            matched_image_ids = [image for image in image_repositories if image['id'] == image_id]
+
+            if matched_image_ids:
+                matched_image_id = matched_image_ids[0]
+                service_ids = matched_image_id.get('services')
+
+        # Attempt to match service ids to ECS services
+        available_services = [ecs.get_service(service_id, environment_id) for service_id in service_ids]
+        if available_services:
+            matched_services[image_id] = available_services
+            service_arns = [service['serviceArn'] for service in available_services]
+            click.echo(click.style(f"{image_id}: ECS Services discovered: {service_arns}", fg="bright_yellow"))
+
+    if not confirm:
+        click.echo("")
+        click.confirm(click.style("Create deployment?", fg="green", bold=True), abort=True)
 
     caller_identity = user_details.caller_identity(underlying=True)
     deployment = create_deployment(environment, caller_identity['arn'], description)
@@ -298,12 +321,7 @@ def deploy(ctx, release_id, environment_id, namespace, description):
     click.echo(click.style(f"Requested by: {deployment['requested_by']}", fg="yellow"))
     click.echo(click.style(f"Date created: {deployment['date_created']}", fg="yellow"))
 
-    releases_store.add_deployment(
-        release_id=release['release_id'],
-        deployment=deployment,
-        dry_run=dry_run
-    )
-
+    click.echo("")
     for image_id, image_name in release['images'].items():
         ssm_path = parameter_store.update_ssm(
             service_id=image_id,
@@ -312,13 +330,12 @@ def deploy(ctx, release_id, environment_id, namespace, description):
             dry_run=dry_run
         )
 
-        click.echo("")
-        click.echo(click.style(f"*** {image_id}: Updated SSM path {ssm_path} to {image_name}", fg="yellow"))
+        click.echo(click.style(f"{image_id}: Updated SSM path {ssm_path} to {image_name}", fg="bright_yellow"))
 
         old_tag = image_name.split(":")[-1]
         new_tag = f"env.{environment_id}"
 
-        ecr.retag_image(
+        result = ecr.retag_image(
             namespace=namespace,
             service_id=image_id,
             tag=old_tag,
@@ -326,83 +343,32 @@ def deploy(ctx, release_id, environment_id, namespace, description):
             dry_run=dry_run
         )
 
-        click.echo(click.style(
-            f"*** {image_id}: Retagged image {image_id}:{old_tag} to {image_id}:{new_tag}",
-            fg="yellow"
-        ))
-        click.echo("")
+        if result['status'] == 'success':
+            click.echo(click.style(
+                f"{image_id}: Re-tagged image {image_id}:{old_tag} to {image_id}:{new_tag}",
+                fg="bright_yellow"
+            ))
+        else:
+            click.echo(click.style(
+                f"{image_id}: Already tagged image {image_id}:{old_tag} to {image_id}:{new_tag} (nothing to do)",
+                fg="yellow"
+            ))
 
-    image_repositories = project.get('image_repositories')
+        if image_id in matched_services:
+            deployments = [ecs.redeploy_service(
+                service['clusterArn'],
+                service['serviceArn']
+            ) for service in matched_services.get(image_id)]
 
-    # Naively assume service name matches image name
-    service_ids = [image_id]
-
-    # Attempt to match deployment image id to config and override service_ids
-    if image_repositories:
-        matched_image_ids = [image for image in image_repositories if image['id'] == image_id]
-
-        if matched_image_ids:
-            matched_image_id = matched_image_ids[0]
-            service_ids = matched_image_id.get('services')
-
-    # Attempt to match service ids to ECS services
-    matched_services = [ecs.get_service(service_id, environment_id) for service_id in service_ids]
-
-    if matched_services:
-        service_arns = [service['serviceArn'] for service in matched_services]
-        click.echo(click.style(f"*** {image_id}: ECS Services discovered: {service_arns}", fg="bright_yellow"))
-
-        click.echo("")
-        click.confirm(click.style("Attempt ECS deployment?", fg="green", bold=True), abort=True)
-
-        deployments = [ecs.redeploy_service(
-            service['clusterArn'],
-            service['serviceArn']
-        ) for service in matched_services]
-
-        click.echo(click.style(f"*** {image_id}: ECS Services deployed: {service_arns}", fg="yellow"))
-        click.echo(pprint(deployments))
-
-    else:
-        click.echo(click.style(
-            f"*** {image_id}: No matching ECS Service discovered, manual redeployment required",
-            fg="yellow"
-        ))
-
-    image_repositories = project.get('image_repositories')
-
-    # Naively assume service name matches image name
-    service_ids = [image_id]
-
-    # Attempt to match deployment image id to config and override service_ids
-    if image_repositories:
-        matched_image_ids = [image for image in image_repositories if image['id'] == image_id]
-
-        if matched_image_ids:
-            matched_image_id = matched_image_ids[0]
-            service_ids = matched_image_id.get('services')
-
-    # Attempt to match service ids to ECS services
-    matched_services = [ecs.get_service(service_id, environment_id) for service_id in service_ids]
-
-    if matched_services:
-        service_arns = [service['serviceArn'] for service in matched_services]
-        click.echo(click.style(f"*** {image_id}: ECS Services discovered: {service_arns}", fg="bright_yellow"))
-
-        click.echo("")
-        click.confirm(click.style("Attempt ECS deployment?", fg="green", bold=True), abort=True)
-
-        deployments = [ecs.redeploy_service(service['clusterArn'], service['serviceArn']) for service in matched_services]
-
-        click.echo(click.style(f"*** {image_id}: ECS Services deployed: {service_arns}", fg="yellow"))
-        click.echo(pprint(deployments))
-
-    else:
-        click.echo(click.style(f"*** {image_id}: No matching ECS Service discovered, manual redeployment required", fg="yellow"))
+            for deployment in deployments:
+                service_arn = deployment['service_arn']
+                deployment_id = deployment['deployment_id']
+                click.echo(click.style(f"{image_id}: ECS Service deployed {service_arn} to {deployment_id}", fg="bright_yellow"))
 
     if dry_run:
         click.echo("dry-run, not created.")
 
+    click.echo("")
     click.echo(click.style(f"Deployed {image_id} to {new_tag}", fg="green"))
 
 

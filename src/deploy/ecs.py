@@ -1,10 +1,6 @@
 import itertools
 
 from .iam import Iam
-<<<<<<< HEAD
-=======
-from pprint import pprint
->>>>>>> 378ca9888db9385feb0b3fcd38420afc0f3e3ddf
 
 
 class Ecs:

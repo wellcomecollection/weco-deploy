@@ -130,7 +130,9 @@ class Ecr:
                 if not e.response['Error']['Code'] == 'ImageAlreadyExistsException':
                     raise e
                 else:
-                    print(f"Image {tag} already tagged {new_tag}: nothing to do")
+                    return {'status': 'noop'}
+
+        return {'status': 'success'}
 
     def login(self, profile_name=None):
         base = ['aws', 'ecr', 'get-login']
