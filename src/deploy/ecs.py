@@ -100,7 +100,6 @@ class Ecs:
             service, service_id, env
         )]
 
-
         if len(matched_services) > 1:
             raise RuntimeError(f"Multiple matching services found for {service_id}/{env}!")
 

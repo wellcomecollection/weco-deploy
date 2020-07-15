@@ -350,7 +350,10 @@ def _deploy(project, role_arn, dry_run, confirm, release_id, environment_id, nam
             for deployment in deployments:
                 service_arn = deployment['service_arn']
                 deployment_id = deployment['deployment_id']
-                click.echo(click.style(f"{image_id}: ECS Service deployed {service_arn} to {deployment_id}", fg="bright_yellow"))
+                click.echo(click.style(
+                    f"{image_id}: ECS Service deployed {service_arn} to {deployment_id}",
+                    fg="bright_yellow"
+                ))
 
     if dry_run:
         click.echo("dry-run, not created.")
@@ -456,6 +459,7 @@ def _prepare(project, role_arn, dry_run, from_label, service_id, release_descrip
         click.echo("dry-run, not created.")
 
     return release['release_id']
+
 
 @cli.command()
 @click.option('--from-label', prompt="Label to base release upon",
