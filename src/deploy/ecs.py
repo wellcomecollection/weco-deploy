@@ -1,6 +1,10 @@
 import itertools
 
 from .iam import Iam
+<<<<<<< HEAD
+=======
+from pprint import pprint
+>>>>>>> 378ca9888db9385feb0b3fcd38420afc0f3e3ddf
 
 
 class Ecs:
@@ -99,6 +103,7 @@ class Ecs:
         matched_services = [service for service in self.described_services if _match_deployment_tags(
             service, service_id, env
         )]
+
 
         if len(matched_services) > 1:
             raise RuntimeError(f"Multiple matching services found for {service_id}/{env}!")

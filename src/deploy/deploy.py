@@ -369,6 +369,37 @@ def deploy(ctx, release_id, environment_id, namespace, description):
             fg="yellow"
         ))
 
+    image_repositories = project.get('image_repositories')
+
+    # Naively assume service name matches image name
+    service_ids = [image_id]
+
+    # Attempt to match deployment image id to config and override service_ids
+    if image_repositories:
+        matched_image_ids = [image for image in image_repositories if image['id'] == image_id]
+
+        if matched_image_ids:
+            matched_image_id = matched_image_ids[0]
+            service_ids = matched_image_id.get('services')
+
+    # Attempt to match service ids to ECS services
+    matched_services = [ecs.get_service(service_id, environment_id) for service_id in service_ids]
+
+    if matched_services:
+        service_arns = [service['serviceArn'] for service in matched_services]
+        click.echo(click.style(f"*** {image_id}: ECS Services discovered: {service_arns}", fg="bright_yellow"))
+
+        click.echo("")
+        click.confirm(click.style("Attempt ECS deployment?", fg="green", bold=True), abort=True)
+
+        deployments = [ecs.redeploy_service(service['clusterArn'], service['serviceArn']) for service in matched_services]
+
+        click.echo(click.style(f"*** {image_id}: ECS Services deployed: {service_arns}", fg="yellow"))
+        click.echo(pprint(deployments))
+
+    else:
+        click.echo(click.style(f"*** {image_id}: No matching ECS Service discovered, manual redeployment required", fg="yellow"))
+
     if dry_run:
         click.echo("dry-run, not created.")
 
