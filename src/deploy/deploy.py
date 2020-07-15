@@ -327,8 +327,9 @@ def deploy(ctx, release_id, environment_id, namespace, description):
         )
 
         click.echo(click.style(
-            f"*** {image_id}: Retagged image {image_id}:{old_tag} to {image_id}:{new_tag}", fg="yellow")
-        )
+            f"*** {image_id}: Retagged image {image_id}:{old_tag} to {image_id}:{new_tag}",
+            fg="yellow"
+        ))
         click.echo("")
 
     image_repositories = project.get('image_repositories')
@@ -354,13 +355,19 @@ def deploy(ctx, release_id, environment_id, namespace, description):
         click.echo("")
         click.confirm(click.style("Attempt ECS deployment?", fg="green", bold=True), abort=True)
 
-        deployments = [ecs.redeploy_service(service['clusterArn'], service['serviceArn']) for service in matched_services]
+        deployments = [ecs.redeploy_service(
+            service['clusterArn'],
+            service['serviceArn']
+        ) for service in matched_services]
 
         click.echo(click.style(f"*** {image_id}: ECS Services deployed: {service_arns}", fg="yellow"))
         click.echo(pprint(deployments))
 
     else:
-        click.echo(click.style(f"*** {image_id}: No matching ECS Service discovered, manual redeployment required", fg="yellow"))
+        click.echo(click.style(
+            f"*** {image_id}: No matching ECS Service discovered, manual redeployment required",
+            fg="yellow"
+        ))
 
     if dry_run:
         click.echo("dry-run, not created.")
