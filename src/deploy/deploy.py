@@ -7,6 +7,7 @@ from pprint import pprint
 
 from .commands import configure_aws_profile
 from .ecr import Ecr
+from .ecs import Ecs
 from .model import create_deployment, create_release
 from .project_config import load, save, exists, get_environments_lookup
 
@@ -64,13 +65,14 @@ def _is_url(label):
 @click.group()
 @click.option('--project-file', '-f', default=DEFAULT_PROJECT_FILEPATH)
 @click.option('--verbose', '-v', is_flag=True, help="Print verbose messages.")
+@click.option('--confirm', '-y', is_flag=True, help="Non-interactive deployment confirmation")
 @click.option("--project-id", '-i', help="Specify the project ID")
 @click.option("--region-id", '-i', help="Specify the AWS region ID")
 @click.option("--account-id", help="Specify the AWS account ID")
 @click.option("--role-arn")
 @click.option('--dry-run', '-d', is_flag=True, help="Don't make changes.")
 @click.pass_context
-def cli(ctx, project_file, verbose, project_id, region_id, account_id, role_arn, dry_run):
+def cli(ctx, project_file, verbose, confirm, project_id, region_id, account_id, role_arn, dry_run):
     try:
         projects = load(project_file)
     except FileNotFoundError:
@@ -133,6 +135,7 @@ def cli(ctx, project_file, verbose, project_id, region_id, account_id, role_arn,
         'github_repository': project.get('github_repository'),
         'tf_stack_root': project.get('tf_stack_root'),
         'verbose': verbose,
+        'confirm': confirm,
         'dry_run': dry_run,
         'project': project,
     }
@@ -239,27 +242,14 @@ def initialise(ctx, project_name, environment_id, environment_name):
         click.echo("dry-run, not created.")
 
 
-@cli.command()
-@click.option('--release-id', prompt="Release ID to deploy", default="latest", show_default=True,
-              help="The ID of the release to be deployed, or the latest release if unspecified")
-@click.option('--environment-id', prompt="Environment ID to deploy release to",
-              default="stage", show_default=True,
-              help="The target environment of this deployment")
-@click.option("--namespace", default=DEFAULT_ECR_NAMESPACE, show_default=True)
-@click.option('--description', prompt="Enter a description for this deployment",
-              help="A description of this deployment", default="No description provided")
-@click.pass_context
-def deploy(ctx, release_id, environment_id, namespace, description):
-    project = ctx.obj['project']
-    role_arn = ctx.obj['role_arn']
-    dry_run = ctx.obj['dry_run']
-
+def _deploy(project, role_arn, dry_run, confirm, release_id, environment_id, namespace, description):
     releases_store = DynamoDbReleaseStore(project['id'], role_arn)
     parameter_store = SsmParameterStore(project['id'], role_arn)
     account_id = project['account_id']
     region_id = project['aws_region_name']
 
     ecr = Ecr(account_id, region_id, role_arn)
+    ecs = Ecs(account_id, region_id, role_arn)
 
     user_details = Iam(role_arn)
 
@@ -281,11 +271,33 @@ def deploy(ctx, release_id, environment_id, namespace, description):
     click.echo(click.style(f"Date created: {release['date_created']}", fg="yellow"))
 
     click.echo("")
-    for service, image in release['images'].items():
-        click.echo(click.style(f"{service}: {image}", fg="bright_yellow"))
+    matched_services = {}
+    for image_id, image_uri in release['images'].items():
+        click.echo(click.style(f"{image_id}: {image_uri}", fg="bright_yellow"))
 
-    click.echo("")
-    click.confirm(click.style("Create deployment?", fg="green", bold=True), abort=True)
+        image_repositories = project.get('image_repositories')
+
+        # Naively assume service name matches image id
+        service_ids = [image_id]
+
+        # Attempt to match deployment image id to config and override service_ids
+        if image_repositories:
+            matched_image_ids = [image for image in image_repositories if image['id'] == image_id]
+
+            if matched_image_ids:
+                matched_image_id = matched_image_ids[0]
+                service_ids = matched_image_id.get('services')
+
+        # Attempt to match service ids to ECS services
+        available_services = [ecs.get_service(service_id, environment_id) for service_id in service_ids]
+        if available_services:
+            matched_services[image_id] = available_services
+            service_arns = [service['serviceArn'] for service in available_services]
+            click.echo(click.style(f"{image_id}: ECS Services discovered: {service_arns}", fg="bright_yellow"))
+
+    if not confirm:
+        click.echo("")
+        click.confirm(click.style("Create deployment?", fg="green", bold=True), abort=True)
 
     caller_identity = user_details.caller_identity(underlying=True)
     deployment = create_deployment(environment, caller_identity['arn'], description)
@@ -296,58 +308,82 @@ def deploy(ctx, release_id, environment_id, namespace, description):
     click.echo(click.style(f"Requested by: {deployment['requested_by']}", fg="yellow"))
     click.echo(click.style(f"Date created: {deployment['date_created']}", fg="yellow"))
 
-    releases_store.add_deployment(
-        release_id=release['release_id'],
-        deployment=deployment,
-        dry_run=dry_run
-    )
-
-    for service_id, image_name in release['images'].items():
+    click.echo("")
+    for image_id, image_name in release['images'].items():
         ssm_path = parameter_store.update_ssm(
-            service_id=service_id,
+            service_id=image_id,
             label=environment_id,
             image_name=image_name,
             dry_run=dry_run
         )
 
-        click.echo("")
-        click.echo(click.style(f"*** {service_id}: Updated SSM path {ssm_path} to {image_name}", fg="yellow"))
+        click.echo(click.style(f"{image_id}: Updated SSM path {ssm_path} to {image_name}", fg="bright_yellow"))
 
         old_tag = image_name.split(":")[-1]
         new_tag = f"env.{environment_id}"
 
-        ecr.retag_image(
+        result = ecr.retag_image(
             namespace=namespace,
-            service_id=service_id,
+            service_id=image_id,
             tag=old_tag,
             new_tag=new_tag,
             dry_run=dry_run
         )
 
-        click.echo(click.style(
-            f"*** {service_id}: Retagged image {service_id}:{old_tag} to {service_id}:{new_tag}", fg="yellow")
-        )
-        click.echo("")
+        if result['status'] == 'success':
+            click.echo(click.style(
+                f"{image_id}: Re-tagged image {image_id}:{old_tag} to {image_id}:{new_tag}",
+                fg="bright_yellow"
+            ))
+        else:
+            click.echo(click.style(
+                f"{image_id}: Already tagged image {image_id}:{old_tag} to {image_id}:{new_tag} (nothing to do)",
+                fg="yellow"
+            ))
+
+        if image_id in matched_services:
+            deployments = [ecs.redeploy_service(
+                service['clusterArn'],
+                service['serviceArn']
+            ) for service in matched_services.get(image_id)]
+
+            for deployment in deployments:
+                service_arn = deployment['service_arn']
+                deployment_id = deployment['deployment_id']
+                click.echo(click.style(
+                    f"{image_id}: ECS Service deployed {service_arn} to {deployment_id}",
+                    fg="bright_yellow"
+                ))
 
     if dry_run:
         click.echo("dry-run, not created.")
 
-    click.echo(click.style(f"Deployed {service_id} to {new_tag}", fg="green"))
+    click.echo("")
+    click.echo(click.style(f"Deployed {image_id} to {new_tag}", fg="green"))
 
 
 @cli.command()
-@click.option('--from-label', prompt="Label to base release upon",
-              help="The existing label upon which this release will be based", default="latest", show_default=True)
-@click.option('--service-id', prompt="Service to update", default="all", show_default=True,
-              help="The service to update with a (prompted for) new image")
-@click.option('--release-description', prompt="Description for this release", default="No description provided")
+@click.option('--release-id', prompt="Release ID to deploy", default="latest", show_default=True,
+              help="The ID of the release to be deployed, or the latest release if unspecified")
+@click.option('--environment-id', prompt="Environment ID to deploy release to",
+              default="stage", show_default=True,
+              help="The target environment of this deployment")
+@click.option("--namespace", default=DEFAULT_ECR_NAMESPACE, show_default=True)
+@click.option('--description', prompt="Enter a description for this deployment",
+              help="A description of this deployment", default="No description provided")
 @click.pass_context
-def prepare(ctx, from_label, service_id, release_description):
+def deploy(ctx, release_id, environment_id, namespace, description):
     project = ctx.obj['project']
-    account_id = project['account_id']
-    region_id = project['aws_region_name']
     role_arn = ctx.obj['role_arn']
     dry_run = ctx.obj['dry_run']
+    confirm = ctx.obj['confirm']
+
+    _deploy(project, role_arn, dry_run, confirm, release_id, environment_id, namespace, description)
+
+
+def _prepare(project, role_arn, dry_run, from_label, service_id, release_description):
+    account_id = project['account_id']
+    region_id = project['aws_region_name']
 
     ecr = Ecr(account_id, region_id, role_arn)
     releases_store = DynamoDbReleaseStore(project['id'], role_arn)
@@ -359,11 +395,11 @@ def prepare(ctx, from_label, service_id, release_description):
     from_images = {}
     if image_repositories:
         for image in image_repositories:
-            service_id = image['id']
+            image_id = image['id']
             account_id = image.get('account_id', account_id)
             namespace = image.get('namespace', DEFAULT_ECR_NAMESPACE)
 
-            image_details = ecr.describe_image(namespace, service_id, from_label, account_id)
+            image_details = ecr.describe_image(namespace, image_id, from_label, account_id)
             from_images[image_details['service_id']] = image_details['ref']
     else:
         from_images = parameter_store.get_services_to_images(from_label)
@@ -421,6 +457,45 @@ def prepare(ctx, from_label, service_id, release_description):
         releases_store.put_release(release)
     else:
         click.echo("dry-run, not created.")
+
+    return release['release_id']
+
+
+@cli.command()
+@click.option('--from-label', prompt="Label to base release upon",
+              help="The existing label upon which this release will be based", default="latest", show_default=True)
+@click.option('--service-id', prompt="Service to update", default="all", show_default=True,
+              help="The service to update with a (prompted for) new image")
+@click.option('--release-description', prompt="Description for this release", default="No description provided")
+@click.pass_context
+def prepare(ctx, from_label, service_id, release_description):
+    project = ctx.obj['project']
+    role_arn = ctx.obj['role_arn']
+    dry_run = ctx.obj['dry_run']
+
+    _prepare(project, role_arn, dry_run, from_label, service_id, release_description)
+
+
+@cli.command()
+@click.option('--from-label', prompt="Label to base release upon",
+              help="The existing label upon which this release will be based", default="latest", show_default=True)
+@click.option('--service-id', prompt="Service to update", default="all", show_default=True,
+              help="The service to update with a (prompted for) new image")
+@click.option('--environment-id', prompt="Environment ID to deploy release to",
+              default="stage", show_default=True,
+              help="The target environment of this deployment")
+@click.option("--namespace", default=DEFAULT_ECR_NAMESPACE, show_default=True)
+@click.option('--description', prompt="Enter a description for this deployment",
+              help="A description of this deployment", default="No description provided")
+@click.pass_context
+def release_deploy(ctx, from_label, service_id, environment_id, namespace, description):
+    project = ctx.obj['project']
+    role_arn = ctx.obj['role_arn']
+    dry_run = ctx.obj['dry_run']
+    confirm = ctx.obj['confirm']
+
+    release_id = _prepare(project, role_arn, dry_run, from_label, service_id, description)
+    _deploy(project, role_arn, dry_run, confirm, release_id, environment_id, namespace, description)
 
 
 @cli.command()
