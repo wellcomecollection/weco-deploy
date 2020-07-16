@@ -4,7 +4,11 @@ from .iam import Iam
 class SsmParameterStore:
     def __init__(self, project_id, region_name, role_arn):
         self.project_id = project_id
-        self.session = Iam.get_session("ReleaseToolSsmParameterStore", region_name, role_arn)
+        self.session = Iam.get_session(
+            session_name="ReleaseToolSsmParameterStore",
+            role_arn=role_arn,
+            region_name=region_name
+        )
         self.ssm = self.session.client('ssm')
 
     @staticmethod

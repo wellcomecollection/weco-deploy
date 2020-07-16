@@ -5,7 +5,6 @@ from dateutil.parser import parse
 from urllib.parse import urlparse
 from pprint import pprint
 
-from .commands import configure_aws_profile
 from .ecr import Ecr
 from .ecs import Ecs
 from .model import create_deployment, create_release
@@ -107,7 +106,7 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_id, account_id, 
     if region_id:
         project['aws_region_name'] = region_id
 
-    user_details = Iam(role_arn)
+    user_details = Iam(project['role_arn'], project['aws_region_name'])
     caller_identity = user_details.caller_identity()
     underlying_caller_identity = user_details.caller_identity(underlying=True)
 
@@ -158,13 +157,9 @@ def publish(ctx, service_id, namespace, label):
     parameter_store = SsmParameterStore(project['id'], region_name, role_arn)
 
     click.echo(click.style(f"Attempting to publish {project['id']}/{service_id}", fg="blue"))
-
-    profile_name = 'service_publisher'
-    configure_aws_profile(role_arn, profile_name)
-
     click.echo(click.style(f"Authenticating {account_id} for `docker push` with ECR", fg="yellow"))
 
-    ecr.login(profile_name)
+    ecr.login()
 
     remote_image_name, remote_image_tag, local_image_tag = ecr.publish_image(
         namespace,

@@ -4,10 +4,14 @@ from .iam import Iam
 
 
 class Ecs:
-    def __init__(self, account_id, region_name, role_arn=None):
+    def __init__(self, account_id, region_name, role_arn):
         self.account_id = account_id
         self.region_name = region_name
-        self.session = Iam.get_session("ReleaseToolEcs", region_name, role_arn)
+        self.session = Iam.get_session(
+            session_name="ReleaseToolEcs",
+            role_arn=role_arn,
+            region_name=region_name
+        )
         self.ecs = self.session.client('ecs')
         self.described_services = []
         self._load_described_services()
