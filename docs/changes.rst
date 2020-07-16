@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+3.3.1 - 2020-07-16
+------------------
+
+Try to fix ECR login again.
+
+------------------
 3.3.0 - 2020-07-16
 ------------------
 
