@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+3.2.0 - 2020-07-16
+------------------
+
+Auto-detect ECS services and ask to deploy if configuration is available.
+
+------------------
 3.1.0 - 2020-07-14
 ------------------
 
