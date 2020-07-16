@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+3.3.0 - 2020-07-16
+------------------
+
+Fix an issue where ecr login failed because of IAM auth problems.
+
+------------------
 3.2.0 - 2020-07-16
 ------------------
 

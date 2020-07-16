@@ -2,7 +2,7 @@ import boto3
 
 
 class Iam:
-    def __init__(self, role_arn, region_name="eu-west-1"):
+    def __init__(self, role_arn, region_name):
         self.session = Iam.get_session(
             session_name="ReleaseToolIamUserDetails",
             role_arn=role_arn,

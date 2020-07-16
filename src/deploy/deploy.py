@@ -68,7 +68,7 @@ def _is_url(label):
 @click.option("--project-id", '-i', help="Specify the project ID")
 @click.option("--region-id", '-i', help="Specify the AWS region ID")
 @click.option("--account-id", help="Specify the AWS account ID")
-@click.option("--role-arn")
+@click.option("--role-arn", help="Specify an AWS role to assume")
 @click.option('--dry-run', '-d', is_flag=True, help="Don't make changes.")
 @click.pass_context
 def cli(ctx, project_file, verbose, confirm, project_id, region_id, account_id, role_arn, dry_run):
@@ -151,13 +151,12 @@ def publish(ctx, service_id, namespace, label):
     dry_run = ctx.obj['dry_run']
 
     account_id = project['account_id']
-    region_id = project['aws_region_name']
+    region_name = project['aws_region_name']
 
-    ecr = Ecr(account_id, region_id, role_arn)
-    parameter_store = SsmParameterStore(project['id'], role_arn)
+    ecr = Ecr(account_id, region_name, role_arn)
+    parameter_store = SsmParameterStore(project['id'], region_name, role_arn)
 
     click.echo(click.style(f"Attempting to publish {project['id']}/{service_id}", fg="blue"))
-
     click.echo(click.style(f"Authenticating {account_id} for `docker push` with ECR", fg="yellow"))
 
     ecr.login()
@@ -237,15 +236,16 @@ def initialise(ctx, project_name, environment_id, environment_name):
 
 
 def _deploy(project, role_arn, dry_run, confirm, release_id, environment_id, namespace, description):
-    releases_store = DynamoDbReleaseStore(project['id'], role_arn)
-    parameter_store = SsmParameterStore(project['id'], role_arn)
     account_id = project['account_id']
-    region_id = project['aws_region_name']
+    region_name = project['aws_region_name']
 
-    ecr = Ecr(account_id, region_id, role_arn)
-    ecs = Ecs(account_id, region_id, role_arn)
+    releases_store = DynamoDbReleaseStore(project['id'], region_name, role_arn)
+    parameter_store = SsmParameterStore(project['id'], region_name, role_arn)
 
-    user_details = Iam(role_arn)
+    ecr = Ecr(account_id, region_name, role_arn)
+    ecs = Ecs(account_id, region_name, role_arn)
+
+    user_details = Iam(role_arn, region_name)
 
     environments = get_environments_lookup(project)
 
@@ -377,12 +377,12 @@ def deploy(ctx, release_id, environment_id, namespace, description):
 
 def _prepare(project, role_arn, dry_run, from_label, service_id, release_description):
     account_id = project['account_id']
-    region_id = project['aws_region_name']
+    region_name = project['aws_region_name']
 
-    ecr = Ecr(account_id, region_id, role_arn)
-    releases_store = DynamoDbReleaseStore(project['id'], role_arn)
-    parameter_store = SsmParameterStore(project['id'], role_arn)
-    user_details = Iam(role_arn)
+    ecr = Ecr(account_id, region_name, role_arn)
+    releases_store = DynamoDbReleaseStore(project['id'], region_name, role_arn)
+    parameter_store = SsmParameterStore(project['id'], region_name, role_arn)
+    user_details = Iam(role_arn, region_name)
 
     image_repositories = project.get('image_repositories')
 

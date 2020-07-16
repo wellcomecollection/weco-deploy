@@ -4,7 +4,7 @@ from .iam import Iam
 
 
 class Ecs:
-    def __init__(self, account_id, region_id, role_arn=None):
+    def __init__(self, account_id, region_name, role_arn):
         self.account_id = account_id
         self.region_name = region_name
         self.session = Iam.get_session(

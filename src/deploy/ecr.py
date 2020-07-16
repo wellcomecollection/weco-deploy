@@ -19,7 +19,7 @@ class Ecr:
         self.ecr = self.session.client('ecr')
 
         self.ecr_base_uri = (
-            f"{self.account_id}.dkr.ecr.{self.region_id}.amazonaws.com"
+            f"{self.account_id}.dkr.ecr.{self.region_name}.amazonaws.com"
         )
 
     @staticmethod
