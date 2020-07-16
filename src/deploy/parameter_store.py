@@ -2,9 +2,9 @@ from .iam import Iam
 
 
 class SsmParameterStore:
-    def __init__(self, project_id, role_arn=None):
+    def __init__(self, project_id, region_name, role_arn):
         self.project_id = project_id
-        self.session = Iam.get_session("ReleaseToolSsmParameterStore", role_arn)
+        self.session = Iam.get_session("ReleaseToolSsmParameterStore", region_name, role_arn)
         self.ssm = self.session.client('ssm')
 
     @staticmethod
