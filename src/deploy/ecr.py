@@ -1,16 +1,21 @@
+from base64 import b64decode
 import os
 
 from botocore.exceptions import ClientError
 
 from .iam import Iam
-from .commands import cmd, ensure
+from .commands import cmd
 
 
 class Ecr:
-    def __init__(self, account_id, region_id, role_arn=None):
+    def __init__(self, account_id, region_name, role_arn):
         self.account_id = account_id
-        self.region_id = region_id
-        self.session = Iam.get_session("ReleaseToolEcr", role_arn)
+        self.region_name = region_name
+        self.session = Iam.get_session(
+            session_name="ReleaseToolEcr",
+            role_arn=role_arn,
+            region_name=region_name
+        )
         self.ecr = self.session.client('ecr')
 
         self.ecr_base_uri = (
@@ -134,14 +139,14 @@ class Ecr:
 
         return {'status': 'success'}
 
-    def login(self, profile_name=None):
-        base = ['aws', 'ecr', 'get-login']
-        login_options = ['--no-include-email', '--registry-ids', self.account_id]
-        profile_options = ['--profile', profile_name]
+    def login(self):
+        response = self.ecr.get_authorization_token(
+            registryIds=[self.account_id]
+        )
 
-        if profile_name:
-            login = base + profile_options + login_options
-        else:
-            login = base + login_options
+        for auth in response['authorizationData']:
+            auth_token = b64decode(auth['authorizationToken']).decode()
+            username, password = auth_token.split(':')
+            command = ['docker', 'login', '-u', username, '-p', password, auth['proxyEndpoint']]
 
-        ensure(cmd(*login))
+            cmd(*command)

@@ -8,7 +8,11 @@ class DynamoDbReleaseStore:
     def __init__(self, project_id, role_arn=None):
         self.project_id = project_id
         self.table_name = f"wellcome-releases-{project_id}"
-        self.session = Iam.get_session("ReleaseToolDynamoDbReleaseStore", role_arn)
+        self.session = Iam.get_session(
+            session_name="ReleaseToolDynamoDbReleaseStore",
+            role_arn=role_arn,
+            region_name=region_name
+        )
         self.dynamo_db = self.session.resource("dynamodb")
         self.table = self.dynamo_db.Table(self.table_name)
 
