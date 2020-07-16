@@ -98,6 +98,10 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_id, account_id, 
             )
 
     project = projects.get(project_id)
+
+    if not project:
+        raise RuntimeError(f"{project_id} is not described in {project_file}!")
+
     project['id'] = project_id
 
     if role_arn:
@@ -132,7 +136,6 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_id, account_id, 
         'project_filepath': project_file,
         'role_arn': project.get('role_arn'),
         'github_repository': project.get('github_repository'),
-        'tf_stack_root': project.get('tf_stack_root'),
         'verbose': verbose,
         'confirm': confirm,
         'dry_run': dry_run,
