@@ -110,6 +110,14 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_id, account_id, 
     if region_id:
         project['aws_region_name'] = region_id
 
+    releases_store = DynamoDbReleaseStore(
+        project_id=project["id"],
+        region_name=project['aws_region_name'],
+        role_arn=project['role_arn']
+    )
+
+    releases_store.initialise()
+
     user_details = Iam(project['role_arn'], project['aws_region_name'])
     caller_identity = user_details.caller_identity()
     underlying_caller_identity = user_details.caller_identity(underlying=True)
@@ -134,7 +142,6 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_id, account_id, 
 
     ctx.obj = {
         'project_filepath': project_file,
-        'role_arn': project.get('role_arn'),
         'github_repository': project.get('github_repository'),
         'verbose': verbose,
         'confirm': confirm,
@@ -150,9 +157,9 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_id, account_id, 
 @click.pass_context
 def publish(ctx, service_id, namespace, label):
     project = ctx.obj['project']
-    role_arn = ctx.obj['role_arn']
     dry_run = ctx.obj['dry_run']
 
+    role_arn = project['role_arn']
     account_id = project['account_id']
     region_name = project['aws_region_name']
 
@@ -193,62 +200,40 @@ def publish(ctx, service_id, namespace, label):
     click.echo(click.style(f"Done publishing {project['id']}/{service_id}", fg="green"))
 
 
-@cli.command()
-@click.option('--project-name', '-n', prompt="Enter a descriptive name for this project",
-              help="The name of the project")
-@click.option('--environment-id', '-e', prompt="Enter an id for an environment", help="The primary environment's ID")
-@click.option('--environment-name', '-a', prompt="Enter a descriptive name for this environment",
-              help="The primary environment's name")
-@click.pass_context
-def initialise(ctx, project_name, environment_id, environment_name):
-    role_arn = ctx.obj['role_arn']
-    verbose = ctx.obj['verbose']
-    dry_run = ctx.obj['dry_run']
-    project = ctx.obj['project']
-
-    project_filepath = ctx.obj['project_filepath']
-
-    releases_store = DynamoDbReleaseStore(project["id"], role_arn)
-
-    project = {
-        'id': project["id"],
-        'name': project_name,
-        'role_arn': role_arn,
-        'environments': [
-            {
-                'id': environment_id,
-                'name': environment_name
-            }
-        ]
-    }
-
-    if verbose:
-        click.echo(pprint(project))
-    if not dry_run:
-        if exists(project_filepath):
-            click.confirm(
-                f"This will replace existing project file ({project_filepath}), do you want to continue?",
-                abort=True)
-
-        click.confirm(f"{releases_store.describe_initialisation()}?")
-        releases_store.initialise()
-
-        save(project_filepath, project)
-    elif verbose:
-        click.echo("dry-run, not created.")
-
-
-def _deploy(project, role_arn, dry_run, confirm, release_id, environment_id, namespace, description):
+def _deploy(project, dry_run, confirm, release_id, environment_id, namespace, description):
+    project_id = project["id"]
     account_id = project['account_id']
+    role_arn = project['role_arn']
     region_name = project['aws_region_name']
 
-    releases_store = DynamoDbReleaseStore(project['id'], region_name, role_arn)
-    parameter_store = SsmParameterStore(project['id'], region_name, role_arn)
+    releases_store = DynamoDbReleaseStore(
+        project_id=project["id"],
+        region_name=region_name,
+        role_arn=role_arn
+    )
 
-    ecr = Ecr(account_id, region_name, role_arn)
-    ecs = Ecs(account_id, region_name, role_arn)
+    parameter_store = SsmParameterStore(
+        project_id=project_id,
+        region_name=region_name,
+        role_arn=role_arn
+    )
 
-    user_details = Iam(role_arn, region_name)
+    ecr = Ecr(
+        account_id=account_id,
+        region_name=region_name,
+        role_arn=role_arn
+    )
+
+    ecs = Ecs(
+        account_id=account_id,
+        region_name=region_name,
+        role_arn=role_arn
+    )
+
+    user_details = Iam(
+        role_arn=role_arn,
+        region_name=region_name
+    )
 
     environments = get_environments_lookup(project)
 
@@ -287,6 +272,8 @@ def _deploy(project, role_arn, dry_run, confirm, release_id, environment_id, nam
 
         # Attempt to match service ids to ECS services
         available_services = [ecs.get_service(service_id, environment_id) for service_id in service_ids]
+        available_services = [service for service in available_services if service]
+
         if available_services:
             matched_services[image_id] = available_services
             service_arns = [service['serviceArn'] for service in available_services]
@@ -371,21 +358,41 @@ def _deploy(project, role_arn, dry_run, confirm, release_id, environment_id, nam
 @click.pass_context
 def deploy(ctx, release_id, environment_id, namespace, description):
     project = ctx.obj['project']
-    role_arn = ctx.obj['role_arn']
     dry_run = ctx.obj['dry_run']
     confirm = ctx.obj['confirm']
 
-    _deploy(project, role_arn, dry_run, confirm, release_id, environment_id, namespace, description)
+    _deploy(project, dry_run, confirm, release_id, environment_id, namespace, description)
 
 
-def _prepare(project, role_arn, dry_run, from_label, service_id, release_description):
+def _prepare(project, dry_run, from_label, service_id, description):
+    project_id = project['id']
+    project_name = project['name']
     account_id = project['account_id']
     region_name = project['aws_region_name']
+    role_arn = project['role_arn']
 
-    ecr = Ecr(account_id, region_name, role_arn)
-    releases_store = DynamoDbReleaseStore(project['id'], region_name, role_arn)
-    parameter_store = SsmParameterStore(project['id'], region_name, role_arn)
-    user_details = Iam(role_arn, region_name)
+    releases_store = DynamoDbReleaseStore(
+        project_id=project_id,
+        region_name=region_name,
+        role_arn=role_arn
+    )
+
+    parameter_store = SsmParameterStore(
+        project_id=project_id,
+        region_name=region_name,
+        role_arn=role_arn
+    )
+
+    ecr = Ecr(
+        account_id=account_id,
+        region_name=region_name,
+        role_arn=role_arn
+    )
+
+    user_details = Iam(
+        role_arn=role_arn,
+        region_name=region_name
+    )
 
     image_repositories = project.get('image_repositories')
 
@@ -423,11 +430,12 @@ def _prepare(project, role_arn, dry_run, from_label, service_id, release_descrip
     caller_identity = user_details.caller_identity(underlying=True)
 
     release = create_release(
-        project['id'],
-        project['name'],
-        caller_identity['arn'],
-        release_description,
-        release_images)
+        project_id=project_id,
+        project_name=project_name,
+        current_user=caller_identity['arn'],
+        description=description,
+        images=release_images
+    )
 
     click.echo("")
     if service_id == "all":
@@ -467,10 +475,9 @@ def _prepare(project, role_arn, dry_run, from_label, service_id, release_descrip
 @click.pass_context
 def prepare(ctx, from_label, service_id, release_description):
     project = ctx.obj['project']
-    role_arn = ctx.obj['role_arn']
     dry_run = ctx.obj['dry_run']
 
-    _prepare(project, role_arn, dry_run, from_label, service_id, release_description)
+    _prepare(project, dry_run, from_label, service_id, release_description)
 
 
 @cli.command()
@@ -501,8 +508,13 @@ def release_deploy(ctx, from_label, service_id, environment_id, namespace, descr
 def show_release(ctx, release_id):
     project = ctx.obj['project']
     role_arn = ctx.obj['role_arn']
+    region_name = project['aws_region_name']
 
-    releases_store = DynamoDbReleaseStore(project['id'], role_arn)
+    releases_store = DynamoDbReleaseStore(
+        project_id=project["id"],
+        region_name=region_name,
+        role_arn=role_arn
+    )
 
     if not release_id:
         release = releases_store.get_latest_release()
@@ -517,13 +529,19 @@ def show_release(ctx, release_id):
 def show_deployments(ctx, release_id):
     project = ctx.obj['project']
     role_arn = ctx.obj['role_arn']
+    region_name = project['aws_region_name']
 
-    releases_store = DynamoDbReleaseStore(project['id'], role_arn)
+    releases_store = DynamoDbReleaseStore(
+        project_id=project["id"],
+        region_name=region_name,
+        role_arn=role_arn
+    )
 
     if not release_id:
         releases = releases_store.get_recent_deployments()
     else:
         releases = [releases_store.get_release(release_id)]
+
     summaries = _summarise_release_deployments(releases)
     for summary in summaries:
         click.echo("{release_id} {environment_id} {deployed_date} '{description}'".format(**summary))
@@ -535,7 +553,13 @@ def show_deployments(ctx, release_id):
 def show_images(ctx, label):
     project = ctx.obj['project']
     role_arn = ctx.obj['role_arn']
-    parameter_store = SsmParameterStore(project['id'], role_arn)
+    region_name = project['aws_region_name']
+
+    parameter_store = SsmParameterStore(
+        project_id=project['id'],
+        region_name=region_name,
+        role_arn=role_arn
+    )
 
     images = parameter_store.get_images(label=label)
 
