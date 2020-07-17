@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+3.3.2 - 2020-07-17
+------------------
+
+Allow parsing yaml as config, fix some bugs
+
+------------------
 3.3.1 - 2020-07-16
 ------------------
 
