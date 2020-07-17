@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+4.0.0 - 2020-07-17
+------------------
+
+Makes the code a bit nicer, publish takes --image-id rather than --service-id
+
+------------------
 3.3.2 - 2020-07-17
 ------------------
 
