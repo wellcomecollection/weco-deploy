@@ -1,4 +1,6 @@
 import datetime
+from urllib.parse import urlparse
+import uuid
 
 import yaml
 
@@ -9,15 +11,26 @@ from .releases_store import DynamoDbReleaseStore
 from .parameter_store import SsmParameterStore
 from .iam import Iam
 
+DEFAULT_ECR_NAMESPACE = "uk.ac.wellcome"
+
+
+def _is_url(label):
+    try:
+        res = urlparse(label)
+        return all([res.scheme, res.netloc])
+    except ValueError:
+        return False
+
+
+def _load(filepath):
+    with open(filepath) as infile:
+        return yaml.safe_load(infile)
+
 
 class Projects:
-    @staticmethod
-    def _load(project_filepath):
-        with open(project_filepath) as infile:
-            return yaml.safe_load(infile)
 
     def __init__(self, project_filepath):
-        self.projects = Projects._load(project_filepath)
+        self.projects = _load(project_filepath)
 
     def list(self):
         return list(self.projects.keys())
@@ -92,19 +105,34 @@ class Project:
 
         # Ensure release store is available
         self.releases_store.initialise()
+        self.prepared_releases = {}
 
     def _create_deployment(self, environment_id, details, description):
         return {
             "environment": environment_id,
             "date_created": datetime.datetime.utcnow().isoformat(),
-            "requested_by": self.user_details['caller_identity']['arn'],
+            "requested_by": self.user_details['underlying_caller_identity']['arn'],
             "description": description,
             "details": details
         }
 
+    def _create_release(self, description, images):
+        release_id = str(uuid.uuid4())
+
+        return {
+            "release_id": release_id,
+            "project_id": self.id,
+            "project_name": self.config.get('name', 'unnamed'),
+            "date_created": datetime.datetime.utcnow().isoformat(),
+            "requested_by": self.user_details['underlying_caller_identity']['arn'],
+            "description": description,
+            "images": images,
+            "deployments": []
+        }
+
     def get_environment(self, environment_id):
         environments = {
-            e['id']: e for e in self.config['environments'] if 'id' in e
+            e['id']: e for e in self.config.get('environments', []) if 'id' in e
         }
 
         if environment_id not in environments:
@@ -145,6 +173,70 @@ class Project:
 
         return matched_services
 
+    def publish(self, namespace, image_id, label):
+        self.ecr.login()
+
+        remote_uri, remote_tag, local_tag = self.ecr.publish_image(
+            namespace=namespace,
+            image_id=image_id,
+        )
+
+        tag_result = self.ecr.tag_image(
+            namespace=namespace,
+            image_id=image_id,
+            tag=remote_tag,
+            new_tag=label
+        )
+
+        ssm_result = self.parameter_store.update_ssm(
+            image_id,
+            label,
+            remote_uri,
+        )
+
+        return {
+            'ecr_push': {
+                'local_tag': local_tag,
+                'remote_tag': remote_tag,
+                'remote_uri': remote_uri,
+            },
+            'ecr_tag': tag_result,
+            'ssm_update': ssm_result
+        }
+
+    def prepare(self, from_label, description):
+        image_repositories = self.config.get('image_repositories')
+
+        release_images = {}
+        if image_repositories:
+            for image in image_repositories:
+                image_id = image['id']
+                account_id = image.get('account_id', self.account_id)
+                namespace = image.get('namespace', DEFAULT_ECR_NAMESPACE)
+
+                image_details = self.ecr.describe_image(
+                    namespace=namespace,
+                    image_id=image_id,
+                    tag=from_label,
+                    account_id=account_id
+                )
+
+                release_images[image_details['image_id']] = image_details['ref']
+        else:
+            release_images = self.parameter_store.get_services_to_images(
+                label=from_label
+            )
+
+        if not release_images:
+            raise RuntimeError(f"No images found for {self.id}/{from_label}")
+
+        release = self._create_release(
+            description=description,
+            images=release_images
+        )
+
+        return self.releases_store.put_release(release)
+
     def deploy(self, release_id, environment_id, namespace, description):
         release = self.get_release(release_id)
         matched_services = self.get_ecs_services(release_id, environment_id)
@@ -165,7 +257,7 @@ class Project:
 
             tag_result = self.ecr.tag_image(
                 namespace=namespace,
-                service_id=image_id,
+                image_id=image_id,
                 tag=old_tag,
                 new_tag=new_tag
             )
@@ -196,5 +288,3 @@ class Project:
         self.releases_store.add_deployment(release['release_id'], deployment)
 
         return deployment
-
-

@@ -23,38 +23,37 @@ class Ecr:
         )
 
     @staticmethod
-    def _get_release_image_tag(service_id):
+    def _get_release_image_tag(image_id):
         repo_root = cmd("git", "rev-parse", "--show-toplevel")
-        release_file = os.path.join(repo_root, ".releases", service_id)
+        release_file = os.path.join(repo_root, ".releases", image_id)
 
         return open(release_file).read().strip()
 
     @staticmethod
-    def _get_repository_name(namespace, service_id):
-        return f"{namespace}/{service_id}"
+    def _get_repository_name(namespace, image_id):
+        return f"{namespace}/{image_id}"
 
-    def _get_full_repository_uri(self, namespace, service_id, tag):
-        return f"{self.ecr_base_uri}/{Ecr._get_repository_name(namespace, service_id)}:{tag}"
+    def _get_full_repository_uri(self, namespace, image_id, tag):
+        return f"{self.ecr_base_uri}/{Ecr._get_repository_name(namespace, image_id)}:{tag}"
 
-    def publish_image(self, namespace, service_id, dry_run=False):
-        local_image_tag = Ecr._get_release_image_tag(service_id)
-        local_image_name = f"{service_id}:{local_image_tag}"
+    def publish_image(self, namespace, image_id):
+        local_image_tag = Ecr._get_release_image_tag(image_id)
+        local_image_name = f"{image_id}:{local_image_tag}"
 
         remote_image_tag = f"ref.{local_image_tag}"
-        remote_image_name = self._get_full_repository_uri(namespace, service_id, remote_image_tag)
+        remote_image_name = self._get_full_repository_uri(namespace, image_id, remote_image_tag)
 
-        if not dry_run:
-            try:
-                cmd('docker', 'tag', local_image_name, remote_image_name)
-                cmd('docker', 'push', remote_image_name)
+        try:
+            cmd('docker', 'tag', local_image_name, remote_image_name)
+            cmd('docker', 'push', remote_image_name)
 
-            finally:
-                cmd('docker', 'rmi', remote_image_name)
+        finally:
+            cmd('docker', 'rmi', remote_image_name)
 
         return remote_image_name, remote_image_tag, local_image_tag
 
-    def describe_image(self, namespace, service_id, tag, account_id=None):
-        repository_name = Ecr._get_repository_name(namespace, service_id)
+    def describe_image(self, namespace, image_id, tag, account_id=None):
+        repository_name = Ecr._get_repository_name(namespace, image_id)
         if not account_id:
             account_id = self.account_id
 
@@ -81,11 +80,11 @@ class Ecr:
 
         envs = {env_tag.split('.')[-1]: self._get_full_repository_uri(
             namespace,
-            service_id,
+            image_id,
             env_tag
         ) for env_tag in env_tags}
 
-        refs = [self._get_full_repository_uri(namespace, service_id, ref_tag) for ref_tag in ref_tags]
+        refs = [self._get_full_repository_uri(namespace, image_id, ref_tag) for ref_tag in ref_tags]
 
         # It is possible multiple ref tags can occur if images are published at new git refs with
         # no image changes, deal with it gracefully - just get the first
@@ -98,13 +97,13 @@ class Ecr:
             'repository_name': image_details['repositoryName'],
             'image_digest': image_details['imageDigest'],
             'is_latest': is_latest,
-            'service_id': service_id,
+            'image_id': image_id,
             'envs': envs,
             'ref': ref
         }
 
-    def tag_image(self, namespace, service_id, tag, new_tag):
-        repository_name = Ecr._get_repository_name(namespace, service_id)
+    def tag_image(self, namespace, image_id, tag, new_tag):
+        repository_name = Ecr._get_repository_name(namespace, image_id)
 
         result = self.ecr.batch_get_image(
             registryId=self.account_id,

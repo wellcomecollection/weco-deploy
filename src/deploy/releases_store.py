@@ -33,6 +33,8 @@ class DynamoDbReleaseStore:
     def put_release(self, release):
         self.table.put_item(Item=release)
 
+        return release
+
     def get_latest_release(self):
         items = self.table.query(IndexName='project_gsi',
                                  KeyConditionExpression=Key('project_id').eq(self.project_id),
