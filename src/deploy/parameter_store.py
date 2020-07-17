@@ -74,4 +74,7 @@ class SsmParameterStore:
                 Overwrite=True
             )
 
-        return ssm_path
+        return {
+            'ssm_path': ssm_path,
+            'image_name': image_name
+        }
