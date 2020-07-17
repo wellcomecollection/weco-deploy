@@ -130,6 +130,7 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_name, account_id
         'confirm': confirm,
         'dry_run': dry_run,
         'project': config,
+        'project2': project
     }
 
 
@@ -162,7 +163,7 @@ def publish(ctx, service_id, namespace, label):
 
     click.echo(click.style(f"Published Image {local_image_tag} to {remote_image_name}", fg="yellow"))
 
-    ecr.retag_image(
+    ecr.tag_image(
         namespace,
         service_id,
         remote_image_tag,
@@ -289,7 +290,7 @@ def _deploy(project, dry_run, confirm, release_id, environment_id, namespace, de
         old_tag = image_name.split(":")[-1]
         new_tag = f"env.{environment_id}"
 
-        result = ecr.retag_image(
+        result = ecr.tag_image(
             namespace=namespace,
             service_id=image_id,
             tag=old_tag,
@@ -340,11 +341,53 @@ def _deploy(project, dry_run, confirm, release_id, environment_id, namespace, de
               help="A description of this deployment", default="No description provided")
 @click.pass_context
 def deploy(ctx, release_id, environment_id, namespace, description):
-    project = ctx.obj['project']
-    dry_run = ctx.obj['dry_run']
     confirm = ctx.obj['confirm']
 
-    _deploy(project, dry_run, confirm, release_id, environment_id, namespace, description)
+    project2 = ctx.obj['project2']
+
+    release = project2.get_release(release_id)
+    environment = project2.get_environment(environment_id)
+
+    click.echo("")
+    click.echo(click.style(f"Deploying release:  {release['release_id']}", fg="blue"))
+    click.echo(click.style(f"Targeting env: {environment['id']}, ({environment['name']})", fg="yellow"))
+    click.echo(click.style(f"Requested by: {release['requested_by']}", fg="yellow"))
+    click.echo(click.style(f"Date created: {release['date_created']}", fg="yellow"))
+
+    ecs_services = project2.get_ecs_services(release_id, environment_id)
+
+    for image_id, services in ecs_services.items():
+        service_arns = [service['serviceArn'] for service in services]
+        click.echo(click.style(f"{image_id}: ECS Services discovered: {service_arns}", fg="bright_yellow"))
+
+    if not confirm:
+        click.echo("")
+        click.confirm(click.style("Create deployment?", fg="cyan", bold=True), abort=True)
+
+    result = project2.deploy(release_id, environment_id, namespace, description)
+
+    click.echo("")
+    click.echo(click.style(f"Deployment Summary", fg="bright_green"))
+    click.echo(click.style(f"Requested by: {result['requested_by']}", fg="green"))
+    click.echo(click.style(f"Date created: {result['date_created']}", fg="green"))
+    click.echo("")
+    for image_id, summary in result['details'].items():
+        click.echo(click.style(
+            f"{image_id}: SSM Updated {summary['ssm_result']['ssm_path']} to {summary['ssm_result']['image_name']}",
+            fg="green"
+        ))
+        click.echo(click.style(
+            f"{image_id}: ECR Updated {summary['tag_result']['source']} to {summary['tag_result']['target']}",
+            fg="green"
+        ))
+
+        for ecs_deployment in summary['ecs_deployments']:
+            click.echo(click.style(
+                f"{image_id}: ECS Deployed {ecs_deployment['service_arn']} to {ecs_deployment['deployment_id']}",
+                fg="green"
+            ))
+
+    click.echo("")
 
 
 def _prepare(project, dry_run, from_label, service_id, description):

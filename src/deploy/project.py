@@ -1,3 +1,5 @@
+import datetime
+
 import yaml
 
 from .ecr import Ecr
@@ -91,55 +93,108 @@ class Project:
         # Ensure release store is available
         self.releases_store.initialise()
 
-    # def deploy(self, release_id, environment_id, namespace, description):
-    #     if release_id == "latest":
-    #         release = self.releases_store.get_latest_release()
-    #     else:
-    #         release = self.releases_store.get_release(release_id)
-    #
-    #
-    #     for image_id, image_name in release['images'].items():
-    #         ssm_path = parameter_store.update_ssm(
-    #             service_id=image_id,
-    #             label=environment_id,
-    #             image_name=image_name,
-    #             dry_run=dry_run
-    #         )
-    #
-    #     click.echo(click.style(f"{image_id}: Updated SSM path {ssm_path} to {image_name}", fg="bright_yellow"))
-    #
-    #     old_tag = image_name.split(":")[-1]
-    #     new_tag = f"env.{environment_id}"
-    #
-    #     result = ecr.retag_image(
-    #         namespace=namespace,
-    #         service_id=image_id,
-    #         tag=old_tag,
-    #         new_tag=new_tag,
-    #         dry_run=dry_run
-    #     )
-    #
-    #     if result['status'] == 'success':
-    #         click.echo(click.style(
-    #             f"{image_id}: Re-tagged image {image_id}:{old_tag} to {image_id}:{new_tag}",
-    #             fg="bright_yellow"
-    #         ))
-    #     else:
-    #         click.echo(click.style(
-    #             f"{image_id}: Already tagged image {image_id}:{old_tag} to {image_id}:{new_tag} (nothing to do)",
-    #             fg="yellow"
-    #         ))
-    #
-    #     if image_id in matched_services:
-    #         deployments = [ecs.redeploy_service(
-    #             service['clusterArn'],
-    #             service['serviceArn']
-    #         ) for service in matched_services.get(image_id)]
-    #
-    #         for deployment in deployments:
-    #             service_arn = deployment['service_arn']
-    #             deployment_id = deployment['deployment_id']
-    #             click.echo(click.style(
-    #                 f"{image_id}: ECS Service deployed {service_arn} to {deployment_id}",
-    #                 fg="bright_yellow"
-    #             ))
+    def _create_deployment(self, environment_id, details, description):
+        return {
+            "environment": environment_id,
+            "date_created": datetime.datetime.utcnow().isoformat(),
+            "requested_by": self.user_details['caller_identity']['arn'],
+            "description": description,
+            "details": details
+        }
+
+    def get_environment(self, environment_id):
+        environments = {
+            e['id']: e for e in self.config['environments'] if 'id' in e
+        }
+
+        if environment_id not in environments:
+            raise ValueError(f"Unknown environment. Expected '{environment_id}' in {environments}")
+
+        return environments[environment_id]
+
+    def get_release(self, release_id):
+        if release_id == "latest":
+            return self.releases_store.get_latest_release()
+        else:
+            return self.releases_store.get_release(release_id)
+
+    def get_ecs_services(self, release_id, environment_id):
+        release = self.get_release(release_id)
+
+        matched_services = {}
+        for image_id, image_uri in release['images'].items():
+            image_repositories = self.config.get('image_repositories')
+
+            # Naively assume service name matches image id
+            service_ids = [image_id]
+
+            # Attempt to match deployment image id to config and override service_ids
+            if image_repositories:
+                matched_image_ids = [image for image in image_repositories if image['id'] == image_id]
+
+                if matched_image_ids:
+                    matched_image_id = matched_image_ids[0]
+                    service_ids = matched_image_id.get('services')
+
+            # Attempt to match service ids to ECS services
+            available_services = [self.ecs.get_service(service_id, environment_id) for service_id in service_ids]
+            available_services = [service for service in available_services if service]
+
+            if available_services:
+                matched_services[image_id] = available_services
+
+        return matched_services
+
+    def deploy(self, release_id, environment_id, namespace, description):
+        release = self.get_release(release_id)
+        matched_services = self.get_ecs_services(release_id, environment_id)
+
+        # Force check for valid environment
+        _ = self.get_environment(environment_id)
+
+        deployment_details = {}
+        for image_id, image_name in release['images'].items():
+            ssm_result = self.parameter_store.update_ssm(
+                service_id=image_id,
+                label=environment_id,
+                image_name=image_name
+            )
+
+            old_tag = image_name.split(":")[-1]
+            new_tag = f"env.{environment_id}"
+
+            tag_result = self.ecr.tag_image(
+                namespace=namespace,
+                service_id=image_id,
+                tag=old_tag,
+                new_tag=new_tag
+            )
+
+            ecs_deployments = []
+            if image_id in matched_services:
+                deployments = [self.ecs.redeploy_service(
+                    service['clusterArn'],
+                    service['serviceArn']
+                ) for service in matched_services.get(image_id)]
+
+                for deployment in deployments:
+                    service_arn = deployment['service_arn']
+                    deployment_id = deployment['deployment_id']
+                    ecs_deployments.append({
+                        'service_arn': service_arn,
+                        'deployment_id': deployment_id
+                    })
+
+            deployment_details[image_id] = {
+                'ssm_result': ssm_result,
+                'tag_result': tag_result,
+                'ecs_deployments': ecs_deployments
+            }
+
+        deployment = self._create_deployment(environment_id, deployment_details, description)
+
+        self.releases_store.add_deployment(release['release_id'], deployment)
+
+        return deployment
+
+

@@ -103,7 +103,7 @@ class Ecr:
             'ref': ref
         }
 
-    def retag_image(self, namespace, service_id, tag, new_tag, dry_run=False):
+    def tag_image(self, namespace, service_id, tag, new_tag):
         repository_name = Ecr._get_repository_name(namespace, service_id)
 
         result = self.ecr.batch_get_image(
@@ -122,22 +122,30 @@ class Ecr:
 
         image = result["images"][0]
 
-        if not dry_run:
-            try:
-                result = self.ecr.put_image(
-                    registryId=self.account_id,
-                    repositoryName=repository_name,
-                    imageTag=new_tag,
-                    imageManifest=image['imageManifest']
-                )
-            except ClientError as e:
-                # Matching tag & digest already exists (nothing to do)
-                if not e.response['Error']['Code'] == 'ImageAlreadyExistsException':
-                    raise e
-                else:
-                    return {'status': 'noop'}
+        tag_operation = {
+            'source': f"{repository_name}:{tag}",
+            'target': f"{repository_name}:{new_tag}"
+        }
 
-        return {'status': 'success'}
+        try:
+            self.ecr.put_image(
+                registryId=self.account_id,
+                repositoryName=repository_name,
+                imageTag=new_tag,
+                imageManifest=image['imageManifest']
+            )
+
+            tag_operation_status = "success"
+        except ClientError as e:
+            # Matching tag & digest already exists (nothing to do)
+            if not e.response['Error']['Code'] == 'ImageAlreadyExistsException':
+                raise e
+            else:
+                tag_operation_status = "noop"
+
+        tag_operation['status'] = tag_operation_status
+
+        return tag_operation
 
     def login(self):
         response = self.ecr.get_authorization_token(
