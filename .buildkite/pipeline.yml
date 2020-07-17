@@ -1,0 +1,7 @@
+steps:
+  - command: "docker run -v $(pwd):/src --env TOXENV=lint wellcome/tox"
+    label: "lint"
+  - command: "docker run -v $(pwd):/src --env TOXENV=check_release_file wellcome/tox"
+    label: "check_release_file"
+  - command: "docker run -v $(pwd):/src --env TOXENV=py37 wellcome/tox"
+    label: "test"
