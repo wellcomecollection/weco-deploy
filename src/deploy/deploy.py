@@ -229,9 +229,10 @@ def deploy(ctx, release_id, environment_id, namespace, description):
     )
 
 
-def _prepare(project, from_label, description):
+def _prepare(project, from_label, namespace, description):
     release = project.prepare(
         from_label=from_label,
+        namespace=namespace,
         description=description
     )
 
@@ -253,15 +254,18 @@ def _prepare(project, from_label, description):
 @click.option('--from-label', prompt="Label to base release upon",
               help="The existing label upon which this release will be based",
               default="latest", show_default=True)
+@click.option('--namespace', help="Namespace in which to locate images",
+              default=DEFAULT_ECR_NAMESPACE)
 @click.option('--description', prompt="Description for this release",
               default="No description provided")
 @click.pass_context
-def prepare(ctx, from_label, description):
+def prepare(ctx, from_label, namespace, description):
     project = ctx.obj['project']
 
     _prepare(
         project=project,
         from_label=from_label,
+        namespace=namespace,
         description=description
     )
 
@@ -283,6 +287,7 @@ def release_deploy(ctx, from_label, environment_id, namespace, description):
     release_id = _prepare(
         project=project,
         from_label=from_label,
+        namespace=namespace,
         description=description
     )
 
