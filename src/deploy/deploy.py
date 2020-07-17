@@ -8,12 +8,14 @@ from pprint import pprint
 from .ecr import Ecr
 from .ecs import Ecs
 from .model import create_deployment, create_release
-from .project_config import load, save, exists, get_environments_lookup
+from .config import load, get_environments_lookup
 
 from .releases_store import DynamoDbReleaseStore
 from .parameter_store import SsmParameterStore
 from .pretty_printing import pprint_path_keyval_dict
 from .iam import Iam
+
+from.project import Projects
 
 DEFAULT_PROJECT_FILEPATH = ".wellcome_project"
 DEFAULT_ECR_NAMESPACE = "uk.ac.wellcome"
@@ -66,14 +68,14 @@ def _is_url(label):
 @click.option('--verbose', '-v', is_flag=True, help="Print verbose messages.")
 @click.option('--confirm', '-y', is_flag=True, help="Non-interactive deployment confirmation")
 @click.option("--project-id", '-i', help="Specify the project ID")
-@click.option("--region-id", '-i', help="Specify the AWS region ID")
+@click.option("--region-name", '-i', help="Specify the AWS region name")
 @click.option("--account-id", help="Specify the AWS account ID")
 @click.option("--role-arn", help="Specify an AWS role to assume")
 @click.option('--dry-run', '-d', is_flag=True, help="Don't make changes.")
 @click.pass_context
-def cli(ctx, project_file, verbose, confirm, project_id, region_id, account_id, role_arn, dry_run):
+def cli(ctx, project_file, verbose, confirm, project_id, region_name, account_id, role_arn, dry_run):
     try:
-        projects = load(project_file)
+        projects = Projects(project_file)
     except FileNotFoundError:
         if ctx.invoked_subcommand != "initialise":
             message = f"Couldn't find project metadata file {project_file!r}.  Run `initialise`."
@@ -85,7 +87,7 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_id, account_id, 
         }
         return
 
-    project_names = list(projects.keys())
+    project_names = projects.list()
     project_count = len(project_names)
 
     if not project_id:
@@ -97,56 +99,37 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_id, account_id, 
                 type=click.Choice(project_names)
             )
 
-    project = projects.get(project_id)
-
-    if not project:
-        raise RuntimeError(f"{project_id} is not described in {project_file}!")
-
-    project['id'] = project_id
-
-    if role_arn:
-        project['role_arn'] = role_arn
-
-    if region_id:
-        project['aws_region_name'] = region_id
-
-    releases_store = DynamoDbReleaseStore(
-        project_id=project["id"],
-        region_name=project['aws_region_name'],
-        role_arn=project['role_arn']
+    project = projects.load(
+        project_id=project_id,
+        region_name=region_name,
+        account_id=account_id,
+        role_arn=role_arn
     )
 
-    releases_store.initialise()
+    config = project.config
 
-    user_details = Iam(project['role_arn'], project['aws_region_name'])
-    caller_identity = user_details.caller_identity()
-    underlying_caller_identity = user_details.caller_identity(underlying=True)
-
-    if account_id:
-        project['account_id'] = account_id
-    else:
-        project['account_id'] = caller_identity['account_id']
+    user_arn = project.user_details['caller_identity']['arn']
+    underlying_user_arn = project.user_details['underlying_caller_identity']['arn']
 
     if verbose:
         click.echo(click.style(f"Loaded {project_file}:", fg="cyan"))
-        pprint(project)
+        pprint(config)
         click.echo("")
-        click.echo(click.style(f"Using role_arn:         {project['role_arn']}", fg="cyan"))
-        click.echo(click.style(f"Using aws_region_name:  {project['aws_region_name']}", fg="cyan"))
-        click.echo(click.style(f"Running as role:        {caller_identity['arn']}", fg="cyan"))
-        if caller_identity['arn'] != underlying_caller_identity['arn']:
-            click.echo(click.style(f"Underlying role:        {underlying_caller_identity['arn']}", fg="cyan"))
+        click.echo(click.style(f"Using role_arn:         {config['role_arn']}", fg="cyan"))
+        click.echo(click.style(f"Using aws_region_name:  {config['aws_region_name']}", fg="cyan"))
+        click.echo(click.style(f"Running as role:        {user_arn}", fg="cyan"))
+        if user_arn != underlying_user_arn:
+            click.echo(click.style(f"Underlying role:        {underlying_user_arn}", fg="cyan"))
 
-        click.echo(click.style(f"Using account_id:       {project['account_id']}", fg="cyan"))
+        click.echo(click.style(f"Using account_id:       {config['account_id']}", fg="cyan"))
         click.echo("")
 
     ctx.obj = {
         'project_filepath': project_file,
-        'github_repository': project.get('github_repository'),
         'verbose': verbose,
         'confirm': confirm,
         'dry_run': dry_run,
-        'project': project,
+        'project': config,
     }
 
 
