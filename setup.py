@@ -24,7 +24,8 @@ assert __version__ is not None
 
 install_requires = [
     'click >= 7.1.2',
-    'boto3 >=1.14.18'
+    'boto3 >= 1.14.18',
+    'pyyaml >= 5.3.1'
 ]
 
 setup(

@@ -1,17 +1,17 @@
 # -*- encoding: utf-8
 
-import json
+import yaml
 import os
 
 
 def load(project_filepath):
     with open(project_filepath) as infile:
-        return json.load(infile)
+        return yaml.safe_load(infile)
 
 
 def save(project_filepath, project):
     with open(project_filepath, 'w') as outfile:
-        json.dump(project, outfile, sort_keys=True, indent=2)
+        yaml.dump(project, outfile, sort_keys=True, indent=2)
 
 
 def exists(project_filepath):
