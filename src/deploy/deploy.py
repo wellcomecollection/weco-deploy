@@ -20,7 +20,7 @@ def _format_ecr_uri(uri):
 
     return {
         'label': image_label,
-        'tag': image_tag[:7]
+        'tag': image_tag
     }
 
 
@@ -35,14 +35,15 @@ def _summarise_ssm_response(images):
 
 def _summarise_release_deployments(releases):
     summaries = []
-    for r in releases:
-        for d in r['deployments']:
+    for release in releases:
+        for deployment in release['deployments']:
             summaries.append(
                 {
-                    'release_id': r['release_id'][:8],
-                    'environment_id': d['environment']['id'],
-                    'deployed_date': parse(d['date_created']).strftime('%d-%m-%YT%H:%M'),
-                    'description': d['description']
+                    'release_id': release.get('release_id'),
+                    'environment_id': deployment.get('environment'),
+                    'deployed_date': parse(deployment.get('date_created')).strftime('%d-%m-%YT%H:%M'),
+                    'requested_by': deployment.get('requested_by').split('/')[-1],
+                    'description': deployment.get('description')
                 }
             )
     return summaries
@@ -165,7 +166,7 @@ def _deploy(project, release_id, environment_id, namespace, description, confirm
     env_name = environment.get('name', environment_id)
 
     click.echo("")
-    click.echo(click.style(f"Deploying release:  {release['release_id']}", fg="blue"))
+    click.echo(click.style(f"Deploying release  {release['release_id']}", fg=" cyan"))
     click.echo(click.style(f"Targeting env: {env_id}, ({env_name})", fg="yellow"))
     click.echo(click.style(f"Requested by: {release['requested_by']}", fg="yellow"))
     click.echo(click.style(f"Date created: {release['date_created']}", fg="yellow"))
@@ -318,23 +319,12 @@ def show_release(ctx, release_id):
 @click.pass_context
 def show_deployments(ctx, release_id):
     project = ctx.obj['project']
-    role_arn = ctx.obj['role_arn']
-    region_name = project['aws_region_name']
 
-    releases_store = DynamoDbReleaseStore(
-        project_id=project["id"],
-        region_name=region_name,
-        role_arn=role_arn
-    )
-
-    if not release_id:
-        releases = releases_store.get_recent_deployments()
-    else:
-        releases = [releases_store.get_release(release_id)]
+    releases = project.get_deployments(release_id)
 
     summaries = _summarise_release_deployments(releases)
     for summary in summaries:
-        click.echo("{release_id} {environment_id} {deployed_date} '{description}'".format(**summary))
+        click.echo("{release_id} {environment_id} {deployed_date} '{requested_by}'".format(**summary))
 
 
 @cli.command()
@@ -342,31 +332,16 @@ def show_deployments(ctx, release_id):
 @click.pass_context
 def show_images(ctx, label):
     project = ctx.obj['project']
-    role_arn = ctx.obj['role_arn']
-    region_name = project['aws_region_name']
 
-    parameter_store = SsmParameterStore(
-        project_id=project['id'],
-        region_name=region_name,
-        role_arn=role_arn
-    )
+    if not label:
+        label = 'latest'
 
-    images = parameter_store.get_images(label=label)
-
-    summaries = sorted(_summarise_ssm_response(images), key=lambda k: k['name'])
+    images = project.get_images(label)
 
     paths = {}
-    for summary in summaries:
-        result = {}
-        ecr_uri = _format_ecr_uri(summary['value'])
-        name = summary['name']
-
-        result['image_name'] = "{label:>25}:{tag}".format(**ecr_uri)
-        result['last_modified'] = summary['last_modified']
-
-        paths[name] = "{last_modified} {image_name}".format(**result)
-
-    click.echo("\n".join(pprint_path_keyval_dict(paths)))
+    for id, ecr_uri in images.items():
+        ecr_uri = _format_ecr_uri(ecr_uri)
+        click.echo(f"{id}: {ecr_uri}")
 
 
 def main():

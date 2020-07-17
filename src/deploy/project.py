@@ -139,6 +139,12 @@ class Project:
 
         return environments[environment_id]
 
+    def get_deployments(self, release_id=None):
+        if release_id:
+            return [self.releases_store.get_release(release_id)]
+        else:
+            return self.releases_store.get_recent_deployments()
+
     def get_release(self, release_id):
         if release_id == "latest":
             return self.releases_store.get_latest_release()
@@ -203,7 +209,7 @@ class Project:
             'ssm_update': ssm_result
         }
 
-    def prepare(self, from_label, description):
+    def get_images(self, from_label):
         image_repositories = self.config.get('image_repositories')
 
         release_images = {}
@@ -225,6 +231,13 @@ class Project:
             release_images = self.parameter_store.get_services_to_images(
                 label=from_label
             )
+
+        return release_images
+
+    def prepare(self, from_label, description):
+        release_images = self.get_images(
+            from_label=from_label
+        )
 
         if not release_images:
             raise RuntimeError(f"No images found for {self.id}/{from_label}")
