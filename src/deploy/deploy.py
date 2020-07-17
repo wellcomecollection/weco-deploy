@@ -2,18 +2,11 @@ import click
 import json
 
 from dateutil.parser import parse
-from urllib.parse import urlparse
 from pprint import pprint
-
-from .ecr import Ecr
-from .ecs import Ecs
-from .model import create_deployment, create_release
-from .config import load, get_environments_lookup
 
 from .releases_store import DynamoDbReleaseStore
 from .parameter_store import SsmParameterStore
 from .pretty_printing import pprint_path_keyval_dict
-from .iam import Iam
 
 from.project import Projects
 
@@ -311,19 +304,12 @@ def release_deploy(ctx, from_label, environment_id, namespace, description):
 @click.pass_context
 def show_release(ctx, release_id):
     project = ctx.obj['project']
-    role_arn = ctx.obj['role_arn']
-    region_name = project['aws_region_name']
-
-    releases_store = DynamoDbReleaseStore(
-        project_id=project["id"],
-        region_name=region_name,
-        role_arn=role_arn
-    )
 
     if not release_id:
-        release = releases_store.get_latest_release()
-    else:
-        release = releases_store.get_release(release_id)
+        release_id = 'latest'
+
+    release = project.get_release(release_id)
+
     click.echo(json.dumps(release, sort_keys=True, indent=2))
 
 

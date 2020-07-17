@@ -28,7 +28,6 @@ def _load(filepath):
 
 
 class Projects:
-
     def __init__(self, project_filepath):
         self.projects = _load(project_filepath)
 
