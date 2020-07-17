@@ -4,10 +4,6 @@ import json
 from dateutil.parser import parse
 from pprint import pprint
 
-from .releases_store import DynamoDbReleaseStore
-from .parameter_store import SsmParameterStore
-from .pretty_printing import pprint_path_keyval_dict
-
 from.project import Projects
 
 DEFAULT_PROJECT_FILEPATH = ".wellcome_project"
@@ -184,7 +180,7 @@ def _deploy(project, release_id, environment_id, namespace, description, confirm
     result = project.deploy(release_id, environment_id, namespace, description)
 
     click.echo("")
-    click.echo(click.style(f"Deployment Summary", fg="green"))
+    click.echo(click.style("Deployment Summary", fg="green"))
     click.echo(click.style(f"Requested by: {result['requested_by']}", fg="yellow"))
     click.echo(click.style(f"Date created: {result['date_created']}", fg="yellow"))
     click.echo("")
