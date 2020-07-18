@@ -162,7 +162,7 @@ def _deploy(project, release_id, environment_id, namespace, description, confirm
     env_name = environment.get('name', environment_id)
 
     click.echo("")
-    click.echo(click.style(f"Deploying release  {release['release_id']}", fg=" cyan"))
+    click.echo(click.style(f"Deploying release  {release['release_id']}", fg="green"))
     click.echo(click.style(f"Targeting env: {env_id}, ({env_name})", fg="yellow"))
     click.echo(click.style(f"Requested by: {release['requested_by']}", fg="yellow"))
     click.echo(click.style(f"Date created: {release['date_created']}", fg="yellow"))
