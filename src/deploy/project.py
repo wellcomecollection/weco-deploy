@@ -167,7 +167,7 @@ class Project:
 
                 if matched_image_ids:
                     matched_image_id = matched_image_ids[0]
-                    service_ids = matched_image_id.get('services')
+                    service_ids = matched_image_id.get('services', [])
 
             # Attempt to match service ids to ECS services
             available_services = [self.ecs.get_service(service_id, environment_id) for service_id in service_ids]
