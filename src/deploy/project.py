@@ -167,7 +167,7 @@ class Project:
 
                 if matched_image_ids:
                     matched_image_id = matched_image_ids[0]
-                    service_ids = matched_image_id.get('services')
+                    service_ids = matched_image_id.get('services', [])
 
             # Attempt to match service ids to ECS services
             available_services = [self.ecs.get_service(service_id, environment_id) for service_id in service_ids]
@@ -209,7 +209,7 @@ class Project:
             'ssm_update': ssm_result
         }
 
-    def get_images(self, from_label):
+    def get_images(self, from_label, namespace=DEFAULT_ECR_NAMESPACE):
         image_repositories = self.config.get('image_repositories')
 
         release_images = {}
@@ -217,7 +217,7 @@ class Project:
             for image in image_repositories:
                 image_id = image['id']
                 account_id = image.get('account_id', self.account_id)
-                namespace = image.get('namespace', DEFAULT_ECR_NAMESPACE)
+                namespace = image.get('namespace', namespace)
 
                 image_details = self.ecr.describe_image(
                     namespace=namespace,
@@ -234,9 +234,10 @@ class Project:
 
         return release_images
 
-    def prepare(self, from_label, description):
+    def prepare(self, from_label, description, namespace=DEFAULT_ECR_NAMESPACE):
         release_images = self.get_images(
-            from_label=from_label
+            from_label=from_label,
+            namespace=namespace
         )
 
         if not release_images:
