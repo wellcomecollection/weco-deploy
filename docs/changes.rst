@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+4.1.0 - 2020-07-18
+------------------
+
+Updates readme and adds a missing namespace param to the prepare command
+
+------------------
 4.0.0 - 2020-07-17
 ------------------
 
