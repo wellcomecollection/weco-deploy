@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+4.1.1 - 2020-07-20
+------------------
+
+Ensure services are not deployed multiple times where a service is targeted multiple times in a deployment
+
+------------------
 4.1.0 - 2020-07-18
 ------------------
 
