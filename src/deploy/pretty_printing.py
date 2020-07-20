@@ -89,4 +89,12 @@ def pprint_date(date_obj, *, now=datetime.datetime.now()):
     elif is_yesterday:
         return date_obj.strftime("yesterday @ %H:%M")
     else:
-        return date_obj.strftime("%Y-%m-%d @ %H:%M")
+        result = date_obj.strftime("%a %d %B %Y @ %H:%M")
+
+        # Trim the trailing zero from the day of the month, but not from the
+        # timestamp.  Add an extra space to the month names and timestamps
+        # all line up.
+        if result[4] == "0":
+            return result.replace(" 0", "  ", 1)
+        else:
+            return result
