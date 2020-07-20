@@ -3,6 +3,7 @@ import json
 
 from dateutil.parser import parse
 from pprint import pprint
+from tabulate import tabulate
 
 from.project import Projects
 
@@ -30,19 +31,15 @@ def _summarise_ssm_response(images):
 
 
 def _summarise_release_deployments(releases):
-    summaries = []
     for release in releases:
         for deployment in release['deployments']:
-            summaries.append(
-                {
-                    'release_id': release.get('release_id'),
-                    'environment_id': deployment.get('environment'),
-                    'deployed_date': parse(deployment.get('date_created')).strftime('%d-%m-%YT%H:%M'),
-                    'requested_by': deployment.get('requested_by').split('/')[-1],
-                    'description': deployment.get('description')
-                }
-            )
-    return summaries
+            yield {
+                'release_id': release.get('release_id'),
+                'environment_id': deployment.get('environment'),
+                'deployed_date': parse(deployment.get('date_created')),
+                'requested_by': deployment.get('requested_by', {}).get("id", "").split('/')[-1],
+                'description': deployment.get('description')
+            }
 
 
 @click.group()
@@ -323,9 +320,26 @@ def show_deployments(ctx, release_id):
 
     releases = project.get_deployments(release_id)
 
-    summaries = _summarise_release_deployments(releases)
-    for summary in summaries:
-        click.echo("{release_id} {environment_id} {deployed_date} '{requested_by}'".format(**summary))
+    rows = []
+
+    headers = [
+        "release ID",
+        "environment ID",
+        "deployed date",
+        "request by",
+        "description"
+    ]
+
+    for summary in _summarise_release_deployments(releases):
+        rows.append([
+            summary.get("release_id", ""),
+            summary.get("environment_id", {}).get("id", ""),
+            summary["deployed_date"].strftime("%-d %b %Y @ %H:%M"),
+            summary.get("requested_by", ""),
+            summary.get("description", "")
+        ])
+
+    print(tabulate(rows, headers=headers))
 
 
 @cli.command()
