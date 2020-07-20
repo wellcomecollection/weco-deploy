@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+4.1.2 - 2020-07-20
+------------------
+
+Fix a bug in the ``show-deployments`` command.
+
+------------------
 4.1.1 - 2020-07-20
 ------------------
 
