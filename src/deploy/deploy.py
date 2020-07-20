@@ -34,11 +34,16 @@ def _summarise_ssm_response(images):
 def _summarise_release_deployments(releases):
     for release in releases:
         for deployment in release['deployments']:
+            try:
+                requested_by = deployment.get("requested_by", {}).get("id", "")
+            except AttributeError:
+                requested_by = deployment.get("requested_by", "")
+
             yield {
                 'release_id': release.get('release_id'),
                 'environment_id': deployment.get('environment'),
                 'deployed_date': parse(deployment.get('date_created')),
-                'requested_by': deployment.get('requested_by', {}).get("id", "").split('/')[-1],
+                'requested_by': requested_by.split('/')[-1],
                 'description': deployment.get('description')
             }
 
@@ -332,12 +337,17 @@ def show_deployments(ctx, release_id):
     ]
 
     for summary in _summarise_release_deployments(releases):
+        try:
+            environment_id = summary["environment_id"].get("id", "")
+        except AttributeError:
+            environment_id = summary["environment_id"]
+
         rows.append([
-            summary.get("release_id", ""),
-            summary.get("environment_id", {}).get("id", ""),
+            summary["release_id"],
+            environment_id,
             pprint_date(summary["deployed_date"]),
-            summary.get("requested_by", ""),
-            summary.get("description", "")
+            summary["requested_by"],
+            summary["description"]
         ])
 
     print(tabulate(rows, headers=headers))
