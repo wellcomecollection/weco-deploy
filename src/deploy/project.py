@@ -258,6 +258,23 @@ class Project:
         _ = self.get_environment(environment_id)
 
         deployment_details = {}
+
+        ecs_services_deployed = {}
+
+        # Memoize service deployments to prevent multiple deployments
+        def _deploy_ecs_service(service):
+            if service['serviceArn'] in ecs_services_deployed:
+                return ecs_services_deployed[service['serviceArn']]
+            else:
+                result = self.ecs.redeploy_service(
+                    service['clusterArn'],
+                    service['serviceArn']
+                )
+
+                ecs_services_deployed[service['serviceArn']] = result
+
+                return result
+
         for image_id, image_name in release['images'].items():
             ssm_result = self.parameter_store.update_ssm(
                 service_id=image_id,
@@ -277,10 +294,8 @@ class Project:
 
             ecs_deployments = []
             if image_id in matched_services:
-                deployments = [self.ecs.redeploy_service(
-                    service['clusterArn'],
-                    service['serviceArn']
-                ) for service in matched_services.get(image_id)]
+
+                deployments = [_deploy_ecs_service(service) for service in matched_services.get(image_id)]
 
                 for deployment in deployments:
                     service_arn = deployment['service_arn']
