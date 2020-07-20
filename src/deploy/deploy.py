@@ -5,7 +5,8 @@ from dateutil.parser import parse
 from pprint import pprint
 from tabulate import tabulate
 
-from.project import Projects
+from .pretty_printing import pprint_date
+from .project import Projects
 
 DEFAULT_PROJECT_FILEPATH = ".wellcome_project"
 DEFAULT_ECR_NAMESPACE = "uk.ac.wellcome"
@@ -334,7 +335,7 @@ def show_deployments(ctx, release_id):
         rows.append([
             summary.get("release_id", ""),
             summary.get("environment_id", {}).get("id", ""),
-            summary["deployed_date"].strftime("%-d %b %Y @ %H:%M"),
+            pprint_date(summary["deployed_date"]),
             summary.get("requested_by", ""),
             summary.get("description", "")
         ])
