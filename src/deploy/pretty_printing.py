@@ -69,7 +69,6 @@ def pprint_path_keyval_dict(paths):
     return pprint_nested_tree(tree)
 
 
-
 def pprint_date(date_obj, *, now=datetime.datetime.now()):
     assert date_obj <= now
 
