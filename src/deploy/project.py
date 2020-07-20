@@ -243,12 +243,15 @@ class Project:
         if not release_images:
             raise RuntimeError(f"No images found for {self.id}/{from_label}")
 
-        release = self._create_release(
+        previous_release = self.releases_store.get_latest_release()
+
+        new_release = self._create_release(
             description=description,
             images=release_images
         )
+        self.releases_store.put_release(new_release)
 
-        return self.releases_store.put_release(release)
+        return {"previous_release": previous_release, "new_release": new_release}
 
     def deploy(self, release_id, environment_id, namespace, description):
         release = self.get_release(release_id)

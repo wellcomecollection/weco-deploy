@@ -5,6 +5,7 @@ from dateutil.parser import parse
 from pprint import pprint
 from tabulate import tabulate
 
+from . import git
 from .pretty_printing import pprint_date
 from .project import Projects
 
@@ -239,18 +240,46 @@ def _prepare(project, from_label, namespace, description):
         description=description
     )
 
+    prev_release = release["previous_release"]
+    new_release = release["new_release"]
+
     click.echo(click.style(f"Prepared release from images in {from_label}", fg="green"))
-    click.echo(click.style(f"Requested by: {release['requested_by']}", fg="yellow"))
-    click.echo(click.style(f"Date created: {release['date_created']}", fg="yellow"))
+    click.echo(click.style(f"Requested by: {new_release['requested_by']}", fg="yellow"))
+    click.echo(click.style(f"Date created: {new_release['date_created']}", fg="yellow"))
     click.echo("")
 
-    for service, image in release['images'].items():
-        click.echo(click.style(f"{service}: {image}", fg="bright_yellow"))
+    rows = []
+
+    headers = [
+        "service",
+        "old image",
+        "new image",
+        "Git commit",
+    ]
+
+    for service, image in sorted(new_release["images"].items()):
+        # The image IDs are of the form
+        #
+        #     {ecr_repo_uri}/{namespace}/{service}:ref.{git_commit}
+        #
+        prev_git_commit = prev_release["images"].get(service, "").split(".")[-1][:7]
+        new_git_commit = image.split(".")[-1][:7]
+
+        rows.append([
+            service,
+            prev_git_commit,
+            new_git_commit
+            if new_git_commit == prev_git_commit
+            else click.style(new_git_commit, fg="green"),
+            git.log(new_git_commit),
+        ])
+
+    print(tabulate(rows, headers=headers))
 
     click.echo("")
-    click.echo(click.style(f"Created release {release['release_id']}", fg="bright_green"))
+    click.echo(click.style(f"Created release {new_release['release_id']}", fg="bright_green"))
 
-    return release['release_id']
+    return new_release['release_id']
 
 
 @cli.command()
