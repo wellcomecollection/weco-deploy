@@ -1,0 +1,8 @@
+[run]
+branch = True
+include =
+    **/.tox/*/lib/*/site-packages/deploy/*.py
+    **/.tox/*/lib/*/site-packages/deploy/**/*.py
+
+[report]
+show_missing = True

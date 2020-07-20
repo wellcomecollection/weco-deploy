@@ -3,8 +3,10 @@ import json
 
 from dateutil.parser import parse
 from pprint import pprint
+from tabulate import tabulate
 
-from.project import Projects
+from .pretty_printing import pprint_date
+from .project import Projects
 
 DEFAULT_PROJECT_FILEPATH = ".wellcome_project"
 DEFAULT_ECR_NAMESPACE = "uk.ac.wellcome"
@@ -30,19 +32,20 @@ def _summarise_ssm_response(images):
 
 
 def _summarise_release_deployments(releases):
-    summaries = []
     for release in releases:
         for deployment in release['deployments']:
-            summaries.append(
-                {
-                    'release_id': release.get('release_id'),
-                    'environment_id': deployment.get('environment'),
-                    'deployed_date': parse(deployment.get('date_created')).strftime('%d-%m-%YT%H:%M'),
-                    'requested_by': deployment.get('requested_by').split('/')[-1],
-                    'description': deployment.get('description')
-                }
-            )
-    return summaries
+            try:
+                requested_by = deployment.get("requested_by", {}).get("id", "")
+            except AttributeError:
+                requested_by = deployment.get("requested_by", "")
+
+            yield {
+                'release_id': release.get('release_id'),
+                'environment_id': deployment.get('environment'),
+                'deployed_date': parse(deployment.get('date_created')),
+                'requested_by': requested_by.split('/')[-1],
+                'description': deployment.get('description')
+            }
 
 
 @click.group()
@@ -323,9 +326,31 @@ def show_deployments(ctx, release_id):
 
     releases = project.get_deployments(release_id)
 
-    summaries = _summarise_release_deployments(releases)
-    for summary in summaries:
-        click.echo("{release_id} {environment_id} {deployed_date} '{requested_by}'".format(**summary))
+    rows = []
+
+    headers = [
+        "release ID",
+        "environment ID",
+        "deployed date",
+        "request by",
+        "description"
+    ]
+
+    for summary in _summarise_release_deployments(releases):
+        try:
+            environment_id = summary["environment_id"].get("id", "")
+        except AttributeError:
+            environment_id = summary["environment_id"]
+
+        rows.append([
+            summary["release_id"],
+            environment_id,
+            pprint_date(summary["deployed_date"]),
+            summary["requested_by"],
+            summary["description"]
+        ])
+
+    print(tabulate(rows, headers=headers))
 
 
 @cli.command()
