@@ -173,9 +173,16 @@ def _deploy(project, release_id, environment_id, namespace, description, confirm
 
     ecs_services = project.get_ecs_services(release_id, environment_id)
 
-    for image_id, services in ecs_services.items():
-        service_arns = [service['serviceArn'] for service in services]
-        click.echo(click.style(f"{image_id}: ECS Services discovered: {service_arns}", fg="bright_yellow"))
+    rows = []
+
+    headers = ["image ID", "services"]
+
+    for image_id, services in sorted(ecs_services.items()):
+        service_names = [serv["serviceArn"].split("/")[-1] for serv in services]
+        rows.append([image_id, ", ".join(sorted(service_names))])
+
+    print("ECS services discovered:\n")
+    print(tabulate(rows, headers=headers))
 
     if not confirm:
         click.echo("")
