@@ -393,9 +393,19 @@ def show_images(ctx, label):
 
     images = project.get_images(label)
 
+    rows = []
+
+    headers = [
+        "image ID",
+        "label",
+        "tag",
+    ]
+
     for image_id, ecr_uri in images.items():
         ecr_uri = _format_ecr_uri(ecr_uri)
-        click.echo(f"{image_id}: {ecr_uri}")
+        rows.append([image_id, ecr_uri["label"], ecr_uri["tag"]])
+
+    print(tabulate(rows, headers=headers))
 
 
 def main():
