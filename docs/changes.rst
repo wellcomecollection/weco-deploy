@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+4.1.6 - 2020-07-21
+------------------
+
+Modify the output of the ``deploy`` command to show a table of ECS services discovered.
+
+------------------
 4.1.5 - 2020-07-21
 ------------------
 
