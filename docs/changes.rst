@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+4.1.4 - 2020-07-21
+------------------
+
+When running the ``show-images`` command, print a table rather than a list.
+
+------------------
 4.1.3 - 2020-07-21
 ------------------
 
