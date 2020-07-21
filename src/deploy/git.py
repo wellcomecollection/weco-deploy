@@ -3,7 +3,7 @@ import functools
 from .commands import cmd
 
 
-@functools.lru_cache
+@functools.lru_cache()
 def log(commit_id):
     """
     Returns a one-line log for a given commit ID.
