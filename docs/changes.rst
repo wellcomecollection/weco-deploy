@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+4.1.5 - 2020-07-21
+------------------
+
+Fix a bug in the ``prepare`` command that would throw a subprocess.CalledProcessError if your release included a Git commit that you didn't have locally.
+
+------------------
 4.1.4 - 2020-07-21
 ------------------
 
