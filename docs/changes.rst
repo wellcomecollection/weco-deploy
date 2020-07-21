@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+4.1.3 - 2020-07-21
+------------------
+
+When running the ``prepare`` command, show a table of services, the Git commit of the previous and new release, and the commit message associated with the new images.
+
+------------------
 4.1.2 - 2020-07-20
 ------------------
 
