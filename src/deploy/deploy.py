@@ -92,11 +92,11 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_name, account_id
         click.echo(click.style(f"Loaded {project_file}:", fg="cyan"))
         pprint(config)
         click.echo("")
-        click.echo(click.style(f"Using role_arn:         {config['role_arn']}", fg="cyan"))
+        click.echo(click.style(f"Using role_arn:     {config['role_arn']}", fg="cyan"))
         click.echo(click.style(f"Using region_name:  {config['region_name']}", fg="cyan"))
-        click.echo(click.style(f"Running as role:        {user_arn}", fg="cyan"))
+        click.echo(click.style(f"Running as role:    {user_arn}", fg="cyan"))
         if user_arn != underlying_user_arn:
-            click.echo(click.style(f"Underlying role:        {underlying_user_arn}", fg="cyan"))
+            click.echo(click.style(f"Underlying role:    {underlying_user_arn}", fg="cyan"))
 
         click.echo(click.style(f"Using account_id:       {config['account_id']}", fg="cyan"))
         click.echo("")
