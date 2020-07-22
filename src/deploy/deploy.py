@@ -10,8 +10,6 @@ from .pretty_printing import pprint_date
 from .project import Projects
 
 DEFAULT_PROJECT_FILEPATH = ".wellcome_project"
-DEFAULT_ECR_NAMESPACE = "uk.ac.wellcome"
-
 
 def _format_ecr_uri(uri):
     image_name = uri.split("/")[2]
@@ -21,15 +19,6 @@ def _format_ecr_uri(uri):
         'label': image_label,
         'tag': image_tag
     }
-
-
-def _summarise_ssm_response(images):
-    for image in images:
-        yield {
-            'name': image['Name'],
-            'value': image['Value'],
-            'last_modified': image['LastModifiedDate'].strftime('%d-%m-%YT%H:%M')
-        }
 
 
 def _summarise_release_deployments(releases):
@@ -56,10 +45,11 @@ def _summarise_release_deployments(releases):
 @click.option("--project-id", '-i', help="Specify the project ID")
 @click.option("--region-name", '-i', help="Specify the AWS region name")
 @click.option("--account-id", help="Specify the AWS account ID")
+@click.option("--namespace", help="Specify the project namespace")
 @click.option("--role-arn", help="Specify an AWS role to assume")
 @click.option('--dry-run', '-d', is_flag=True, help="Don't make changes.")
 @click.pass_context
-def cli(ctx, project_file, verbose, confirm, project_id, region_name, account_id, role_arn, dry_run):
+def cli(ctx, project_file, verbose, confirm, project_id, region_name, account_id, namespace, role_arn, dry_run):
     try:
         projects = Projects(project_file)
     except FileNotFoundError:
@@ -88,8 +78,9 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_name, account_id
     project = projects.load(
         project_id=project_id,
         region_name=region_name,
+        role_arn=role_arn,
         account_id=account_id,
-        role_arn=role_arn
+        namespace=namespace
     )
 
     config = project.config
@@ -102,7 +93,7 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_name, account_id
         pprint(config)
         click.echo("")
         click.echo(click.style(f"Using role_arn:         {config['role_arn']}", fg="cyan"))
-        click.echo(click.style(f"Using aws_region_name:  {config['aws_region_name']}", fg="cyan"))
+        click.echo(click.style(f"Using region_name:  {config['region_name']}", fg="cyan"))
         click.echo(click.style(f"Running as role:        {user_arn}", fg="cyan"))
         if user_arn != underlying_user_arn:
             click.echo(click.style(f"Underlying role:        {underlying_user_arn}", fg="cyan"))
@@ -119,17 +110,14 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_name, account_id
     }
 
 
-def _publish(project, image_id, namespace, label):
+def _publish(project, image_id, label):
     click.echo(click.style(f"Attempting to publish {project.id}/{image_id}", fg="green"))
 
     publish_result = project.publish(
-        namespace=namespace,
         image_id=image_id,
         label=label
     )
 
-    ssm_path = publish_result['ssm_update']['ssm_path']
-    ssm_value = publish_result['ssm_update']['image_name']
     local_tag = publish_result['ecr_push']['local_tag']
     remote_uri = publish_result['ecr_push']['remote_uri']
     tag_source = publish_result['ecr_tag']['source']
@@ -137,28 +125,25 @@ def _publish(project, image_id, namespace, label):
 
     click.echo(click.style(f"Published {local_tag} to {remote_uri}", fg="yellow"))
     click.echo(click.style(f"Tagged {tag_source} with {tag_target}", fg="yellow"))
-    click.echo(click.style(f"Updated SSM path {ssm_path} to {ssm_value}", fg="yellow"))
 
     click.echo(click.style(f"Done publishing {project.id}/{image_id}", fg="bright_green"))
 
 
 @cli.command()
 @click.option("--image-id", required=True)
-@click.option("--namespace", required=True, default=DEFAULT_ECR_NAMESPACE)
 @click.option("--label", default="latest")
 @click.pass_context
-def publish(ctx, image_id, namespace, label):
+def publish(ctx, image_id, label):
     project = ctx.obj['project']
 
     _publish(
         project=project,
         image_id=image_id,
-        namespace=namespace,
         label=label
     )
 
 
-def _deploy(project, release_id, environment_id, namespace, description, confirm=True):
+def _deploy(project, release_id, environment_id, description, confirm=True):
     release = project.get_release(release_id)
 
     environment = project.get_environment(environment_id)
@@ -178,7 +163,7 @@ def _deploy(project, release_id, environment_id, namespace, description, confirm
     headers = ["image ID", "services"]
 
     for image_id, services in sorted(ecs_services.items()):
-        service_names = [serv["serviceArn"].split("/")[-1] for serv in services]
+        service_names = [serv['ecs_response']["serviceArn"].split("/")[-1] for serv in services]
         rows.append([image_id, ", ".join(sorted(service_names))])
 
     print("ECS services discovered:\n")
@@ -188,7 +173,7 @@ def _deploy(project, release_id, environment_id, namespace, description, confirm
         click.echo("")
         click.confirm(click.style("Create deployment?", fg="cyan", bold=True), abort=True)
 
-    result = project.deploy(release_id, environment_id, namespace, description)
+    result = project.deploy(release_id, environment_id, description)
 
     click.echo("")
     click.echo(click.style("Deployment Summary", fg="green"))
@@ -197,10 +182,6 @@ def _deploy(project, release_id, environment_id, namespace, description, confirm
     click.echo("")
     for image_id, summary in result['details'].items():
         click.echo(click.style(f"Summary for {image_id}", fg="bright_yellow"))
-        click.echo(click.style(
-            f"{image_id}: SSM Updated {summary['ssm_result']['ssm_path']} to {summary['ssm_result']['image_name']}",
-            fg="yellow"
-        ))
         click.echo(click.style(
             f"{image_id}: ECR Updated {summary['tag_result']['source']} to {summary['tag_result']['target']}",
             fg="yellow"
@@ -222,11 +203,10 @@ def _deploy(project, release_id, environment_id, namespace, description, confirm
 @click.option('--environment-id', prompt="Environment ID to deploy release to",
               default="stage", show_default=True,
               help="The target environment of this deployment")
-@click.option("--namespace", default=DEFAULT_ECR_NAMESPACE, show_default=True)
 @click.option('--description', prompt="Enter a description for this deployment",
               help="A description of this deployment", default="No description provided")
 @click.pass_context
-def deploy(ctx, release_id, environment_id, namespace, description):
+def deploy(ctx, release_id, environment_id, description):
     confirm = ctx.obj['confirm']
     project = ctx.obj['project']
 
@@ -234,16 +214,14 @@ def deploy(ctx, release_id, environment_id, namespace, description):
         project=project,
         release_id=release_id,
         environment_id=environment_id,
-        namespace=namespace,
         description=description,
         confirm=confirm
     )
 
 
-def _prepare(project, from_label, namespace, description):
+def _prepare(project, from_label, description):
     release = project.prepare(
         from_label=from_label,
-        namespace=namespace,
         description=description
     )
 
@@ -293,18 +271,15 @@ def _prepare(project, from_label, namespace, description):
 @click.option('--from-label', prompt="Label to base release upon",
               help="The existing label upon which this release will be based",
               default="latest", show_default=True)
-@click.option('--namespace', help="Namespace in which to locate images",
-              default=DEFAULT_ECR_NAMESPACE)
 @click.option('--description', prompt="Description for this release",
               default="No description provided")
 @click.pass_context
-def prepare(ctx, from_label, namespace, description):
+def prepare(ctx, from_label, description):
     project = ctx.obj['project']
 
     _prepare(
         project=project,
         from_label=from_label,
-        namespace=namespace,
         description=description
     )
 
@@ -315,7 +290,6 @@ def prepare(ctx, from_label, namespace, description):
 @click.option('--environment-id', prompt="Environment ID to deploy release to",
               default="stage", show_default=True,
               help="The target environment of this deployment")
-@click.option("--namespace", default=DEFAULT_ECR_NAMESPACE, show_default=True)
 @click.option('--description', prompt="Enter a description for this deployment",
               help="A description of this deployment", default="No description provided")
 @click.pass_context
@@ -326,7 +300,6 @@ def release_deploy(ctx, from_label, environment_id, namespace, description):
     release_id = _prepare(
         project=project,
         from_label=from_label,
-        namespace=namespace,
         description=description
     )
 
@@ -334,7 +307,6 @@ def release_deploy(ctx, from_label, environment_id, namespace, description):
         project=project,
         release_id=release_id,
         environment_id=environment_id,
-        namespace=namespace,
         description=description,
         confirm=confirm
     )
