@@ -1,6 +1,5 @@
-import itertools
-
 from .iam import Iam
+from .iterators import chunked_iterable
 
 
 class Ecs:
@@ -17,37 +16,19 @@ class Ecs:
         self._load_described_services()
 
     def _load_described_services(self):
-        service_arns_iterator = self.list_cluster_service_arns()
+        for cluster_arn in self.list_cluster_arns():
+            service_arns = self.list_service_arns(cluster_arn=cluster_arn)
 
-        services = {}
-        for cluster_arn, service_arn in service_arns_iterator:
-            if cluster_arn in services:
-                services[cluster_arn].append(service_arn)
-            else:
-                services[cluster_arn] = [service_arn]
-
-        for cluster_arn, service_arns in services.items():
-            for service_arns_chunk in Ecs._chunked_iterable(service_arns, 10):
-                response = self.ecs.describe_services(
+            # We can specify up to 10 services in a single DescribeServices API call.
+            for service_set in chunked_iterable(service_arns, size=10):
+                resp = self.ecs.describe_services(
                     cluster=cluster_arn,
-                    services=service_arns_chunk,
-                    include=[
-                        'TAGS',
-                    ]
+                    services=service_set,
+                    include=["TAGS"]
                 )
 
-                for service_details in response['services']:
-                    self.described_services.append(service_details)
-
-    # Credit to https://alexwlchan.net/2018/12/iterating-in-fixed-size-chunks/
-    @staticmethod
-    def _chunked_iterable(iterable, size):
-        it = iter(iterable)
-        while True:
-            chunk = tuple(itertools.islice(it, size))
-            if not chunk:
-                break
-            yield chunk
+                for service_description in resp["services"]:
+                    self.described_services.append(service_description)
 
     def list_cluster_arns(self):
         """
@@ -58,7 +39,7 @@ class Ecs:
         for page in paginator.paginate():
             yield from page["clusterArns"]
 
-    def list_service_arns(self, cluster_arn):
+    def list_service_arns(self, *, cluster_arn):
         """
         Generates the ARN of every ECS service in a cluster.
         """
@@ -66,15 +47,6 @@ class Ecs:
 
         for page in paginator.paginate(cluster=cluster_arn):
             yield from page["serviceArns"]
-
-    def list_cluster_service_arns(self):
-        """
-        Generates a set of (cluster_arn, service_arn) tuples for every ECS cluster
-        in an account.
-        """
-        for cluster_arn in self.list_cluster_arns():
-            for service_arn in self.list_service_arns(cluster_arn=cluster_arn):
-                yield (cluster_arn, service_arn)
 
     def redeploy_service(self, cluster_arn, service_arn):
         response = self.ecs.update_service(
