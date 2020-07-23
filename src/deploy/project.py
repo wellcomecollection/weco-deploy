@@ -197,9 +197,6 @@ class Project:
 
         matched_services = {}
         for image_id, image_uri in release['images'].items():
-            # Naively assume service name matches image id
-            service_ids = [image_id]
-
             # Attempt to match deployment image id to config and override service_ids
             matched_image = self._match_image_id(image_id)
 

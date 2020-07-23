@@ -11,6 +11,7 @@ from .project import Projects
 
 DEFAULT_PROJECT_FILEPATH = ".wellcome_project"
 
+
 def _format_ecr_uri(uri):
     image_name = uri.split("/")[2]
     image_label, image_tag = image_name.split(":")
