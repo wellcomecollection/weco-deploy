@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.0.0 - 2020-07-23
+------------------
+
+Better handling of defaults to reduce repetition, services have their own config to allow deployment into differing accounts/regions.
+
+------------------
 4.1.6 - 2020-07-21
 ------------------
 
