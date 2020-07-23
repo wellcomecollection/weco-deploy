@@ -4,7 +4,7 @@ from .tags import parse_aws_tags
 
 
 class Ecs:
-    def __init__(self, account_id, region_name, role_arn):
+    def __init__(self, region_name, role_arn):
         session = Iam.get_session(
             session_name="ReleaseToolEcs",
             role_arn=role_arn,

@@ -117,7 +117,7 @@ class Project:
             role_arn=role_arn or self.role_arn
         )
 
-    def _ecs(self, account_id=None, region_name=None, role_arn=None):
+    def _ecs(self, region_name=None, role_arn=None):
         return Ecs(
             region_name=region_name or self.region_name,
             role_arn=role_arn or self.role_arn
@@ -193,7 +193,7 @@ class Project:
 
             return {
                 'config': service,
-                'ecs_response': ecs_service
+                'response': ecs_service
             }
 
         matched_services = {}
@@ -205,12 +205,8 @@ class Project:
 
             if matched_image:
                 services = matched_image.get('services', [])
-                available_services = [
-                    self.ecs.find_matching_service(
-                        service_id=service_id, environment_id=environment_id
-                    )
-                    for service_id in service_ids
-                ]
+
+                available_services = [_get_service(service) for service in services]
                 available_services = [service for service in available_services if service]
 
             if available_services:
@@ -312,19 +308,18 @@ class Project:
 
         # Memoize service deployments to prevent multiple deployments
         def _deploy_ecs_service(service):
-            if service['ecs_response']['serviceArn'] in ecs_services_deployed:
-                return ecs_services_deployed[service['ecs_response']['serviceArn']]
+            if service['response']['serviceArn'] in ecs_services_deployed:
+                return ecs_services_deployed['serviceArn']
             else:
                 result = self._ecs(
-                    account_id=service['config'].get('account_id'),
                     region_name=service['config'].get('region_name'),
                     role_arn=service['config'].get('role_arn'),
                 ).redeploy_service(
-                    service['ecs_response']['clusterArn'],
-                    service['ecs_response']['serviceArn']
+                    service['response']['clusterArn'],
+                    service['response']['serviceArn']
                 )
 
-                ecs_services_deployed[service['ecs_response']['serviceArn']] = result
+                ecs_services_deployed[service['response']['serviceArn']] = result
 
                 return result
 

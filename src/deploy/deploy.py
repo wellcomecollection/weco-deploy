@@ -167,7 +167,7 @@ def _deploy(project, release_id, environment_id, description, confirm=True):
     headers = ["image ID", "services"]
 
     for image_id, services in sorted(ecs_services.items()):
-        service_names = [serv['ecs_response']["serviceArn"].split("/")[-1] for serv in services]
+        service_names = [service['response']["serviceArn"].split("/")[-1] for service in services]
         rows.append([image_id, ", ".join(sorted(service_names))])
 
     print("ECS services discovered:\n")
