@@ -144,7 +144,7 @@ def publish(ctx, image_id, label):
     )
 
 
-def _deploy(project, release_id, environment_id, description, confirm=True):
+def _deploy(project, release_id, environment_id, description, confirm=True, skip_ecs_deploy=False):
     release = project.get_release(release_id)
 
     environment = project.get_environment(environment_id)
@@ -184,7 +184,12 @@ def _deploy(project, release_id, environment_id, description, confirm=True):
         click.echo("")
         click.confirm(click.style("Create deployment?", fg="cyan", bold=True), abort=True)
 
-    result = project.deploy(release_id, environment_id, description)
+    result = project.deploy(
+        release_id=release_id,
+        environment_id=environment_id,
+        description=description,
+        skip_ecs_deploy=skip_ecs_deploy
+    )
 
     click.echo("")
     click.echo(click.style("Deployment Summary", fg="green"))
@@ -193,16 +198,31 @@ def _deploy(project, release_id, environment_id, description, confirm=True):
     click.echo("")
     for image_id, summary in result['details'].items():
         click.echo(click.style(f"Summary for {image_id}", fg="bright_yellow"))
-        click.echo(click.style(
-            f"{image_id}: ECR Updated {summary['tag_result']['source']} to {summary['tag_result']['target']}",
-            fg="yellow"
-        ))
+        source = summary['tag_result']['source']
+        target = summary['tag_result']['target']
 
-        for ecs_deployment in summary['ecs_deployments']:
+        if summary['tag_result']['status'] == "noop":
             click.echo(click.style(
-                f"{image_id}: ECS Deployed {ecs_deployment['service_arn']} to {ecs_deployment['deployment_id']}",
+                f"{image_id}: ECR Tags not updated, {source} already tagged {target}",
                 fg="yellow"
             ))
+        else:
+            click.echo(click.style(
+                f"{image_id}: ECR Tags Updated {source} tagged with {target}",
+                fg="yellow"
+            ))
+
+        if skip_ecs_deploy:
+            click.echo(click.style(
+                f"{image_id}: ECS Not Deployed (skip_ecs_deploy=True)",
+                fg="yellow"
+            ))
+        else:
+            for ecs_deployment in summary['ecs_deployments']:
+                click.echo(click.style(
+                    f"{image_id}: ECS Deployed {ecs_deployment['service_arn']} to {ecs_deployment['deployment_id']}",
+                    fg="yellow"
+                ))
 
     click.echo("")
     click.echo(click.style(f"Deployed release {release['release_id']} to {env_id}, ({env_name})", fg="bright_green"))
@@ -216,8 +236,9 @@ def _deploy(project, release_id, environment_id, description, confirm=True):
               help="The target environment of this deployment")
 @click.option('--description', prompt="Enter a description for this deployment",
               help="A description of this deployment", default="No description provided")
+@click.option('--skip-ecs-deploy', '-y', is_flag=True, help="Do not attempt to force redeployment")
 @click.pass_context
-def deploy(ctx, release_id, environment_id, description):
+def deploy(ctx, release_id, environment_id, description, skip_ecs_deploy):
     confirm = ctx.obj['confirm']
     project = ctx.obj['project']
 
@@ -226,7 +247,8 @@ def deploy(ctx, release_id, environment_id, description):
         release_id=release_id,
         environment_id=environment_id,
         description=description,
-        confirm=confirm
+        confirm=confirm,
+        skip_ecs_deploy=skip_ecs_deploy
     )
 
 

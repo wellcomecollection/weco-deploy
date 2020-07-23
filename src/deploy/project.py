@@ -322,7 +322,7 @@ class Project:
             new_tag=new_tag
         )
 
-    def deploy(self, release_id, environment_id, description):
+    def deploy(self, release_id, environment_id, description, skip_ecs_deploy=False):
         release = self.get_release(release_id)
         matched_services = self.get_ecs_services(
             release=release,
@@ -352,16 +352,16 @@ class Project:
 
             ecs_deployments = []
             if image_id in matched_services:
+                if not skip_ecs_deploy:
+                    deployments = [_ecs_deploy(service) for service in matched_services.get(image_id)]
 
-                deployments = [_ecs_deploy(service) for service in matched_services.get(image_id)]
-
-                for deployment in deployments:
-                    service_arn = deployment['service_arn']
-                    deployment_id = deployment['deployment_id']
-                    ecs_deployments.append({
-                        'service_arn': service_arn,
-                        'deployment_id': deployment_id
-                    })
+                    for deployment in deployments:
+                        service_arn = deployment['service_arn']
+                        deployment_id = deployment['deployment_id']
+                        ecs_deployments.append({
+                            'service_arn': service_arn,
+                            'deployment_id': deployment_id
+                        })
 
             deployment_details[image_id] = {
                 'tag_result': tag_result,
