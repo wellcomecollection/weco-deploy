@@ -180,9 +180,7 @@ class Project:
         else:
             return self.releases_store.get_release(release_id)
 
-    def get_ecs_services(self, release_id, environment_id):
-        release = self.get_release(release_id)
-
+    def get_ecs_services(self, release, environment_id):
         def _get_service(service):
             ecs_service = self._ecs(
                 account_id=service.get('account_id'),
@@ -291,7 +289,10 @@ class Project:
 
     def deploy(self, release_id, environment_id, description):
         release = self.get_release(release_id)
-        matched_services = self.get_ecs_services(release_id, environment_id)
+        matched_services = self.get_ecs_services(
+            release=release,
+            environment_id=environment_id
+        )
 
         # Force check for valid environment
         _ = self.get_environment(environment_id)

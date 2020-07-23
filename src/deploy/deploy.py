@@ -157,7 +157,10 @@ def _deploy(project, release_id, environment_id, description, confirm=True):
     click.echo(click.style(f"Requested by: {release['requested_by']}", fg="yellow"))
     click.echo(click.style(f"Date created: {release['date_created']}", fg="yellow"))
 
-    ecs_services = project.get_ecs_services(release_id, environment_id)
+    ecs_services = project.get_ecs_services(
+        release=release,
+        environment_id=environment_id
+    )
 
     rows = []
 
