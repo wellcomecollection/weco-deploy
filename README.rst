@@ -29,7 +29,7 @@ following format:
           # Optional service block for automated deployments
           # This tag needs to match the value of ECS service tag "deployment:service"
           services:
-          - ecs_service_tag
+          - id: ecs_service_tag
         name: My Awesome Project
         role_arn: arn:aws:iam::12345678901:role/platform-ci
         aws_region_name: eu-west-1
