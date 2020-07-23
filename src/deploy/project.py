@@ -8,10 +8,10 @@ from .ecr import Ecr
 from .ecs import Ecs
 
 from .releases_store import DynamoDbReleaseStore
-from .parameter_store import SsmParameterStore
 from .iam import Iam
 
 DEFAULT_ECR_NAMESPACE = "uk.ac.wellcome"
+DEFAULT_REGION_NAME = "eu-west-1"
 
 
 def _is_url(label):
@@ -34,31 +34,50 @@ class Projects:
     def list(self):
         return list(self.projects.keys())
 
-    def load(self, project_id, region_name=None, role_arn=None, account_id=None):
+    def load(self, project_id, region_name=None, role_arn=None, account_id=None, namespace=None):
         config = self.projects.get(project_id)
 
         if not config:
             raise RuntimeError(f"No matching project {project_id} in {self.projects()}")
 
-        return Project(project_id, config, region_name, role_arn, account_id)
+        return Project(
+            project_id=project_id,
+            config=config,
+            region_name=region_name,
+            role_arn=role_arn,
+            account_id=account_id,
+            namespace=namespace
+        )
 
 
 class Project:
-    def __init__(self, project_id, config, region_name=None, role_arn=None, account_id=None):
+    def __init__(self, project_id, config, region_name=None, role_arn=None, account_id=None, namespace=None):
         self.id = project_id
         self.config = config
 
         self.config['id'] = project_id
 
+        if namespace:
+            self.config['namespace'] = namespace
+        else:
+            if 'namespace' not in self.config:
+                self.config['namespace'] = DEFAULT_ECR_NAMESPACE
+
         if role_arn:
             self.config['role_arn'] = role_arn
+        else:
+            if 'role_arn' not in self.config:
+                raise ValueError("region_name is not set!")
 
         if region_name:
-            self.config['aws_region_name'] = region_name
+            self.config['region_name'] = region_name
+        else:
+            if 'region_name' not in self.config:
+                self.config['region_name'] = DEFAULT_REGION_NAME
 
         iam = Iam(
             self.config['role_arn'],
-            self.config['aws_region_name']
+            self.config['region_name']
         )
 
         self.user_details = {
@@ -74,8 +93,10 @@ class Project:
 
         # Initialise project level vars
         self.role_arn = self.config['role_arn']
-        self.region_name = self.config['aws_region_name']
+        self.region_name = self.config['region_name']
         self.account_id = self.config['account_id']
+        self.namespace = self.config['namespace']
+        self.image_repositories = self.config.get('image_repositories', [])
 
         # Create required services
         self.releases_store = DynamoDbReleaseStore(
@@ -84,27 +105,24 @@ class Project:
             role_arn=self.role_arn
         )
 
-        self.parameter_store = SsmParameterStore(
-            project_id=self.id,
-            region_name=self.region_name,
-            role_arn=self.role_arn
-        )
-
-        self.ecr = Ecr(
-            account_id=self.account_id,
-            region_name=self.region_name,
-            role_arn=self.role_arn
-        )
-
-        self.ecs = Ecs(
-            account_id=self.account_id,
-            region_name=self.region_name,
-            role_arn=self.role_arn
-        )
+        self.prepared_releases = {}
 
         # Ensure release store is available
         self.releases_store.initialise()
-        self.prepared_releases = {}
+
+    def _ecr(self, account_id=None, region_name=None, role_arn=None):
+        return Ecr(
+            account_id=account_id or self.account_id,
+            region_name=region_name or self.region_name,
+            role_arn=role_arn or self.role_arn
+        )
+
+    def _ecs(self, account_id=None, region_name=None, role_arn=None):
+        return Ecs(
+            account_id=account_id or self.account_id,
+            region_name=region_name or self.region_name,
+            role_arn=role_arn or self.role_arn
+        )
 
     def _create_deployment(self, environment_id, details, description):
         return {
@@ -128,6 +146,17 @@ class Project:
             "images": images,
             "deployments": []
         }
+
+    def _match_image_id(self, image_id):
+        matched_images = [image for image in self.image_repositories if image['id'] == image_id]
+
+        if len(matched_images) > 1:
+            raise RuntimeError(f"Multiple matching images found for {image_id}: ({matched_images}!")
+
+        if matched_images:
+            return matched_images[0]
+        else:
+            return None
 
     def get_environment(self, environment_id):
         environments = {
@@ -154,49 +183,63 @@ class Project:
     def get_ecs_services(self, release_id, environment_id):
         release = self.get_release(release_id)
 
+        def _get_service(service):
+            ecs_service = self._ecs(
+                account_id=service.get('account_id'),
+                region_name=service.get('region_name'),
+                role_arn=service.get('role_arn')
+            ).get_service(service['id'], environment_id)
+
+            return {
+                'config': service,
+                'ecs_response': ecs_service
+            }
+
         matched_services = {}
         for image_id, image_uri in release['images'].items():
-            image_repositories = self.config.get('image_repositories')
-
-            # Naively assume service name matches image id
-            service_ids = [image_id]
-
             # Attempt to match deployment image id to config and override service_ids
-            if image_repositories:
-                matched_image_ids = [image for image in image_repositories if image['id'] == image_id]
+            matched_image = self._match_image_id(image_id)
 
-                if matched_image_ids:
-                    matched_image_id = matched_image_ids[0]
-                    service_ids = matched_image_id.get('services', [])
+            available_services = []
 
-            # Attempt to match service ids to ECS services
-            available_services = [self.ecs.get_service(service_id, environment_id) for service_id in service_ids]
-            available_services = [service for service in available_services if service]
+            if matched_image:
+                services = matched_image.get('services', [])
+                available_services = filter(None.__ne__, [_get_service(service) for service in services])
 
             if available_services:
                 matched_services[image_id] = available_services
 
         return matched_services
 
-    def publish(self, namespace, image_id, label):
-        self.ecr.login()
+    def publish(self, image_id, label):
+        # Attempt to match image to config
+        matched_image = self._match_image_id(image_id)
 
-        remote_uri, remote_tag, local_tag = self.ecr.publish_image(
+        # Assume default account id & namespace
+        account_id = self.account_id
+        namespace = self.namespace
+
+        # If we find a match, set overrides
+        if matched_image:
+            # Check if namespace/account_id is overridden for this image
+            namespace = matched_image.get('namespace', self.namespace)
+            account_id = matched_image.get('account_id', self.account_id)
+
+        # Create an ECR client for the correct account
+        ecr = self._ecr(account_id)
+
+        ecr.login()
+
+        remote_uri, remote_tag, local_tag = ecr.publish_image(
             namespace=namespace,
             image_id=image_id,
         )
 
-        tag_result = self.ecr.tag_image(
+        tag_result = ecr.tag_image(
             namespace=namespace,
             image_id=image_id,
             tag=remote_tag,
             new_tag=label
-        )
-
-        ssm_result = self.parameter_store.update_ssm(
-            image_id,
-            label,
-            remote_uri,
         )
 
         return {
@@ -205,40 +248,32 @@ class Project:
                 'remote_tag': remote_tag,
                 'remote_uri': remote_uri,
             },
-            'ecr_tag': tag_result,
-            'ssm_update': ssm_result
+            'ecr_tag': tag_result
         }
 
-    def get_images(self, from_label, namespace=DEFAULT_ECR_NAMESPACE):
-        image_repositories = self.config.get('image_repositories')
-
+    def get_images(self, from_label):
         release_images = {}
-        if image_repositories:
-            for image in image_repositories:
-                image_id = image['id']
-                account_id = image.get('account_id', self.account_id)
-                namespace = image.get('namespace', namespace)
+        for image in self.image_repositories:
 
-                image_details = self.ecr.describe_image(
-                    namespace=namespace,
-                    image_id=image_id,
-                    tag=from_label,
-                    account_id=account_id
-                )
+            image_id = image['id']
 
-                release_images[image_details['image_id']] = image_details['ref']
-        else:
-            release_images = self.parameter_store.get_services_to_images(
-                label=from_label
+            image_details = self._ecr(
+                account_id=image.get('account_id'),
+                region_name=image.get('region_name'),
+                role_arn=image.get('role_arn')
+            ).describe_image(
+                namespace=image.get('namespace', self.namespace),
+                image_id=image_id,
+                tag=from_label,
+                account_id=image.get('account_id')
             )
+
+            release_images[image_details['image_id']] = image_details['ref']
 
         return release_images
 
-    def prepare(self, from_label, description, namespace=DEFAULT_ECR_NAMESPACE):
-        release_images = self.get_images(
-            from_label=from_label,
-            namespace=namespace
-        )
+    def prepare(self, from_label, description):
+        release_images = self.get_images(from_label)
 
         if not release_images:
             raise RuntimeError(f"No images found for {self.id}/{from_label}")
@@ -249,11 +284,12 @@ class Project:
             description=description,
             images=release_images
         )
+
         self.releases_store.put_release(new_release)
 
         return {"previous_release": previous_release, "new_release": new_release}
 
-    def deploy(self, release_id, environment_id, namespace, description):
+    def deploy(self, release_id, environment_id, description):
         release = self.get_release(release_id)
         matched_services = self.get_ecs_services(release_id, environment_id)
 
@@ -266,30 +302,38 @@ class Project:
 
         # Memoize service deployments to prevent multiple deployments
         def _deploy_ecs_service(service):
-            if service['serviceArn'] in ecs_services_deployed:
-                return ecs_services_deployed[service['serviceArn']]
+            if service['ecs_response']['serviceArn'] in ecs_services_deployed:
+                return ecs_services_deployed[service['ecs_response']['serviceArn']]
             else:
-                result = self.ecs.redeploy_service(
-                    service['clusterArn'],
-                    service['serviceArn']
+                result = self._ecs(
+                    account_id=service['config'].get('account_id'),
+                    region_name=service['config'].get('region_name'),
+                    role_arn=service['config'].get('role_arn'),
+                ).redeploy_service(
+                    service['ecs_response']['clusterArn'],
+                    service['ecs_response']['serviceArn']
                 )
 
-                ecs_services_deployed[service['serviceArn']] = result
+                ecs_services_deployed[service['ecs_response']['serviceArn']] = result
 
                 return result
 
         for image_id, image_name in release['images'].items():
-            ssm_result = self.parameter_store.update_ssm(
-                service_id=image_id,
-                label=environment_id,
-                image_name=image_name
-            )
-
             old_tag = image_name.split(":")[-1]
             new_tag = f"env.{environment_id}"
 
-            tag_result = self.ecr.tag_image(
-                namespace=namespace,
+            matched_image = self._match_image_id(image_id)
+            if matched_image:
+                ecr = self._ecr(
+                    account_id=matched_image.get('account_id'),
+                    region_name=matched_image.get('region_name'),
+                    role_arn=matched_image.get('role_arn'),
+                )
+            else:
+                ecr = self._ecr()
+
+            tag_result = ecr.tag_image(
+                namespace=self.namespace,
                 image_id=image_id,
                 tag=old_tag,
                 new_tag=new_tag
@@ -309,7 +353,6 @@ class Project:
                     })
 
             deployment_details[image_id] = {
-                'ssm_result': ssm_result,
                 'tag_result': tag_result,
                 'ecs_deployments': ecs_deployments
             }

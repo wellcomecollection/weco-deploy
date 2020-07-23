@@ -105,7 +105,7 @@ class Ecs:
         )]
 
         if len(matched_services) > 1:
-            raise RuntimeError(f"Multiple matching services found for {service_id}/{env}!")
+            raise RuntimeError(f"Multiple matching services found for {service_id}/{env}: ({matched_services}!")
 
         if len(matched_services) == 0:
             return None
