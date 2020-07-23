@@ -5,14 +5,12 @@ from .tags import parse_aws_tags
 
 class Ecs:
     def __init__(self, account_id, region_name, role_arn):
-        self.account_id = account_id
-        self.region_name = region_name
-        self.session = Iam.get_session(
+        session = Iam.get_session(
             session_name="ReleaseToolEcs",
             role_arn=role_arn,
             region_name=region_name
         )
-        self.ecs = self.session.client('ecs')
+        self.ecs = session.client('ecs')
         self.described_services = []
         self._load_described_services()
 

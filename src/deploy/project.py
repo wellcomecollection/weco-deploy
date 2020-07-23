@@ -119,7 +119,6 @@ class Project:
 
     def _ecs(self, account_id=None, region_name=None, role_arn=None):
         return Ecs(
-            account_id=account_id or self.account_id,
             region_name=region_name or self.region_name,
             role_arn=role_arn or self.role_arn
         )
@@ -183,7 +182,6 @@ class Project:
     def get_ecs_services(self, release, environment_id):
         def _get_service(service):
             ecs = self._ecs(
-                account_id=service.get('account_id'),
                 region_name=service.get('region_name'),
                 role_arn=service.get('role_arn')
             )
