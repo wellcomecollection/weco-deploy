@@ -182,11 +182,16 @@ class Project:
 
     def get_ecs_services(self, release, environment_id):
         def _get_service(service):
-            ecs_service = self._ecs(
+            ecs = self._ecs(
                 account_id=service.get('account_id'),
                 region_name=service.get('region_name'),
                 role_arn=service.get('role_arn')
-            ).get_service(service['id'], environment_id)
+            )
+
+            ecs_service = ecs.find_matching_service(
+                service_id=service['id'],
+                environment_id=environment_id
+            )
 
             return {
                 'config': service,
@@ -202,7 +207,13 @@ class Project:
 
             if matched_image:
                 services = matched_image.get('services', [])
-                available_services = filter(None.__ne__, [_get_service(service) for service in services])
+                available_services = [
+                    self.ecs.find_matching_service(
+                        service_id=service_id, environment_id=environment_id
+                    )
+                    for service_id in service_ids
+                ]
+                available_services = [service for service in available_services if service]
 
             if available_services:
                 matched_services[image_id] = available_services

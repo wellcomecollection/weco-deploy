@@ -62,9 +62,9 @@ class Ecs:
             'deployment_id': response['service']['deployments'][0]['id']
         }
 
-    def get_service(self, service_id, env):
+    def find_matching_service(self, *, service_id, environment_id):
         """
-        Given a service ID (e.g. bag-unpacker) and an environment (e.g. prod),
+        Given a service (e.g. bag-unpacker) and an environment (e.g. prod),
         return the unique matching service.
         """
         def _has_matching_tags(service):
@@ -72,7 +72,7 @@ class Ecs:
 
             return (
                 service_tags.get("deployment:service") == service_id and
-                service_tags.get("deployment:env") == env
+                service_tags.get("deployment:env") == environment_id
             )
 
         matched_services = [
@@ -82,7 +82,10 @@ class Ecs:
         ]
 
         if len(matched_services) > 1:
-            raise RuntimeError(f"Multiple matching services found for {service_id}/{env}: ({matched_services}!")
+            raise RuntimeError(
+                f"Multiple matching services found for {service_id}/{environment_id}: "
+                f"({matched_services})!"
+            )
 
         if len(matched_services) == 0:
             return None
