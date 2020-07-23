@@ -117,9 +117,8 @@ class Project:
             role_arn=role_arn or self.role_arn
         )
 
-    def _ecs(self, account_id=None, region_name=None, role_arn=None):
+    def _ecs(self, region_name=None, role_arn=None):
         return Ecs(
-            account_id=account_id or self.account_id,
             region_name=region_name or self.region_name,
             role_arn=role_arn or self.role_arn
         )
@@ -180,19 +179,21 @@ class Project:
         else:
             return self.releases_store.get_release(release_id)
 
-    def get_ecs_services(self, release_id, environment_id):
-        release = self.get_release(release_id)
-
+    def get_ecs_services(self, release, environment_id):
         def _get_service(service):
-            ecs_service = self._ecs(
-                account_id=service.get('account_id'),
+            ecs = self._ecs(
                 region_name=service.get('region_name'),
                 role_arn=service.get('role_arn')
-            ).get_service(service['id'], environment_id)
+            )
+
+            ecs_service = ecs.find_matching_service(
+                service_id=service['id'],
+                environment_id=environment_id
+            )
 
             return {
                 'config': service,
-                'ecs_response': ecs_service
+                'response': ecs_service
             }
 
         matched_services = {}
@@ -204,7 +205,9 @@ class Project:
 
             if matched_image:
                 services = matched_image.get('services', [])
-                available_services = filter(None.__ne__, [_get_service(service) for service in services])
+
+                available_services = [_get_service(service) for service in services]
+                available_services = [service for service in available_services if service]
 
             if available_services:
                 matched_services[image_id] = available_services
@@ -289,9 +292,42 @@ class Project:
 
         return {"previous_release": previous_release, "new_release": new_release}
 
+    def _deploy_ecs_service(self, service):
+        return self._ecs(
+            region_name=service['config'].get('region_name'),
+            role_arn=service['config'].get('role_arn'),
+        ).redeploy_service(
+            service['response']['clusterArn'],
+            service['response']['serviceArn']
+        )
+
+    def _tag_ecr_image(self, environment_id, image_id, image_name):
+        old_tag = image_name.split(":")[-1]
+        new_tag = f"env.{environment_id}"
+
+        matched_image = self._match_image_id(image_id)
+        if matched_image:
+            ecr = self._ecr(
+                account_id=matched_image.get('account_id'),
+                region_name=matched_image.get('region_name'),
+                role_arn=matched_image.get('role_arn'),
+            )
+        else:
+            ecr = self._ecr()
+
+        return ecr.tag_image(
+            namespace=self.namespace,
+            image_id=image_id,
+            tag=old_tag,
+            new_tag=new_tag
+        )
+
     def deploy(self, release_id, environment_id, description):
         release = self.get_release(release_id)
-        matched_services = self.get_ecs_services(release_id, environment_id)
+        matched_services = self.get_ecs_services(
+            release=release,
+            environment_id=environment_id
+        )
 
         # Force check for valid environment
         _ = self.get_environment(environment_id)
@@ -301,48 +337,23 @@ class Project:
         ecs_services_deployed = {}
 
         # Memoize service deployments to prevent multiple deployments
-        def _deploy_ecs_service(service):
-            if service['ecs_response']['serviceArn'] in ecs_services_deployed:
-                return ecs_services_deployed[service['ecs_response']['serviceArn']]
-            else:
-                result = self._ecs(
-                    account_id=service['config'].get('account_id'),
-                    region_name=service['config'].get('region_name'),
-                    role_arn=service['config'].get('role_arn'),
-                ).redeploy_service(
-                    service['ecs_response']['clusterArn'],
-                    service['ecs_response']['serviceArn']
-                )
+        def _ecs_deploy(service):
+            if service['response']['serviceArn'] not in ecs_services_deployed:
+                ecs_services_deployed[service['response']['serviceArn']] = self._deploy_ecs_service(service)
 
-                ecs_services_deployed[service['ecs_response']['serviceArn']] = result
-
-                return result
+            return ecs_services_deployed[service['response']['serviceArn']]
 
         for image_id, image_name in release['images'].items():
-            old_tag = image_name.split(":")[-1]
-            new_tag = f"env.{environment_id}"
-
-            matched_image = self._match_image_id(image_id)
-            if matched_image:
-                ecr = self._ecr(
-                    account_id=matched_image.get('account_id'),
-                    region_name=matched_image.get('region_name'),
-                    role_arn=matched_image.get('role_arn'),
-                )
-            else:
-                ecr = self._ecr()
-
-            tag_result = ecr.tag_image(
-                namespace=self.namespace,
+            tag_result = self._tag_ecr_image(
+                environment_id=environment_id,
                 image_id=image_id,
-                tag=old_tag,
-                new_tag=new_tag
+                image_name=image_name
             )
 
             ecs_deployments = []
             if image_id in matched_services:
 
-                deployments = [_deploy_ecs_service(service) for service in matched_services.get(image_id)]
+                deployments = [_ecs_deploy(service) for service in matched_services.get(image_id)]
 
                 for deployment in deployments:
                     service_arn = deployment['service_arn']

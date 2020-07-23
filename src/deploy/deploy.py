@@ -157,14 +157,17 @@ def _deploy(project, release_id, environment_id, description, confirm=True):
     click.echo(click.style(f"Requested by: {release['requested_by']}", fg="yellow"))
     click.echo(click.style(f"Date created: {release['date_created']}", fg="yellow"))
 
-    ecs_services = project.get_ecs_services(release_id, environment_id)
+    ecs_services = project.get_ecs_services(
+        release=release,
+        environment_id=environment_id
+    )
 
     rows = []
 
     headers = ["image ID", "services"]
 
     for image_id, services in sorted(ecs_services.items()):
-        service_names = [serv['ecs_response']["serviceArn"].split("/")[-1] for serv in services]
+        service_names = [service['response']["serviceArn"].split("/")[-1] for service in services]
         rows.append([image_id, ", ".join(sorted(service_names))])
 
     print("ECS services discovered:\n")
