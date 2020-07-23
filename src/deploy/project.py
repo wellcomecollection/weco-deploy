@@ -349,7 +349,7 @@ class Project:
                 image_id=image_id,
                 image_name=image_name
             )
-            
+
             ecs_deployments = []
             if image_id in matched_services:
 
