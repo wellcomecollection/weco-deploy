@@ -166,12 +166,19 @@ def _deploy(project, release_id, environment_id, description, confirm=True):
 
     headers = ["image ID", "services"]
 
+    def _get_service_name(service):
+        if service['response']:
+            return click.style(service['response']["serviceArn"].split("/")[-1], fg="green")
+        else:
+            return click.style("Not found", fg="red")
+
     for image_id, services in sorted(ecs_services.items()):
-        service_names = [service['response']["serviceArn"].split("/")[-1] for service in services]
+        service_names = [_get_service_name(service) for service in services]
         rows.append([image_id, ", ".join(sorted(service_names))])
 
-    print("ECS services discovered:\n")
-    print(tabulate(rows, headers=headers))
+    click.echo("")
+    click.echo(click.style("ECS services discovered:\n", fg="yellow", underline=True))
+    click.echo(click.style(tabulate(rows, headers=headers), fg="yellow"))
 
     if not confirm:
         click.echo("")
@@ -263,7 +270,7 @@ def _prepare(project, from_label, description):
             git.log(new_git_commit),
         ])
 
-    print(tabulate(rows, headers=headers))
+    click.echo(click.style(tabulate(rows, headers=headers), fg="yellow"))
 
     click.echo("")
     click.echo(click.style(f"Created release {new_release['release_id']}", fg="bright_green"))
