@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.0.2 - 2020-07-23
+------------------
+
+Nicer colours & handle no matching services in deploy step
+
+------------------
 5.0.1 - 2020-07-23
 ------------------
 
