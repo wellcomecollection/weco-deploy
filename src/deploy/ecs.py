@@ -1,5 +1,6 @@
 from .iam import Iam
 from .iterators import chunked_iterable
+from .tags import parse_aws_tags
 
 
 class Ecs:
@@ -62,31 +63,23 @@ class Ecs:
         }
 
     def get_service(self, service_id, env):
-        def _match_deployment_tags(service, desired_service_tag, desired_env_tag):
-            tags = service.get('tags')
+        """
+        Given a service ID (e.g. bag-unpacker) and an environment (e.g. prod),
+        return the unique matching service.
+        """
+        def _has_matching_tags(service):
+            service_tags = parse_aws_tags(service.get("tags", []))
 
-            if not tags:
-                return False
+            return (
+                service_tags.get("deployment:service") == service_id and
+                service_tags.get("deployment:env") == env
+            )
 
-            env_tags = [tag for tag in tags if tag.get('key') == 'deployment:env']
-            service_tags = [tag for tag in tags if tag.get('key') == 'deployment:service']
-
-            env_tag = None
-            if env_tags:
-                env_tag = env_tags[0]['value']
-
-            service_tag = None
-            if service_tags:
-                service_tag = service_tags[0]['value']
-
-            if env_tag == desired_env_tag and service_tag == desired_service_tag:
-                return True
-            else:
-                return False
-
-        matched_services = [service for service in self.described_services if _match_deployment_tags(
-            service, service_id, env
-        )]
+        matched_services = [
+            service
+            for service in self.described_services
+            if _has_matching_tags(service)
+        ]
 
         if len(matched_services) > 1:
             raise RuntimeError(f"Multiple matching services found for {service_id}/{env}: ({matched_services}!")
