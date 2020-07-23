@@ -17,7 +17,7 @@ class Ecs:
         self._load_described_services()
 
     def _load_described_services(self):
-        service_arns_iterator = self._iterate_all_service()
+        service_arns_iterator = self.list_cluster_service_arns()
 
         services = {}
         for cluster_arn, service_arn in service_arns_iterator:
@@ -49,20 +49,32 @@ class Ecs:
                 break
             yield chunk
 
-    def _iterate_all_service(self):
-        cluster_paginator = self.ecs.get_paginator('list_clusters')
-        cluster_iterator = cluster_paginator.paginate()
-        service_paginator = self.ecs.get_paginator('list_services')
+    def list_cluster_arns(self):
+        """
+        Generates the ARN of every ECS cluster in an account.
+        """
+        paginator = self.ecs.get_paginator("list_clusters")
 
-        for cluster_response in cluster_iterator:
-            for cluster_arn in cluster_response['clusterArns']:
-                service_iterator = service_paginator.paginate(
-                    cluster=cluster_arn
-                )
+        for page in paginator.paginate():
+            yield from page["clusterArns"]
 
-                for service_response in service_iterator:
-                    for service_arn in service_response['serviceArns']:
-                        yield cluster_arn, service_arn
+    def list_service_arns(self, cluster_arn):
+        """
+        Generates the ARN of every ECS service in a cluster.
+        """
+        paginator = self.ecs.get_paginator("list_services")
+
+        for page in paginator.paginate(cluster=cluster_arn):
+            yield from page["serviceArns"]
+
+    def list_cluster_service_arns(self):
+        """
+        Generates a set of (cluster_arn, service_arn) tuples for every ECS cluster
+        in an account.
+        """
+        for cluster_arn in self.list_cluster_arns():
+            for service_arn in self.list_service_arns(cluster_arn=cluster_arn):
+                yield (cluster_arn, service_arn)
 
     def redeploy_service(self, cluster_arn, service_arn):
         response = self.ecs.update_service(
