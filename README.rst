@@ -104,7 +104,7 @@ environment and record the outcome
 ::
 
    # To deploy a release to prod from the last one prep
-   weco-deploy prepare deploy --environment-id prod
+   weco-deploy deploy --environment-id prod
 
    # To deploy a particular release to prod
-   weco-deploy prepare deploy --environment-id prod --release-id 1234567
+   weco-deploy deploy --environment-id prod --release-id 1234567
