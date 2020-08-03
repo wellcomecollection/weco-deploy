@@ -108,3 +108,13 @@ environment and record the outcome
 
    # To deploy a particular release to prod
    weco-deploy deploy --environment-id prod --release-id 1234567
+
+One step prepare/publish
+~~~~~~~~~~~~~~~~~~~~
+
+You can prepare / release in a single step using the release-deploy command
+
+::
+
+   # To deploy a release to prod from the last one prep
+   weco-deploy release-deploy --from-label my_test --environment-id prod
