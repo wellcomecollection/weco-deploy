@@ -6,9 +6,10 @@ import yaml
 
 from .ecr import Ecr
 from .ecs import Ecs
-
+from .secrets import SecretsManager
 from .releases_store import DynamoDbReleaseStore
 from .iam import Iam
+from .commands import stdin_to_cmd
 
 DEFAULT_ECR_NAMESPACE = "uk.ac.wellcome"
 DEFAULT_REGION_NAME = "eu-west-1"
@@ -103,6 +104,12 @@ class Project:
             project_id=self.id,
             region_name=self.region_name,
             role_arn=self.role_arn
+        )
+
+        self.secrets_manager = SecretsManager(
+            account_id=account_id or self.account_id,
+            region_name=region_name or self.region_name,
+            role_arn=role_arn or self.role_arn
         )
 
         self.prepared_releases = {}
@@ -373,3 +380,12 @@ class Project:
         self.releases_store.add_deployment(release['release_id'], deployment)
 
         return deployment
+
+    def foo(self):
+        response = self.secrets_manager.get_secret_value("builds/github_wecobot_buildkite_sshkey")
+        secret_string = response['SecretString']
+
+        #foo = stdin_to_cmd(secret_string, 'grep', 'PRIVATE')
+
+        foo = stdin_to_cmd(secret_string, "ssh-add", "-")
+        print(foo)

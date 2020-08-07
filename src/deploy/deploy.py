@@ -304,7 +304,7 @@ def prepare(ctx, from_label, description):
 @click.option('--description', prompt="Enter a description for this deployment",
               help="A description of this deployment", default="No description provided")
 @click.pass_context
-def release_deploy(ctx, from_label, environment_id, namespace, description):
+def release_deploy(ctx, from_label, environment_id, description):
     project = ctx.obj['project']
     confirm = ctx.obj['confirm']
 
@@ -397,6 +397,14 @@ def show_images(ctx, label):
 
     print(tabulate(rows, headers=headers))
 
+
+@cli.command()
+@click.option('--foo', '-f', help="Foo")
+@click.pass_context
+def load_ssh_key(ctx, foo):
+    project = ctx.obj['project']
+
+    project.foo()
 
 def main():
     cli()
