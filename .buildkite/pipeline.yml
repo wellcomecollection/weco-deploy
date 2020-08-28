@@ -21,23 +21,24 @@ steps:
   - label: "pypi publish"
     if: build.branch == "master"
     plugins:
+      - seek-oss/aws-sm#v2.1.0:
+          env:
+            PYPI_PASSWORD: builds/pypi_password
       - docker-compose#v3.5.0:
           run: tox
           env:
             - TOXENV=deploy
             - PYPI_USERNAME=wellcomedigitalplatform
             - PYPI_PASSWORD
-      - seek-oss/aws-sm#v2.1.0:
-          env:
-            PYPI_PASSWORD: builds/pypi_password
+
   - wait
   - label: "docker hub publish"
     if: build.branch == "master"
     plugins:
+      - seek-oss/aws-sm#v2.1.0:
+          env:
+            DOCKER_HUB_PASSWORD: builds/docker_hub_password
       - docker-compose#v3.5.0:
           run: tox
           env:
             - TOXENV=docker_build
-      - seek-oss/aws-sm#v2.1.0:
-          env:
-            DOCKER_HUB_PASSWORD: builds/docker_hub_password

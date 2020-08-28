@@ -3,7 +3,7 @@ services:
   tox:
     build:
       context: .
-      dockerfile: .buildkite/Dockerfile
+      dockerfile: tox.Dockerfile
     volumes:
       - .:/workdir
     environment:
