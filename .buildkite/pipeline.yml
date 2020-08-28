@@ -1,7 +1,35 @@
 steps:
-  - command: "docker run -v $(pwd):/src --env TOXENV=lint wellcome/tox"
-    label: "lint"
-  - command: "docker run -v $(pwd):/src --env TOXENV=check_release_file wellcome/tox"
-    label: "check_release_file"
-  - command: "docker run -v $(pwd):/src --env TOXENV=py37 wellcome/tox"
-    label: "test"
+  - label: "lint"
+    plugins:
+      - docker-compose#v3.5.0:
+          run: tox
+          env:
+            - TOXENV=lint
+  - label: "check_release_file"
+    plugins:
+      - docker-compose#v3.5.0:
+          run: tox
+          env:
+            - TOXENV=check_release_file
+  - label: "test"
+    plugins:
+      - docker-compose#v3.5.0:
+          run: tox
+          env:
+            - TOXENV=py37
+  - wait
+  - label: "pypi publish"
+    if: build.branch == "master"
+    plugins:
+      - docker-compose#v3.5.0:
+          run: tox
+          env:
+            - TOXENV=deploy
+  - wait
+  - label: "docker hub publish"
+    if: build.branch == "master"
+    plugins:
+      - docker-compose#v3.5.0:
+          run: tox
+          env:
+            - TOXENV=docker_build
