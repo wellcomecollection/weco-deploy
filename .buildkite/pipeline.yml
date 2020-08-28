@@ -1,9 +1,8 @@
 steps:
   - label: "lint"
-    env:
-      TOXENV: tox
     plugins:
       - docker-compose#v3.5.0:
+          verbose: true
           run: tox
           env:
-            - TOXENV
+            - TOXENV=lint
