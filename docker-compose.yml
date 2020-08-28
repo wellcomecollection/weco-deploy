@@ -6,3 +6,5 @@ services:
       dockerfile: .buildkite/Dockerfile
     volumes:
       - .:/workdir
+    environment:
+      - TOXENV
