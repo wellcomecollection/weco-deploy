@@ -2,7 +2,34 @@ steps:
   - label: "lint"
     plugins:
       - docker-compose#v3.5.0:
-          verbose: true
           run: tox
           env:
             - TOXENV=lint
+  - label: "check_release_file"
+    plugins:
+      - docker-compose#v3.5.0:
+          run: tox
+          env:
+            - TOXENV=check_release_file
+  - label: "test"
+    plugins:
+      - docker-compose#v3.5.0:
+          run: tox
+          env:
+            - TOXENV=py37
+  - wait
+  - label: "pypi publish"
+    if: build.branch == "master"
+    plugins:
+      - docker-compose#v3.5.0:
+          run: tox
+          env:
+            - TOXENV=deploy
+  - wait
+  - label: "docker hub publish"
+    if: build.branch == "master"
+    plugins:
+      - docker-compose#v3.5.0:
+          run: tox
+          env:
+            - TOXENV=docker_build
