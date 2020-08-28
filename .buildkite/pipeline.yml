@@ -4,6 +4,6 @@ steps:
       TOXENV: tox
     plugins:
       - docker-compose#v3.5.0:
-          run: lint
+          run: tox
           env:
             - TOXENV
