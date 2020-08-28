@@ -1,0 +1,10 @@
+version: "3.8"
+services:
+  lint:
+    build:
+      context: .
+      dockerfile: .buildkite/Dockerfile
+    volumes:
+      - .:/workdir
+    environment:
+      TOXENV: lint
