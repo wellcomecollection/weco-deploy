@@ -6,7 +6,7 @@ services:
       dockerfile: tox.Dockerfile
     volumes:
       - .:/workdir
-      - ${HOME}/.ssh/known_hosts:/root/.ssh/known_hosts:ro
+      - ${HOME}/.ssh/known_hosts:/root/.ssh/known_hosts
       - ${SSH_AUTH_SOCK}:/ssh-agent.sock
     environment:
       - TOXENV
