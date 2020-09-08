@@ -27,25 +27,14 @@ NAME = "weco-deploy"
 
 
 if __name__ == '__main__':
-    if os.getenv("TRAVIS_EVENT_TYPE", "unset") == "push":
-        task = "publish"
-    else:
-        task = "build"
-
-    # Log in to Docker Hub.  Be careful about this subprocess call -- if it
-    # errors, the default exception would print our password to stderr.
-    # See https://alexwlchan.net/2018/05/beware-logged-errors/
-    if task == "publish":
-        try:
-            subprocess.check_call([
-                "docker", "login",
-                "--username", "wellcometravis",
-                "--password", os.environ["DOCKER_HUB_PASSWORD"]
-            ])
-        except subprocess.CalledProcessError as err:
-            sys.exit("Error trying to authenticate with Docker Hub: %r" % err)
-
     tools.git('fetch')
+
+    HEAD = tools.hash_for_name('HEAD')
+    MASTER = tools.hash_for_name('origin/master')
+
+    on_master = tools.is_ancestor(HEAD, MASTER)
+    has_release = tools.has_release()
+
     image_name = "wellcome/%s:%s" % (NAME, tools.latest_version())
 
     subprocess.check_call([
@@ -53,19 +42,26 @@ if __name__ == '__main__':
         "--tag", image_name, ROOT
     ])
 
-    if not tools.has_release():
-        print('Not deploying due to no release')
-        sys.exit(0)
+    if has_release and on_master:
+        # Log in to Docker Hub & push.  Be careful about this subprocess call -- if it
+        # errors, the default exception would print our password to stderr.
+        # See https://alexwlchan.net/2018/05/beware-logged-errors/
+        try:
+            subprocess.check_call([
+                "docker", "login",
+                "--username", "wellcometravis",
+                "--password", os.environ["DOCKER_HUB_PASSWORD"]
+            ])
 
-    try:
-        if task == "publish":
             subprocess.check_call([
                 "docker", "build",
                 "--tag", image_name, ROOT
             ])
+
             subprocess.check_call(["docker", "push", image_name])
-        else:
-            print("Not publishing!")
-    except subprocess.CalledProcessError as err:
-        print("ERROR: %r" % err)
-        sys.exit(1)
+        except subprocess.CalledProcessError as err:
+            print("ERROR: %r" % err)
+            sys.exit(1)
+    else:
+        print('Not publishing due to no release')
+        sys.exit(0)
