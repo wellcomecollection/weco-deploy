@@ -30,7 +30,7 @@ steps:
             - TOXENV=deploy
             - PYPI_USERNAME=wellcomedigitalplatform
             - PYPI_PASSWORD
-
+            - SSH_AUTH_SOCK
   - wait
   - label: "docker hub publish"
     if: build.branch == "master"
