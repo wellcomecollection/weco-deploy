@@ -10,4 +10,4 @@ services:
       - ${SSH_AUTH_SOCK}:/ssh-agent.sock
     environment:
       - TOXENV
-      - SSH_AUTH_SOCK=/ssh-agent.sock
+      - SSH_AUTH_SOCK
