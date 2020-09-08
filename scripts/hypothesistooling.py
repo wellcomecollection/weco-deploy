@@ -129,9 +129,10 @@ def git(*args):
 
 def create_tag_and_push():
     assert __version__ not in tags()
+
+
     git('config', 'user.name', 'Travis CI on behalf of Wellcome')
     git('config', 'user.email', 'wellcomedigitalplatform@wellcome.ac.uk')
-    git('config', 'core.sshCommand', 'ssh -i deploy_key')
     git(
         'remote', 'add', 'ssh-origin',
         'git@github.com:wellcomecollection/weco-deploy.git'
