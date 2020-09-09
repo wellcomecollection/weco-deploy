@@ -8,6 +8,7 @@ services:
       - .:/workdir
       - ${HOME}/.ssh/known_hosts:/root/.ssh/known_hosts
       - ${SSH_AUTH_SOCK}:/ssh-agent.sock
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - TOXENV
       - SSH_AUTH_SOCK=/ssh-agent.sock
