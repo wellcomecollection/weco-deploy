@@ -10,7 +10,6 @@ RUN rc-update add sshd
 
 RUN pip install --upgrade pip awscli setuptools tox
 
-
 VOLUME /workdir
 WORKDIR /workdir
 

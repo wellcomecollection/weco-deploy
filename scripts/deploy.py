@@ -77,11 +77,15 @@ if __name__ == '__main__':
 
     print('Now uploading to pypi.')
 
-    subprocess.check_call([
-        sys.executable, '-m', 'twine', 'upload',
-        '--username', os.environ['PYPI_USERNAME'],
-        '--password', os.environ['PYPI_PASSWORD'],
-        os.path.join(DIST, '*'),
-    ])
+    try:
+        subprocess.check_call([
+            sys.executable, '-m', 'twine', 'upload',
+            '--username', os.environ['PYPI_USERNAME'],
+            '--password', os.environ['PYPI_PASSWORD'],
+            os.path.join(DIST, '*'),
+        ])
+    except subprocess.CalledProcessError as err:
+        print("ERROR: %r" % err)
+        sys.exit(1)
 
     sys.exit(0)

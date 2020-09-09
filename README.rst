@@ -110,7 +110,7 @@ environment and record the outcome
    weco-deploy deploy --environment-id prod --release-id 1234567
 
 One step prepare/publish
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 You can prepare / release in a single step using the release-deploy command
 
