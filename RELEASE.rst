@@ -1,1 +1,3 @@
-RELEASE_TYPE: bump for release
+RELEASE_TYPE:
+
+bump for release
