@@ -1,3 +1,3 @@
 RELEASE_TYPE: patch
 
-Bump for new CI
+bump for new ci
