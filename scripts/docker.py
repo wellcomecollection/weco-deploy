@@ -27,6 +27,12 @@ NAME = "weco-deploy"
 
 
 if __name__ == '__main__':
+    tools.git('config', 'user.name', 'Buildkite on behalf of Wellcome Collection')
+    tools.git('config', 'user.email', 'wellcomedigitalplatform@wellcome.ac.uk')
+    tools.git(
+        'remote', 'add', 'ssh-origin',
+        'git@github.com:wellcomecollection/weco-deploy.git'
+    )
     tools.git('fetch')
 
     HEAD = tools.hash_for_name('HEAD')
