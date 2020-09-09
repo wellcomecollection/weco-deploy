@@ -1,3 +1,3 @@
-RELEASE_TYPE:
+RELEASE_TYPE: patch
 
 bump for release
