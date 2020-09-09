@@ -41,3 +41,4 @@ steps:
           run: tox
           env:
             - TOXENV=docker_build
+            - DOCKER_HUB_PASSWORD
