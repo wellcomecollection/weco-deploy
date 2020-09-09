@@ -130,6 +130,7 @@ def git(*args):
 def create_tag_and_push():
     assert __version__ not in tags()
 
+    print(subprocess.check_output(['/etc/init.d/sshd', 'start']))
     print(subprocess.check_output(['ssh-agent', '-s']))
     print(subprocess.check_output(['ssh-add', '-l']))
     print(subprocess.check_output(['ssh', '-T', 'git@github.com']))
