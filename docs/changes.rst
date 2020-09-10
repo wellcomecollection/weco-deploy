@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.0.13 - 2020-09-10
+-------------------
+
+Fix bug deploying where images do not have a service
+
+-------------------
 5.0.12 - 2020-09-09
 -------------------
 
