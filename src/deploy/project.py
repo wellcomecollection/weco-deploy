@@ -207,7 +207,7 @@ class Project:
                 services = matched_image.get('services', [])
 
                 available_services = [_get_service(service) for service in services]
-                available_services = [service for service in available_services if service]
+                available_services = [service for service in available_services if service["response"]]
 
             if available_services:
                 matched_services[image_id] = available_services

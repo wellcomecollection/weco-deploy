@@ -167,10 +167,7 @@ def _deploy(project, release_id, environment_id, description, confirm=True):
     headers = ["image ID", "services"]
 
     def _get_service_name(service):
-        if service['response']:
-            return click.style(service['response']["serviceArn"].split("/")[-1], fg="green")
-        else:
-            return click.style("Not found", fg="red")
+        return click.style(service['response']["serviceArn"].split("/")[-1], fg="green")
 
     for image_id, services in sorted(ecs_services.items()):
         service_names = [_get_service_name(service) for service in services]
