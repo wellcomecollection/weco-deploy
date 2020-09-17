@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.0.14 - 2020-09-17
+-------------------
+
+Fix the printing of coloured tables in the weco-deploy output.
+
+-------------------
 5.0.13 - 2020-09-10
 -------------------
 
