@@ -342,16 +342,13 @@ class Project:
             )
 
             ecs_deployments = []
-            if image_id in matched_services:
 
-                deployments = [_ecs_deploy(service) for service in matched_services.get(image_id)]
-
-                for deployment in deployments:
-                    service_arn = deployment['service_arn']
-                    deployment_id = deployment['deployment_id']
+            if tag_result['status'] != 'noop':
+                for service in matched_services.get(image_id, []):
+                    deployment = _ecs_deploy(service)
                     ecs_deployments.append({
-                        'service_arn': service_arn,
-                        'deployment_id': deployment_id
+                        'service_arn': deployment['service_arn'],
+                        'deployment_id': deployment['deployment_id']
                     })
 
             deployment_details[image_id] = {
