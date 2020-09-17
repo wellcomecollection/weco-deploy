@@ -261,7 +261,7 @@ def _prepare(project, from_label, description):
         rows.append([
             service,
             prev_git_commit,
-            new_git_commit
+            "-"
             if new_git_commit == prev_git_commit
             else click.style(new_git_commit, fg="green"),
             git.log(new_git_commit),
