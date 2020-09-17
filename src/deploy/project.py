@@ -123,15 +123,6 @@ class Project:
             role_arn=role_arn or self.role_arn
         )
 
-    def _create_deployment(self, environment_id, details, description):
-        return {
-            "environment": environment_id,
-            "date_created": datetime.datetime.utcnow().isoformat(),
-            "requested_by": self.user_details['underlying_caller_identity']['arn'],
-            "description": description,
-            "details": details
-        }
-
     def _create_release(self, description, images):
         release_id = str(uuid.uuid4())
 
@@ -368,7 +359,13 @@ class Project:
                 'ecs_deployments': ecs_deployments
             }
 
-        deployment = self._create_deployment(environment_id, deployment_details, description)
+        deployment = {
+            "environment": environment_id,
+            "date_created": datetime.datetime.utcnow().isoformat(),
+            "requested_by": self.user_details['underlying_caller_identity']['arn'],
+            "description": description,
+            "details": deployment_details
+        }
 
         self.releases_store.add_deployment(release['release_id'], deployment)
 
