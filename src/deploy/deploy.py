@@ -1,5 +1,7 @@
 import click
+import datetime
 import json
+import os
 
 from dateutil.parser import parse
 from pprint import pprint
@@ -183,10 +185,26 @@ def _deploy(project, release_id, environment_id, description, confirm=True):
 
     result = project.deploy(release_id, environment_id, description)
 
+    # Save the result of the deployment, including things like the ECS deploy IDs.
+    # These can be useful for debugging if something goes wrong.
+    #
+    # We save them on every deploy rather than hiding them behind a --debug flag,
+    # because deploying the same release twice may not have the same results.
+    # e.g. if the second deploy won't re-tag ECR images.
+    out_path = os.path.join(
+        os.environ['HOME'], 'local', 'share', 'weco-deploy',
+        datetime.datetime.now().strftime('deploy_%Y-%m-%d_%H-%M-%S.json')
+    )
+
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, 'w') as out_file:
+        out_file.write(json.dumps(result, indent=2, sort_keys=True))
+
     click.echo("")
     click.echo(click.style("Deployment Summary", fg="green"))
     click.echo(click.style(f"Requested by: {result['requested_by']}", fg="yellow"))
     click.echo(click.style(f"Date created: {result['date_created']}", fg="yellow"))
+    click.echo(click.style(f"Deploy data:  {out_path}", fg="yellow"))
     click.echo("")
 
     rows = []
