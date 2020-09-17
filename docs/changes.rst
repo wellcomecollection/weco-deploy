@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.0.17 - 2020-09-17
+-------------------
+
+Deal with no previous releases being available.
+
+-------------------
 5.0.16 - 2020-09-17
 -------------------
 
