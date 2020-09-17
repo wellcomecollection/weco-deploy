@@ -5,6 +5,13 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.0.16 - 2020-09-17
+-------------------
+
+When deploying services, weco-deploy prints a simpler summary of the changes.
+It also skips the ECS deployment if the ECR image tags for a service have not changed.
+
+-------------------
 5.0.15 - 2020-09-17
 -------------------
 
