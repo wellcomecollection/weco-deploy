@@ -57,7 +57,7 @@ class DynamoDbReleaseStore:
         if items['Count'] == 1:
             return items['Items'][0]
         else:
-            raise None
+            return None
 
     def get_recent_deployments(self, limit=10):
         items = self.table.query(IndexName='deployment_gsi',
