@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.0.15 - 2020-09-17
+-------------------
+
+Make it easier to read the list of ECS services discovered when deploying new images.
+
+-------------------
 5.0.14 - 2020-09-17
 -------------------
 
