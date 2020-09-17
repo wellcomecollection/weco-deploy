@@ -343,17 +343,20 @@ class Project:
 
             return ecs_services_deployed[service['response']['serviceArn']]
 
-        for image_id, image_name in release['images'].items():
+        for image_id, image_name in sorted(release['images'].items()):
             tag_result = self._tag_ecr_image(
                 environment_id=environment_id,
                 image_id=image_id,
                 image_name=image_name
             )
 
-            ecs_deployments = [
-                _ecs_deploy(service)
-                for service in matched_services.get(image_id, [])
-            ]
+            if tag_result['status'] == 'noop':
+                ecs_deployments = []
+            else:
+                ecs_deployments = [
+                    _ecs_deploy(service)
+                    for service in matched_services.get(image_id, [])
+                ]
 
             deployment_details[image_id] = {
                 'tag_result': tag_result,
