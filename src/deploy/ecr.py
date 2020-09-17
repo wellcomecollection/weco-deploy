@@ -135,12 +135,12 @@ class Ecr:
             )
 
             tag_operation_status = "success"
-        except ClientError as e:
+        except ClientError as err:
             # Matching tag & digest already exists (nothing to do)
-            if not e.response['Error']['Code'] == 'ImageAlreadyExistsException':
-                raise e
-            else:
+            if err.response['Error']['Code'] == 'ImageAlreadyExistsException':
                 tag_operation_status = "noop"
+            else:
+                raise err
 
         tag_operation['status'] = tag_operation_status
 
