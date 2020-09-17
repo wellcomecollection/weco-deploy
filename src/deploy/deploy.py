@@ -171,7 +171,7 @@ def _deploy(project, release_id, environment_id, description, confirm=True):
 
     for image_id, services in sorted(ecs_services.items()):
         service_names = [_get_service_name(service) for service in services]
-        rows.append([image_id, ", ".join(sorted(service_names))])
+        rows.append([image_id, "\n".join(sorted(service_names))])
 
     click.echo("")
     click.echo(click.style("ECS services discovered:\n", fg="yellow", underline=True))
