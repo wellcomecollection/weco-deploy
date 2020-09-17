@@ -350,18 +350,10 @@ class Project:
                 image_name=image_name
             )
 
-            ecs_deployments = []
-            if image_id in matched_services:
-
-                deployments = [_ecs_deploy(service) for service in matched_services.get(image_id)]
-
-                for deployment in deployments:
-                    service_arn = deployment['service_arn']
-                    deployment_id = deployment['deployment_id']
-                    ecs_deployments.append({
-                        'service_arn': service_arn,
-                        'deployment_id': deployment_id
-                    })
+            ecs_deployments = [
+                _ecs_deploy(service)
+                for service in matched_services.get(image_id, [])
+            ]
 
             deployment_details[image_id] = {
                 'tag_result': tag_result,
