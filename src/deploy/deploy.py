@@ -188,18 +188,31 @@ def _deploy(project, release_id, environment_id, description, confirm=True):
     click.echo(click.style(f"Requested by: {result['requested_by']}", fg="yellow"))
     click.echo(click.style(f"Date created: {result['date_created']}", fg="yellow"))
     click.echo("")
-    for image_id, summary in result['details'].items():
-        click.echo(click.style(f"Summary for {image_id}", fg="bright_yellow"))
-        click.echo(click.style(
-            f"{image_id}: ECR Updated {summary['tag_result']['source']} to {summary['tag_result']['target']}",
-            fg="yellow"
-        ))
 
-        for ecs_deployment in summary['ecs_deployments']:
-            click.echo(click.style(
-                f"{image_id}: ECS Deployed {ecs_deployment['service_arn']} to {ecs_deployment['deployment_id']}",
-                fg="yellow"
-            ))
+    rows = []
+
+    headers = ['image ID', 'summary of changes']
+    for image_id, summary in result['details'].items():
+        if summary['tag_result']['status'] == 'success':
+            ecr_display = 'ECR tag updated'
+        else:
+            ecr_display = ''
+
+        if not summary['ecs_deployments']:
+            ecs_display = ''
+        elif len(summary['ecs_deployments']) == 1:
+            ecs_display = '1 service deployed'
+        else:
+            ecs_display = '%d services deployed' % len(summary['ecs_deployments'])
+
+        if not ecr_display and not ecs_display:
+            rows.append([image_id, '-'])
+        elif not ecr_display:
+            rows.append([image_id, ecs_display])
+        else:
+            rows.append([image_id, ', '.join([ecr_display, ecs_display])])
+
+    click.echo(tabulate(rows, headers=headers))
 
     click.echo("")
     click.echo(click.style(f"Deployed release {release['release_id']} to {env_id}, ({env_name})", fg="bright_green"))
