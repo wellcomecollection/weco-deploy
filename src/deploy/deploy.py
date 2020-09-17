@@ -269,7 +269,7 @@ def _prepare(project, from_label, description):
 
     click.echo(click.style(f"Prepared release from images in {from_label}", fg="green"))
     if prev_release is None:
-        click.echo(click.style(f"This is your first release for this project!", fg="yellow"))
+        click.echo(click.style("This is your first release for this project!", fg="yellow"))
     click.echo(click.style(f"Requested by: {new_release['requested_by']}", fg="yellow"))
     click.echo(click.style(f"Date created: {new_release['date_created']}", fg="yellow"))
     click.echo("")
