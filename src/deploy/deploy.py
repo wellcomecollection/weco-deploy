@@ -175,7 +175,7 @@ def _deploy(project, release_id, environment_id, description, confirm=True):
 
     click.echo("")
     click.echo(click.style("ECS services discovered:\n", fg="yellow", underline=True))
-    click.echo(click.style(tabulate(rows, headers=headers), fg="yellow"))
+    click.echo(tabulate(rows, headers=headers))
 
     if not confirm:
         click.echo("")
@@ -267,7 +267,7 @@ def _prepare(project, from_label, description):
             git.log(new_git_commit),
         ])
 
-    click.echo(click.style(tabulate(rows, headers=headers), fg="yellow"))
+    click.echo(tabulate(rows, headers=headers))
 
     click.echo("")
     click.echo(click.style(f"Created release {new_release['release_id']}", fg="bright_green"))
