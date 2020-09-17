@@ -268,6 +268,8 @@ def _prepare(project, from_label, description):
     new_release = release["new_release"]
 
     click.echo(click.style(f"Prepared release from images in {from_label}", fg="green"))
+    if prev_release is None:
+        click.echo(click.style("This is your first release for this project!", fg="yellow"))
     click.echo(click.style(f"Requested by: {new_release['requested_by']}", fg="yellow"))
     click.echo(click.style(f"Date created: {new_release['date_created']}", fg="yellow"))
     click.echo("")
@@ -286,7 +288,10 @@ def _prepare(project, from_label, description):
         #
         #     {ecr_repo_uri}/{namespace}/{service}:ref.{git_commit}
         #
-        prev_git_commit = prev_release["images"].get(service, "").split(".")[-1][:7]
+        prev_git_commit = "-------"
+        if prev_release is not None:
+            prev_git_commit = prev_release["images"].get(service, "").split(".")[-1][:7]
+
         new_git_commit = image.split(".")[-1][:7]
 
         rows.append([

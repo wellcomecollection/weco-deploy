@@ -43,7 +43,7 @@ class DynamoDbReleaseStore:
         if items['Count'] == 1:
             return items['Items'][0]
         else:
-            raise ValueError(f"Latest release returned {items['Count']} results for {self.project_id}")
+            return None
 
     def get_latest_releases(self, limit=1):
         items = self.table.query(IndexName='project_gsi',
@@ -57,7 +57,7 @@ class DynamoDbReleaseStore:
         if items['Count'] == 1:
             return items['Items'][0]
         else:
-            raise ValueError(f"Release returned {items['Count']} results for {release_id}")
+            return None
 
     def get_recent_deployments(self, limit=10):
         items = self.table.query(IndexName='deployment_gsi',

@@ -324,6 +324,10 @@ class Project:
 
     def deploy(self, release_id, environment_id, description):
         release = self.get_release(release_id)
+
+        if release is None:
+            raise ValueError(f"No releases found {release_id}, cannot continue!")
+
         matched_services = self.get_ecs_services(
             release=release,
             environment_id=environment_id
