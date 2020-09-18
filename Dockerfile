@@ -4,7 +4,7 @@ LABEL maintainer = "Wellcome Collection <dev@wellcomecollection.org>"
 LABEL description = "A Docker image for deploying our Docker images to AWS"
 
 RUN apk update && \
-    apk add docker git
+    apk add docker git openssh
 
 RUN pip install awscli
 
