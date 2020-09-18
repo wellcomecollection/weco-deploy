@@ -3,8 +3,8 @@ weco-deploy
 
 A tool for deploying ECS services at the Wellcome Collection.
 
-.. image:: https://travis-ci.org/wellcomecollection/weco-deploy.svg?branch=master
-    :target: https://travis-ci.org/wellcomecollection/weco-deploy
+.. image:: https://badge.buildkite.com/f5f17766a1334f7445548b70ef2c6de1dbb6ba58c6d4ca7cd1.svg
+    :target: https://buildkite.com/wellcomecollection/weco-deploy
 
 Setup
 -----
