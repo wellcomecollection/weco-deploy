@@ -47,11 +47,19 @@ class Ecs:
         for page in paginator.paginate(cluster=cluster_arn):
             yield from page["serviceArns"]
 
-    def redeploy_service(self, cluster_arn, service_arn):
+    def redeploy_service(self, cluster_arn, service_arn, deployment_label):
         response = self.ecs.update_service(
             cluster=cluster_arn,
             service=service_arn,
             forceNewDeployment=True
+        )
+
+        self.ecs.tag_resource(
+            resourceArn=service_arn,
+            tags=[{
+                'key': 'deployment:label',
+                'value': deployment_label
+            }]
         )
 
         return {
