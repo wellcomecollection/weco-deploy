@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.0.18 - 2020-09-18
+-------------------
+
+Adds openssh to the Dockerfile (required by git in some environments).
+
+-------------------
 5.0.17 - 2020-09-17
 -------------------
 
