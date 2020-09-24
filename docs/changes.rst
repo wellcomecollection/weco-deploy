@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.1.1 - 2020-09-24
+------------------
+
+Fix an issue with the indentation of output when running with ``--verbose``.
+
+------------------
 5.1.0 - 2020-09-24
 ------------------
 
