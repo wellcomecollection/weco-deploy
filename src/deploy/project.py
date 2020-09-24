@@ -292,13 +292,14 @@ class Project:
 
         return {"previous_release": previous_release, "new_release": new_release}
 
-    def _deploy_ecs_service(self, service):
+    def _deploy_ecs_service(self, service, deployment_label):
         return self._ecs(
             region_name=service['config'].get('region_name'),
             role_arn=service['config'].get('role_arn'),
         ).redeploy_service(
-            service['response']['clusterArn'],
-            service['response']['serviceArn']
+            cluster_arn=service['response']['clusterArn'],
+            service_arn=service['response']['serviceArn'],
+            deployment_label=deployment_label
         )
 
     def _tag_ecr_image(self, environment_id, image_id, image_name):
@@ -341,9 +342,12 @@ class Project:
         ecs_services_deployed = {}
 
         # Memoize service deployments to prevent multiple deployments
-        def _ecs_deploy(service):
+        def _ecs_deploy(service, deployment_label):
             if service['response']['serviceArn'] not in ecs_services_deployed:
-                ecs_services_deployed[service['response']['serviceArn']] = self._deploy_ecs_service(service)
+                ecs_services_deployed[service['response']['serviceArn']] = self._deploy_ecs_service(
+                    service=service,
+                    deployment_label=deployment_label
+                )
 
             return ecs_services_deployed[service['response']['serviceArn']]
 
@@ -358,7 +362,10 @@ class Project:
                 ecs_deployments = []
             else:
                 ecs_deployments = [
-                    _ecs_deploy(service)
+                    _ecs_deploy(
+                        service=service,
+                        deployment_label=release['release_id']
+                    )
                     for service in matched_services.get(image_id, [])
                 ]
 
