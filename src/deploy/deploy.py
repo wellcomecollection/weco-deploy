@@ -262,12 +262,7 @@ def deploy(ctx, release_id, environment_id, description):
     )
 
 
-def _prepare(project, from_label, description):
-    release = project.prepare(
-        from_label=from_label,
-        description=description
-    )
-
+def _display_release(release, from_label):
     prev_release = release["previous_release"]
     new_release = release["new_release"]
 
@@ -313,6 +308,20 @@ def _prepare(project, from_label, description):
     return new_release['release_id']
 
 
+def _prepare(project, from_label, description):
+    release = project.prepare(
+        from_label=from_label,
+        description=description
+    )
+
+    _display_release(
+        release=release,
+        from_label=from_label
+    )
+
+    return release["new_release"]
+
+
 @cli.command()
 @click.option('--from-label', prompt="Label to base release upon",
               help="The existing label upon which this release will be based",
@@ -327,6 +336,41 @@ def prepare(ctx, from_label, description):
         project=project,
         from_label=from_label,
         description=description
+    )
+
+
+def _update(project, release_id, service_ids, from_label):
+    release = project.update(
+        release_id=release_id,
+        service_ids=service_ids,
+        from_label=from_label
+    )
+
+    _display_release(
+        release=release,
+        from_label=from_label
+    )
+
+    return release["new_release"]
+
+
+@cli.command()
+@click.option('--release-id', prompt="Release ID to deploy", default="latest", show_default=True,
+              help="The release ID from which to create a new release")
+@click.option('--service-ids', prompt="Comma separated list of Service IDs",
+              help="The services which will be updated")
+@click.option('--from-label', prompt="Label to base release upon",
+              help="The existing label from which to update specified services",
+              default="latest", show_default=True)
+@click.pass_context
+def update(ctx, release_id, service_ids, from_label):
+    project = ctx.obj['project']
+
+    _update(
+        project=project,
+        release_id=release_id,
+        service_ids=service_ids.split(","),
+        from_label=from_label,
     )
 
 

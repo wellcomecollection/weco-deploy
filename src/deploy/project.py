@@ -275,9 +275,7 @@ class Project:
 
         return release_images
 
-    def prepare(self, from_label, description):
-        release_images = self.get_images(from_label)
-
+    def _prepare_release(self, description, release_images):
         if not release_images:
             raise RuntimeError(f"No images found for {self.id}/{from_label}")
 
@@ -291,6 +289,36 @@ class Project:
         self.releases_store.put_release(new_release)
 
         return {"previous_release": previous_release, "new_release": new_release}
+
+    def prepare(self, from_label, description):
+        release_images = self.get_images(from_label)
+
+        return self._prepare_release(
+            description=description,
+            release_images=release_images
+        )
+
+    def update(self, release_id, service_ids, from_label):
+        release = self.get_release(release_id)
+        images = self.get_images(from_label)
+
+        # Ensure all specified services are available as images
+        for service_id in service_ids:
+            if service_id not in images.keys():
+                raise RuntimeError(f"No images found for {service_id}")
+
+        # Filter to only specified images
+        filtered_images = {k: v for k, v in images.items() if k in service_ids}
+
+        # Merge images from specified release with those from service
+        release_images = {**release['images'], **filtered_images}
+
+        description = f"Release based on {release_id}, updating {service_ids} to {from_label}"
+
+        return self._prepare_release(
+            description=description,
+            release_images=release_images
+        )
 
     def _deploy_ecs_service(self, service, deployment_label):
         return self._ecs(
