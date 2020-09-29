@@ -276,9 +276,6 @@ class Project:
         return release_images
 
     def _prepare_release(self, description, release_images):
-        if not release_images:
-            raise RuntimeError(f"No images found for {self.id}/{from_label}")
-
         previous_release = self.releases_store.get_latest_release()
 
         new_release = self._create_release(
@@ -292,6 +289,9 @@ class Project:
 
     def prepare(self, from_label, description):
         release_images = self.get_images(from_label)
+        
+        if not release_images:
+            raise RuntimeError(f"No images found for {self.id}/{from_label}")
 
         return self._prepare_release(
             description=description,
