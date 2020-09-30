@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.2.0 - 2020-09-30
+------------------
+
+Adds a new update command, allowing specific services to be updated from a previous release.
+
+------------------
 5.1.1 - 2020-09-24
 ------------------
 
