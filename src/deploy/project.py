@@ -289,7 +289,7 @@ class Project:
 
     def prepare(self, from_label, description):
         release_images = self.get_images(from_label)
-        
+
         if not release_images:
             raise RuntimeError(f"No images found for {self.id}/{from_label}")
 
