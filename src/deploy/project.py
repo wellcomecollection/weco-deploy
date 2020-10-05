@@ -6,7 +6,7 @@ import yaml
 
 from .ecr import Ecr
 from .ecs import Ecs
-
+from .exceptions import ConfigError
 from .releases_store import DynamoDbReleaseStore
 from .iam import Iam
 from .tags import parse_aws_tags
@@ -39,7 +39,7 @@ class Projects:
         try:
             config = self.projects[project_id]
         except KeyError:
-            raise RuntimeError(f"No matching project {project_id} in {self.projects}")
+            raise ConfigError(f"No matching project {project_id} in {self.projects}")
 
         return Project(project_id=project_id, config=config, **kwargs)
 
@@ -61,7 +61,7 @@ class Project:
             self.config['role_arn'] = role_arn
         else:
             if 'role_arn' not in self.config:
-                raise ValueError("region_name is not set!")
+                raise ConfigError("role_arn is not set!")
 
         if region_name:
             self.config['region_name'] = region_name
