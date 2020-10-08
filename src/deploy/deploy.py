@@ -150,9 +150,7 @@ def publish(ctx, image_id, label):
     )
 
 
-def _deploy(project, release_id, environment_id, description, confirm=True):
-    release = project.get_release(release_id)
-
+def _deploy(project, release, environment_id, description, confirm=True):
     environment = project.get_environment(environment_id)
     env_id = environment.get('id')
     env_name = environment.get('name', environment_id)
@@ -187,7 +185,7 @@ def _deploy(project, release_id, environment_id, description, confirm=True):
         click.echo("")
         click.confirm(click.style("Create deployment?", fg="cyan", bold=True), abort=True)
 
-    result = project.deploy(release_id, environment_id, description)
+    result = project.deploy(release["release_id"], environment_id, description)
 
     # Save the result of the deployment, including things like the ECS deploy IDs.
     # These can be useful for debugging if something goes wrong.
@@ -253,9 +251,11 @@ def deploy(ctx, release_id, environment_id, description):
     confirm = ctx.obj['confirm']
     project = ctx.obj['project']
 
+    release = project.get_release(release_id)
+
     _deploy(
         project=project,
-        release_id=release_id,
+        release=release,
         environment_id=environment_id,
         description=description,
         confirm=confirm
@@ -387,7 +387,7 @@ def release_deploy(ctx, from_label, environment_id, description):
     project = ctx.obj['project']
     confirm = ctx.obj['confirm']
 
-    release_id = _prepare(
+    release = _prepare(
         project=project,
         from_label=from_label,
         description=description
@@ -395,7 +395,7 @@ def release_deploy(ctx, from_label, environment_id, description):
 
     _deploy(
         project=project,
-        release_id=release_id,
+        release=release,
         environment_id=environment_id,
         description=description,
         confirm=confirm
