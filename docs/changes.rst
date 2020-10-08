@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.2.1 - 2020-10-08
+------------------
+
+Fix a bug that meant the prepare-deploy command would always throw an exception.
+
+------------------
 5.2.0 - 2020-09-30
 ------------------
 
