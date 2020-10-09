@@ -2,6 +2,8 @@ import click
 import datetime
 import json
 import os
+import sys
+import time
 
 from dateutil.parser import parse
 from pprint import pprint
@@ -244,6 +246,43 @@ def deploy(ctx, release_id, environment_id, description):
         confirm=confirm
     )
 
+    _confirm_deploy(
+        project=project,
+        release=release,
+        environment_id=environment_id,
+    )
+
+def _confirm_deploy(project, release, environment_id, wait_for_seconds = 600, interval = 10):
+    start_timer = time.perf_counter()
+    release_id = release["release_id"]
+
+    def _is_release_deployed():
+        is_release_deployed = project.is_release_deployed(release, environment_id)
+        waited_for_seconds = time.perf_counter() - start_timer
+        
+        if not is_release_deployed and waited_for_seconds < wait_for_seconds:
+            click.echo(click.style(f"Deployment of {release_id} to {environment_id} is not complete. Waiting {interval} seconds", fg="yellow"))
+            time.sleep(interval)
+            _is_release_deployed()
+
+        if not is_release_deployed and waited_for_seconds >= wait_for_seconds:
+            return False
+        
+        if is_release_deployed:
+            return True
+
+    click.echo("")
+    click.echo(click.style(f"Checking deployment of {release_id} to {environment_id}", fg="yellow"))
+
+    confirmed = _is_release_deployed()
+    if confirmed:
+        click.echo("")
+        click.echo(click.style(f"Deployment of {release_id} to {environment_id} successful", fg="bright_green"))
+        sys.exit(0)
+    else:
+        click.echo("")
+        click.echo(click.style(f"Deployment of {release_id} to {environment_id} failed", fg="yellow"))
+        sys.exit(1)
 
 def _display_release(release, from_label):
     prev_release = release["previous_release"]

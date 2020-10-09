@@ -1,6 +1,7 @@
 import datetime
 from urllib.parse import urlparse
 import uuid
+import json
 
 import yaml
 
@@ -9,6 +10,7 @@ from .ecs import Ecs
 
 from .releases_store import DynamoDbReleaseStore
 from .iam import Iam
+from .tags import parse_aws_tags
 
 DEFAULT_ECR_NAMESPACE = "uk.ac.wellcome"
 DEFAULT_REGION_NAME = "eu-west-1"
@@ -198,7 +200,7 @@ class Project:
             }
 
         matched_services = {}
-        for image_id, image_uri in release['images'].items():
+        for image_id, _ in release['images'].items():
             # Attempt to match deployment image id to config and override service_ids
             matched_image = self._match_image_id(image_id)
 
@@ -214,6 +216,38 @@ class Project:
                 matched_services[image_id] = available_services
 
         return matched_services
+
+
+    def is_release_deployed(self, release, environment_id):
+        """
+        Checks the `deployment:label` tag on a service matches the tags
+        on the tasks within those services. We check that the desiredCount
+        of tasks matches the running count of tasks.
+        """
+        ecs_services = self.get_ecs_services(release, environment_id)
+
+        deployed_services = []
+        for _, services in sorted(ecs_services.items()):
+            for service in services:
+                service_tags = parse_aws_tags(service["response"]["tags"])
+                service_deployment_label = service_tags["deployment:label"]
+                desired_task_count = service["response"]["desiredCount"]
+                ecs = self._ecs(
+                    region_name=service.get('region_name'),
+                    role_arn=service.get('role_arn')
+                )
+                tasks = ecs.list_service_tasks(service)
+
+                deployed_tasks = []
+                for task in tasks:
+                    task_tags = parse_aws_tags(task["tags"])
+                    task_deployment_label = task_tags["deployment:label"]
+                    deployed_tasks.append(task_deployment_label == service_deployment_label)
+                
+                deployed_services.append(all(deployed_tasks) and desired_task_count == len(tasks))
+
+        return all(deployed_services)
+
 
     def publish(self, image_id, label):
         # Attempt to match image to config
