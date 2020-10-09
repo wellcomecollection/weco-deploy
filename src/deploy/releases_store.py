@@ -53,18 +53,64 @@ class DynamoDbReleaseStore:
         return items['Items']
 
     def get_release(self, release_id):
-        items = self.table.query(KeyConditionExpression=Key('release_id').eq(release_id), Limit=1)
-        if items['Count'] == 1:
-            return items['Items'][0]
-        else:
-            return None
+        try:
+            return self.table.get_item(Key={"release_id": release_id})["Item"]
+        except KeyError:
+            raise RuntimeError(f"No such release: {release_id}")
 
     def get_recent_deployments(self, limit=10):
-        items = self.table.query(IndexName='deployment_gsi',
-                                 KeyConditionExpression=Key('project_id').eq(self.project_id),
-                                 ScanIndexForward=False,
-                                 Limit=limit)
-        return items['Items']
+        """
+        Returns the N most recent deployments.
+        """
+        known_deployments = []
+
+        resp = self.table.query(
+            IndexName='deployment_gsi',
+            KeyConditionExpression=Key('project_id').eq(self.project_id),
+            Limit=limit,
+            # Query results are always sorted by the sort key value.  Setting
+            # this parameter to False means they are returned in descending order,
+            # i.e. newer deployments come first.
+            #
+            # The sort key on this GSI is last_date_deployed.
+            ScanIndexForward=False,
+        )
+
+        for release in resp["Items"]:
+            for deployment in release["deployments"]:
+                deployment["release_id"] = release["release_id"]
+                known_deployments.append(deployment)
+
+        known_deployments = sorted(
+            known_deployments, key=lambda d: d["date_created"], reverse=True
+        )
+
+        # We then truncate the list to the limit, otherwise we might be
+        # presenting an incomplete list of deployments.
+        #
+        # Consider:
+        #
+        #   - Release A
+        #       deployed @ 1pm
+        #       deployed @ 6pm
+        #   - Release B
+        #       deployed @ 2pm
+        #   - Release C
+        #       deployed @ 5pm
+        #
+        # If we requested limit=2, then DynamoDB would return the releases
+        # with the two most recent "last_date_deployed" fields.  This would
+        # present the following timeline:
+        #
+        #   - 1pm: Release A
+        #   - 5pm: Release C
+        #   - 6pm: Release A
+        #
+        # What happened to release B???
+        #
+        # We know we have the last N deployments with no gaps, but beyond
+        # that we can't be sure.
+        return known_deployments[:limit]
 
     def add_deployment(self, release_id, deployment, dry_run=False):
         if not dry_run:

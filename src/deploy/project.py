@@ -168,10 +168,14 @@ class Project:
         return environments[environment_id]
 
     def get_deployments(self, release_id=None):
-        if release_id:
-            return [self.releases_store.get_release(release_id)]
+        if release_id is not None:
+            release = self.releases_store.get_release(release_id)
+
+            for d in release["deployments"]:
+                d["release_id"] = release_id
+                yield d
         else:
-            return self.releases_store.get_recent_deployments()
+            yield from self.releases_store.get_recent_deployments()
 
     def get_release(self, release_id):
         if release_id == "latest":
