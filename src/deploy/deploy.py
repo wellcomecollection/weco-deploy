@@ -24,23 +24,6 @@ def _format_ecr_uri(uri):
     }
 
 
-def _summarise_release_deployments(releases):
-    for release in releases:
-        for deployment in release['deployments']:
-            try:
-                requested_by = deployment.get("requested_by", {}).get("id", "")
-            except AttributeError:
-                requested_by = deployment.get("requested_by", "")
-
-            yield {
-                'release_id': release.get('release_id'),
-                'environment_id': deployment.get('environment'),
-                'deployed_date': parse(deployment.get('date_created')),
-                'requested_by': requested_by.split('/')[-1],
-                'description': deployment.get('description')
-            }
-
-
 @click.group()
 @click.option('--project-file', '-f', default=DEFAULT_PROJECT_FILEPATH)
 @click.option('--verbose', '-v', is_flag=True, help="Print verbose messages.")
@@ -422,8 +405,6 @@ def show_release(ctx, release_id):
 def show_deployments(ctx, release_id):
     project = ctx.obj['project']
 
-    releases = project.get_deployments(release_id)
-
     rows = []
 
     headers = [
@@ -434,19 +415,18 @@ def show_deployments(ctx, release_id):
         "description"
     ]
 
-    for summary in _summarise_release_deployments(releases):
-        try:
-            environment_id = summary["environment_id"].get("id", "")
-        except AttributeError:
-            environment_id = summary["environment_id"]
-
-        rows.append([
-            summary["release_id"],
-            environment_id,
-            pprint_date(summary["deployed_date"]),
-            summary["requested_by"],
-            summary["description"]
-        ])
+    for deployment in project.get_deployments(release_id=release_id):
+        rows.append(
+            [
+                deployment["release_id"],
+                deployment["environment"],
+                pprint_date(parse(deployment["date_created"])),
+                deployment["requested_by"].split("/")[-1],
+                deployment["description"]
+                if deployment["description"] != "No description provided"
+                else "-",
+            ]
+        )
 
     print(tabulate(rows, headers=headers))
 
