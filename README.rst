@@ -121,6 +121,21 @@ environment and record the outcome
    # To deploy a particular release to prod
    weco-deploy deploy --environment-id prod --release-id 1234567
 
+Updating a release
+~~~~~~~~~~~~~~~~~~~~
+
+This command allowing you to release only specified services. It allows you
+to specify a previous release, a comma separated list of services to update
+and a label to update them from. 
+
+The command creates a new release with the same images as the old release 
+with only the specified services updated to the given label.
+
+::
+
+   # To update only serviceOne from release 1234567 to ref.abc
+   weco-deploy updatde --release-id 1234567 --service-ids serviceOne --from-label ref.abc
+
 One step prepare/publish
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
