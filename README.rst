@@ -107,7 +107,7 @@ along with when and who prepared the release.
    # To prepare a release from my_test
    weco-deploy prepare --from-label my_test
 
-Publishing a release
+Deploying a release
 ~~~~~~~~~~~~~~~~~~~~
 
 This step will look up a release from dynamo, attempt to apply it to an
