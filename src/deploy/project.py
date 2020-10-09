@@ -34,20 +34,13 @@ class Projects:
     def list(self):
         return list(self.projects.keys())
 
-    def load(self, project_id, region_name=None, role_arn=None, account_id=None, namespace=None):
-        config = self.projects.get(project_id)
+    def load(self, project_id, **kwargs):
+        try:
+            config = self.projects[project_id]
+        except KeyError:
+            raise RuntimeError(f"No matching project {project_id} in {self.projects}")
 
-        if not config:
-            raise RuntimeError(f"No matching project {project_id} in {self.projects()}")
-
-        return Project(
-            project_id=project_id,
-            config=config,
-            region_name=region_name,
-            role_arn=role_arn,
-            account_id=account_id,
-            namespace=namespace
-        )
+        return Project(project_id=project_id, config=config, **kwargs)
 
 
 class Project:
