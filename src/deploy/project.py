@@ -160,15 +160,19 @@ class Project:
 
         return environments[environment_id]
 
-    def get_deployments(self, release_id=None):
+    def get_deployments(self, release_id, limit):
         if release_id is not None:
             release = self.releases_store.get_release(release_id)
 
             for d in release["deployments"]:
                 d["release_id"] = release_id
-                yield d
+
+            deployments = release_id["deployments"]
         else:
-            yield from self.releases_store.get_recent_deployments()
+            deployments = self.releases_store.get_recent_deployments(limit=limit)
+
+        deployments = sorted(deployments, key=lambda d: d["date_created"], reverse=True)
+        return deployments[:limit]
 
     def get_release(self, release_id):
         if release_id == "latest":
