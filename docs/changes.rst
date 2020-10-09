@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.2.3 - 2020-10-09
+------------------
+
+Fix an unexpected error that would be thrown if you passed `--project-id` with an unrecognised project ID.
+
+------------------
 5.2.2 - 2020-10-09
 ------------------
 
