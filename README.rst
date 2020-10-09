@@ -134,7 +134,7 @@ with only the specified services updated to the given label.
 ::
 
    # To update only serviceOne from release 1234567 to ref.abc
-   weco-deploy updatde --release-id 1234567 --service-ids serviceOne --from-label ref.abc
+   weco-deploy update --release-id 1234567 --service-ids serviceOne --from-label ref.abc
 
 One step prepare/publish
 ~~~~~~~~~~~~~~~~~~~~~~~~
