@@ -132,10 +132,18 @@ def create_tag_and_push():
 
     git('config', 'user.name', 'Buildkite on behalf of Wellcome Collection')
     git('config', 'user.email', 'wellcomedigitalplatform@wellcome.ac.uk')
-    git(
-        'remote', 'add', 'ssh-origin',
-        'git@github.com:wellcomecollection/weco-deploy.git'
-    )
+
+    # If CI runs on a machine which has already run a weco-deploy build,
+    # this command will fail trying to add the origin a second time.
+    # It's fine, let it fail.
+    try:
+        git(
+            'remote', 'add', 'ssh-origin',
+            'git@github.com:wellcomecollection/weco-deploy.git'
+        )
+    except subprocess.CalledProcessError:
+        pass
+
     git('tag', __version__)
 
     subprocess.check_call(['git', 'push', 'ssh-origin', 'HEAD:master'])
