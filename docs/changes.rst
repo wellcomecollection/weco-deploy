@@ -5,6 +5,14 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.3.0 - 2020-10-09
+------------------
+
+Allow getting more than 10 deployments with the ``show-deployments`` command.
+
+Get more deployments by passing ``--limit=LIMIT``, e.g. ``--limit=25``.
+
+------------------
 5.2.3 - 2020-10-09
 ------------------
 
