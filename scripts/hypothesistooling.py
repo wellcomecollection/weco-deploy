@@ -127,9 +127,7 @@ def git(*args):
     subprocess.check_call(('git',) + args)
 
 
-def create_tag_and_push():
-    assert __version__ not in tags()
-
+def configure_git():
     git('config', 'user.name', 'Buildkite on behalf of Wellcome Collection')
     git('config', 'user.email', 'wellcomedigitalplatform@wellcome.ac.uk')
 
@@ -143,6 +141,12 @@ def create_tag_and_push():
         )
     except subprocess.CalledProcessError:
         pass
+
+
+def create_tag_and_push():
+    configure_git()
+
+    assert __version__ not in tags()
 
     git('tag', __version__)
 
