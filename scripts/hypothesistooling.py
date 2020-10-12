@@ -127,12 +127,7 @@ def git(*args):
     subprocess.check_call(('git',) + args)
 
 
-def create_tag_and_push():
-    assert __version__ not in tags()
-
-    git('config', 'user.name', 'Buildkite on behalf of Wellcome Collection')
-    git('config', 'user.email', 'wellcomedigitalplatform@wellcome.ac.uk')
-
+def add_ssh_origin():
     # If CI runs on a machine which has already run a weco-deploy build,
     # this command will fail trying to add the origin a second time.
     # It's fine, let it fail.
@@ -143,6 +138,15 @@ def create_tag_and_push():
         )
     except subprocess.CalledProcessError:
         pass
+
+
+def create_tag_and_push():
+    assert __version__ not in tags()
+
+    git('config', 'user.name', 'Buildkite on behalf of Wellcome Collection')
+    git('config', 'user.email', 'wellcomedigitalplatform@wellcome.ac.uk')
+
+    add_ssh_origin()
 
     git('tag', __version__)
 
