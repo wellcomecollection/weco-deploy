@@ -239,8 +239,14 @@ class Project:
                 deployed_tasks = []
                 for task in tasks:
                     task_tags = parse_aws_tags(task["tags"])
-                    task_deployment_label = task_tags["deployment:label"]
-                    deployed_tasks.append(task_deployment_label == service_deployment_label)
+
+                    _is_task_deployed = (
+                        task_tags.get("deployment:label") == service_deployment_label
+                    ) and (
+                        task['lastStatus'] == "RUNNING"
+                    )
+
+                    deployed_tasks.append(_is_task_deployed)
 
                 deployed_services.append(all(deployed_tasks) and desired_task_count == len(tasks))
 

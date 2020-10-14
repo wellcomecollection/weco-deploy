@@ -299,7 +299,7 @@ def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval
         sys.exit(0)
     else:
         click.echo("")
-        click.echo(click.style(f"Deployment of {release_id} to {environment_id} failed", fg="yellow"))
+        click.echo(click.style(f"Deployment of {release_id} to {environment_id} failed", fg="red"))
         sys.exit(1)
 
 
