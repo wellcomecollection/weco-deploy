@@ -112,10 +112,14 @@ class Ecs:
         for page in paginator_iter:
             task_arns += page["taskArns"]
 
-        resp = self.ecs.describe_tasks(
-            cluster=cluster_arn,
-            tasks=task_arns,
-            include=["TAGS"]
-        )
+        # If task_arns is empty we can't ask to describe them
+        if task_arns:
+            resp = self.ecs.describe_tasks(
+                cluster=cluster_arn,
+                tasks=task_arns,
+                include=["TAGS"]
+            )
 
-        return resp["tasks"]
+            return resp["tasks"]
+        else:
+            return []
