@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     HEAD = tools.hash_for_name('HEAD')
     MASTER = tools.hash_for_name('origin/master')
-    print('Current head:', HEAD)
+    print('Current head:  ', HEAD)
     print('Current master:', MASTER)
 
     on_master = tools.is_ancestor(HEAD, MASTER)
