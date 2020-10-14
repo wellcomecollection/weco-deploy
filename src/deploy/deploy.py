@@ -15,6 +15,8 @@ from .project import Projects
 
 DEFAULT_PROJECT_FILEPATH = ".wellcome_project"
 
+LOGGING_ROOT = os.path.join(os.environ["HOME"], ".local", "share", "weco-deploy")
+
 
 def _format_ecr_uri(uri):
     image_name = uri.split("/")[2]
@@ -135,6 +137,25 @@ def publish(ctx, image_id, label):
     )
 
 
+def save_deployment(deployment_result):
+    """
+    Save the result of the deployment to a file, including things like
+    the ECS deploy IDs.  These can be useful for debugging if something goes wrong.
+
+    Returns the path to the saved file.
+    """
+    out_path = os.path.join(
+        LOGGING_ROOT, "deployment_results",
+        datetime.datetime.now().strftime('deploy_%Y-%m-%d_%H-%M-%S.json')
+    )
+
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, 'w') as out_file:
+        out_file.write(json.dumps(deployment_result, indent=2, sort_keys=True))
+
+    return out_path
+
+
 def _deploy(project, release, environment_id, description, confirm=True):
     environment = project.get_environment(environment_id)
     env_id = environment.get('id')
@@ -172,20 +193,7 @@ def _deploy(project, release, environment_id, description, confirm=True):
 
     result = project.deploy(release["release_id"], environment_id, description)
 
-    # Save the result of the deployment, including things like the ECS deploy IDs.
-    # These can be useful for debugging if something goes wrong.
-    #
-    # We save them on every deploy rather than hiding them behind a --debug flag,
-    # because deploying the same release twice may not have the same results.
-    # e.g. if the second deploy won't re-tag ECR images.
-    out_path = os.path.join(
-        os.environ['HOME'], 'local', 'share', 'weco-deploy',
-        datetime.datetime.now().strftime('deploy_%Y-%m-%d_%H-%M-%S.json')
-    )
-
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    with open(out_path, 'w') as out_file:
-        out_file.write(json.dumps(result, indent=2, sort_keys=True))
+    out_path = save_deployment(result)
 
     click.echo("")
     click.echo(click.style("Deployment Summary", fg="green"))

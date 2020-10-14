@@ -5,6 +5,18 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.3.3 - 2020-10-14
+------------------
+
+Logs written during a deployment are saved to ``~/.local/share/weco-deploy``, not ``~/local/share/weco-deploy``.
+
+------------------
+5.3.2 - 2020-10-14
+------------------
+
+Bump for release
+
+------------------
 5.3.1 - 2020-10-12
 ------------------
 

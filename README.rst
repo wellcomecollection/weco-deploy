@@ -71,13 +71,14 @@ the roles specified in configuration.
 Process
 -------
 
-This tool expects you to follow this process: - Publish images to a
-label in ECR e.g. “latest”, images will also be given a label indicating
-their git ref - Prepare a release from a label consisting of a set of
-images at particular git refs - Deploy that release into an
-“environment” - Copy images from one tag to another e.g. “latest” ->
-“env.stage” - Use project configuration and ECS Service tags to detect
-the correct services to redeploy
+This tool expects you to follow this process:
+
+-  Publish images to a label in ECR e.g. “latest”.
+   Images will also be given a label indicating their git ref.
+-  Prepare a release from a label consisting of a set of images at particular git refs
+-  Deploy that release into an “environment”
+-  Copy images from one tag to another e.g. “latest” -> “env.stage”
+-  Use project configuration and ECS Service tags to detect the correct services to redeploy
 
 Publishing images
 ~~~~~~~~~~~~~~~~~
@@ -126,9 +127,9 @@ Updating a release
 
 This command allowing you to release only specified services. It allows you
 to specify a previous release, a comma separated list of services to update
-and a label to update them from. 
+and a label to update them from.
 
-The command creates a new release with the same images as the old release 
+The command creates a new release with the same images as the old release
 with only the specified services updated to the given label.
 
 ::
