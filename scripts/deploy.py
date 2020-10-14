@@ -46,7 +46,7 @@ if __name__ == '__main__':
     tools.git("fetch", "ssh-origin")
 
     HEAD = tools.hash_for_name('HEAD')
-    MASTER = tools.hash_for_name('origin/master')
+    MASTER = tools.hash_for_name('ssh-origin/master')
     print('Current head:  ', HEAD)
     print('Current master:', MASTER)
 
