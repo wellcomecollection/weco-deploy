@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.4.0 - 2020-10-14
+------------------
+
+Adds `_confirm_deploy` to the deploy step, ensuring that the `deployment:label` tag on a service matches the `deployment:label` tag on the tasks within that service.
+
+------------------
 5.3.3 - 2020-10-14
 ------------------
 
