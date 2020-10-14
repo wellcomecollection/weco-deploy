@@ -240,14 +240,13 @@ class Project:
                 for task in tasks:
                     task_tags = parse_aws_tags(task["tags"])
 
-                    # Where previous tasks are not managed by weco-deploy this
-                    # value will not be set, so handle that case gracefully
-                    if "deployment:label" in task_tags:
-                        task_deployment_label = task_tags["deployment:label"]
-                    else:
-                        task_deployment_label = None
+                    _is_task_deployed = (
+                        task_tags.get("deployment:label") == service_deployment_label
+                    ) and (
+                        task['lastStatus'] == "RUNNING"
+                    )
 
-                    deployed_tasks.append(task_deployment_label == service_deployment_label)
+                    deployed_tasks.append(_is_task_deployed)
 
                 deployed_services.append(all(deployed_tasks) and desired_task_count == len(tasks))
 
