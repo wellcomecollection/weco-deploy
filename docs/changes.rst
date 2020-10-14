@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.4.1 - 2020-10-14
+------------------
+
+Adds `_confirm_deploy` to the `release_deploy` cli command.
+
+------------------
 5.4.0 - 2020-10-14
 ------------------
 
