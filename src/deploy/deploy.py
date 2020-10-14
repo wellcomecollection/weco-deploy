@@ -423,8 +423,12 @@ def update(ctx, release_id, service_ids, from_label):
               help="The target environment of this deployment")
 @click.option('--description', prompt="Enter a description for this deployment",
               help="A description of this deployment", default="No description provided")
+@click.option('--confirmation-wait-for',
+              help="How many seconds to wait for a confirmation for", default=600)
+@click.option('--confirmation-interval',
+              help="How many seconds in an interval before re-confirming a deploy", default=10)
 @click.pass_context
-def release_deploy(ctx, from_label, environment_id, description):
+def release_deploy(ctx, from_label, environment_id, description, confirmation_wait_for, confirmation_interval):
     project = ctx.obj['project']
     confirm = ctx.obj['confirm']
 
@@ -440,6 +444,14 @@ def release_deploy(ctx, from_label, environment_id, description):
         environment_id=environment_id,
         description=description,
         confirm=confirm
+    )
+
+    _confirm_deploy(
+        project=project,
+        release=release,
+        environment_id=environment_id,
+        wait_for_seconds=confirmation_wait_for,
+        interval=confirmation_interval
     )
 
 
