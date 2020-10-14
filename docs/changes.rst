@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.4.2 - 2020-10-14
+------------------
+
+Fixes some errors when tasks are not available or when moving from an unmanaged to a managed state
+
+------------------
 5.4.1 - 2020-10-14
 ------------------
 
