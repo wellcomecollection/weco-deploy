@@ -1,4 +1,3 @@
-import json
 from .iam import Iam
 from .iterators import chunked_iterable
 from .tags import parse_aws_tags
@@ -106,9 +105,9 @@ class Ecs:
         """
         service_name = service["response"]["serviceName"]
         cluster_arn = service["response"]["clusterArn"]
-        
+
         paginator = self.ecs.get_paginator("list_tasks")
-        paginator_iter = paginator.paginate(cluster=cluster_arn, serviceName = service_name)
+        paginator_iter = paginator.paginate(cluster=cluster_arn, serviceName=service_name)
         task_arns = []
         for page in paginator_iter:
             task_arns += page["taskArns"]
@@ -118,5 +117,5 @@ class Ecs:
             tasks=task_arns,
             include=["TAGS"]
         )
-        
+
         return resp["tasks"]

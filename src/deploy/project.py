@@ -1,7 +1,6 @@
 import datetime
 from urllib.parse import urlparse
 import uuid
-import json
 
 import yaml
 
@@ -217,7 +216,6 @@ class Project:
 
         return matched_services
 
-
     def is_release_deployed(self, release, environment_id):
         """
         Checks the `deployment:label` tag on a service matches the tags
@@ -243,11 +241,10 @@ class Project:
                     task_tags = parse_aws_tags(task["tags"])
                     task_deployment_label = task_tags["deployment:label"]
                     deployed_tasks.append(task_deployment_label == service_deployment_label)
-                
+
                 deployed_services.append(all(deployed_tasks) and desired_task_count == len(tasks))
 
         return all(deployed_services)
-
 
     def publish(self, image_id, label):
         # Attempt to match image to config

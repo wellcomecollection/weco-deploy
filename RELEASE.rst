@@ -1,3 +1,3 @@
-RELEASE_TYPE: patch
+RELEASE_TYPE: minor
 
-Bump for release
+Adds `_confirm_deploy` to the 
