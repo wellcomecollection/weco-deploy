@@ -42,6 +42,9 @@ if __name__ == '__main__':
         tools.__version__, last_release
     ))
 
+    tools.add_ssh_origin()
+    tools.git("fetch", "ssh-origin")
+
     HEAD = tools.hash_for_name('HEAD')
     MASTER = tools.hash_for_name('origin/master')
     print('Current head:  ', HEAD)
