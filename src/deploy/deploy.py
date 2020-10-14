@@ -13,6 +13,8 @@ from .project import Projects
 
 DEFAULT_PROJECT_FILEPATH = ".wellcome_project"
 
+LOGGING_ROOT = os.path.join(os.environ["HOME"], ".local", "share", "weco-deploy")
+
 
 def _format_ecr_uri(uri):
     image_name = uri.split("/")[2]
@@ -141,7 +143,7 @@ def save_deployment(deployment_result):
     Returns the path to the saved file.
     """
     out_path = os.path.join(
-        os.environ['HOME'], '.local', 'share', 'weco-deploy', 'deployment_results',
+        LOGGING_ROOT, "deployment_results",
         datetime.datetime.now().strftime('deploy_%Y-%m-%d_%H-%M-%S.json')
     )
 
