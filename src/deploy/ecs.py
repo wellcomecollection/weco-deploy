@@ -97,3 +97,25 @@ class Ecs:
             return None
         else:
             return matched_services[0]
+
+    def list_service_tasks(self, service):
+        """
+        Given a service (e.g. bag-unpacker),
+        return a list of tasks running within that service
+        """
+        service_name = service["response"]["serviceName"]
+        cluster_arn = service["response"]["clusterArn"]
+
+        paginator = self.ecs.get_paginator("list_tasks")
+        paginator_iter = paginator.paginate(cluster=cluster_arn, serviceName=service_name)
+        task_arns = []
+        for page in paginator_iter:
+            task_arns += page["taskArns"]
+
+        resp = self.ecs.describe_tasks(
+            cluster=cluster_arn,
+            tasks=task_arns,
+            include=["TAGS"]
+        )
+
+        return resp["tasks"]
