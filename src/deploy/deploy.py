@@ -177,7 +177,7 @@ def _deploy(project, release, environment_id, description, confirm=True):
     # because deploying the same release twice may not have the same results.
     # e.g. if the second deploy won't re-tag ECR images.
     out_path = os.path.join(
-        os.environ['HOME'], 'local', 'share', 'weco-deploy',
+        os.environ['HOME'], '.local', 'share', 'weco-deploy',
         datetime.datetime.now().strftime('deploy_%Y-%m-%d_%H-%M-%S.json')
     )
 
