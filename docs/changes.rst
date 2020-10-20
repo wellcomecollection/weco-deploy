@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.4.4 - 2020-10-20
+------------------
+
+Show the defaults for the ``--confirmation-wait-for`` and ``--confirmation-interval`` flags.
+
+------------------
 5.4.3 - 2020-10-15
 ------------------
 
