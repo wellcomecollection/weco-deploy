@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.5.0 - 2020-10-22
+------------------
+
+Makes waiting for a deployment more verbose by displaying time waited, along with wait time expectation, and totals after deployment.
+
+------------------
 5.4.4 - 2020-10-20
 ------------------
 
