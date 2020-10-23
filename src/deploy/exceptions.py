@@ -4,3 +4,7 @@ class WecoDeployError(Exception):
 
 class ConfigError(WecoDeployError):
     pass
+
+
+class EcrError(WecoDeployError):
+    pass
