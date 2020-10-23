@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.5.5 - 2020-10-23
+------------------
+
+Internal refactoring.  This should have no user-visible effect.
+
+------------------
 5.5.4 - 2020-10-23
 ------------------
 
