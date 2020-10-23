@@ -345,11 +345,13 @@ class Project:
 
             image_id = image['id']
 
-            image_details = self._ecr(
+            ecr = self._ecr(
                 account_id=image.get('account_id'),
                 region_name=image.get('region_name'),
                 role_arn=image.get('role_arn')
-            ).describe_image(
+            )
+
+            image_details = ecr.describe_image(
                 namespace=image.get('namespace', self.namespace),
                 image_id=image_id,
                 tag=from_label,
