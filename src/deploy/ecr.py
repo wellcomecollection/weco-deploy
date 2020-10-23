@@ -28,10 +28,6 @@ class EcrImage:
     def tags(self):
         return set(self._image_details["imageTags"])
 
-    @property
-    def is_latest(self):
-        return "latest" in self.tags
-
     def ref_uri(self):
         ref_tags = {t for t in self.tags if t.startswith("ref.")}
 
@@ -124,7 +120,6 @@ class Ecr:
             'registry_id': image.registry_id,
             'repository_name': repository_name,
             'image_digest': image.image_digest,
-            'is_latest': image.is_latest,
             'image_id': image_id,
             'ref': image.ref_uri(),
         }

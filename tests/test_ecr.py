@@ -58,22 +58,6 @@ def test_multiple_matching_images_is_error(ecr_base_uri, repository_name, tag):
         )
 
 
-@pytest.mark.parametrize(
-    "imageTags, is_latest", [(["latest", "env.stage"], True), (["env.prod"], False),]
-)
-def test_latest(repository_name, tag, imageTags, is_latest):
-    image = EcrImage(
-        ecr_base_uri=ecr_base_uri,
-        repository_name=repository_name,
-        tag=tag,
-        describe_images_resp={
-            "imageDetails": [{"name": "my_image", "imageTags": imageTags}]
-        },
-    )
-
-    assert image.is_latest == is_latest
-
-
 def test_no_ref_tag_is_error(ecr_base_uri, repository_name, tag):
     image = EcrImage(
         ecr_base_uri=ecr_base_uri,
