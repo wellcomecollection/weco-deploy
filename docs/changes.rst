@@ -5,6 +5,14 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.5.6 - 2020-10-23
+------------------
+
+Handle the case asked to describe an image that does not exist gracefully.
+
+This fixes an issue with the update command that would fail when the label requested was not available for all services in a project, even though a subset were being updated.
+
+------------------
 5.5.5 - 2020-10-23
 ------------------
 
