@@ -270,7 +270,9 @@ def deploy(ctx, release_id, environment_id, description, confirmation_wait_for, 
 
 
 def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval):
+    total_time_waited = 0
     start_timer = time.perf_counter()
+    
     release_id = release["release_id"]
 
     click.echo("")
@@ -278,9 +280,9 @@ def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval
     click.echo(click.style(f"Allowing {wait_for_seconds}s for deployment.", fg="yellow"))
 
     while not project.is_release_deployed(release, environment_id):
-        waited_seconds = int(time.perf_counter() - start_timer)
+        total_time_waited = int(time.perf_counter() - start_timer)
 
-        exceeded_wait_time = waited_seconds >= wait_for_seconds
+        exceeded_wait_time = total_time_waited >= wait_for_seconds
 
         if exceeded_wait_time:
             click.echo("")
@@ -288,16 +290,16 @@ def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval
             click.echo(click.style(f"Deployment time exceeded {wait_for_seconds}s", fg="red"))
             sys.exit(1)
 
-        retry_message = f"Trying again in {interval}s, (waited {waited_seconds}s)."
+        retry_message = f"Trying again in {interval}s, (waited {total_time_waited}s)."
         click.echo(click.style(retry_message,fg="yellow"))
 
         time.sleep(interval)
 
-    total_wait_time = int(time.perf_counter() - start_timer)
+    total_time_waited = int(time.perf_counter() - start_timer)
 
     click.echo("")
     click.echo(click.style(f"Deployment of {release_id} to {environment_id} successful", fg="bright_green"))
-    click.echo(click.style(f"Deployment took {total_wait_time}s", fg="bright_green"))
+    click.echo(click.style(f"Deployment took {total_time_waited}s", fg="bright_green"))
     sys.exit(0)
 
 
