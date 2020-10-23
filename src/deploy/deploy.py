@@ -272,7 +272,7 @@ def deploy(ctx, release_id, environment_id, description, confirmation_wait_for, 
 def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval):
     total_time_waited = 0
     start_timer = time.perf_counter()
-    
+
     release_id = release["release_id"]
 
     click.echo("")
@@ -291,7 +291,7 @@ def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval
             sys.exit(1)
 
         retry_message = f"Trying again in {interval}s, (waited {total_time_waited}s)."
-        click.echo(click.style(retry_message,fg="yellow"))
+        click.echo(click.style(retry_message, fg="yellow"))
 
         time.sleep(interval)
 
