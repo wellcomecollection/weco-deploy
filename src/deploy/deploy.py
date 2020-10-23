@@ -275,22 +275,22 @@ def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval
 
     def _is_release_deployed():
         is_release_deployed = project.is_release_deployed(release, environment_id)
-        waited_for_seconds = int(time.perf_counter() - start_timer)
+        total_wait_time = int(time.perf_counter() - start_timer)
 
-        if not is_release_deployed and waited_for_seconds < wait_for_seconds:
+        if not is_release_deployed and total_wait_time < wait_for_seconds:
             click.echo(
                 click.style(
-                    f"Trying again in {interval}s, (waited {wait_for_seconds}s).",
+                    f"Trying again in {interval}s, (waited {total_wait_time}s).",
                     fg="yellow"))
             time.sleep(interval)
             _is_release_deployed()
 
-        if not is_release_deployed and waited_for_seconds >= wait_for_seconds:
+        if not is_release_deployed and total_wait_time >= wait_for_seconds:
             return False
 
         if is_release_deployed:
             return {
-                'waited_for_seconds': waited_for_seconds
+                'total_wait_time': total_wait_time
             }
 
     click.echo("")
@@ -300,7 +300,7 @@ def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval
     confirmation = _is_release_deployed()
 
     if confirmation:
-        total_wait_time = confirmation['waited_for_seconds']
+        total_wait_time = confirmation['total_wait_time']
 
         click.echo("")
         click.echo(click.style(f"Deployment of {release_id} to {environment_id} successful", fg="bright_green"))
