@@ -12,7 +12,7 @@ class EcrImage:
     """
     Convenience wrapper around a response from the ECR DescribeImages API.
     """
-    def __init__(self, repository_name, tag, describe_images_resp):
+    def __init__(self, ecr_base_uri, repository_name, tag, describe_images_resp):
         if not describe_images_resp["imageDetails"]:
             raise EcrError(f"No matching images found for {repository_name}:{tag}!")
 
@@ -20,6 +20,7 @@ class EcrImage:
             raise EcrError(f"Multiple matching images found for {repository_name}:{tag}!")
 
         self._image_details = describe_images_resp["imageDetails"][0]
+        self.ecr_base_uri = ecr_base_uri
         self.repository_name = repository_name
         self.tag = tag
 
@@ -31,14 +32,15 @@ class EcrImage:
     def is_latest(self):
         return "latest" in self.tags
 
-    def env_uris(self, ecr_base_uri):
+    @property
+    def env_uris(self):
         env_tags = {t for t in self.tags if t.startswith("env.")}
         return {
-            tag.split(".")[-1]: f"{ecr_base_uri}/{self.repository_name}:{tag}"
+            tag.split(".")[-1]: f"{self.ecr_base_uri}/{self.repository_name}:{tag}"
             for tag in env_tags
         }
 
-    def ref_uri(self, ecr_base_uri):
+    def ref_uri(self):
         ref_tags = {t for t in self.tags if t.startswith("ref.")}
 
         if not ref_tags:
@@ -49,7 +51,7 @@ class EcrImage:
         # between the two commits.  If so, choose one arbitrarily.
         ref = ref_tags.pop()
 
-        return f"{ecr_base_uri}/{self.repository_name}:{ref}"
+        return f"{self.ecr_base_uri}/{self.repository_name}:{ref}"
 
     @property
     def registry_id(self):
@@ -120,6 +122,7 @@ class Ecr:
         )
 
         image = EcrImage(
+            ecr_base_uri=self.ecr_base_uri,
             repository_name=repository_name,
             tag=tag,
             describe_images_resp=result
@@ -131,8 +134,8 @@ class Ecr:
             'image_digest': image.image_digest,
             'is_latest': image.is_latest,
             'image_id': image_id,
-            'envs': image.env_uris(ecr_base_uri=self.ecr_base_uri),
-            'ref': image.ref_uri(ecr_base_uri=self.ecr_base_uri),
+            'envs': image.env_uris,
+            'ref': image.ref_uri(),
         }
 
     def tag_image(self, namespace, image_id, tag, new_tag):
