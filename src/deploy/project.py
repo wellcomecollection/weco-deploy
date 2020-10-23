@@ -1,4 +1,5 @@
 import datetime
+import functools
 from urllib.parse import urlparse
 import uuid
 
@@ -111,6 +112,7 @@ class Project:
             role_arn=role_arn or self.role_arn
         )
 
+    @functools.lru_cache()
     def _ecs(self, region_name=None, role_arn=None):
         return Ecs(
             region_name=region_name or self.region_name,
@@ -180,6 +182,50 @@ class Project:
             return self.releases_store.get_latest_release()
         else:
             return self.releases_store.get_release(release_id)
+
+    def _get_services_by_image_id(self, release):
+        """
+        Generates a set of tuples (image_id, List[services])
+        """
+        for image_id, _ in release["images"].items():
+            # TODO: self.image_repositories should be a dict, not a list
+            matched_image = self._match_image_id(image_id)
+
+            # TODO: Should this ever happen?
+            if matched_image is None:
+                continue
+
+            try:
+                services = matched_image["services"]
+            except KeyError:
+                continue
+
+            yield (image_id, services)
+
+    def get_ecs_service_arns(self, release, environment_id):
+        """
+        Returns a dict (image ID) -> List[service ARNs].
+        """
+        result = collections.defaultdict(list)
+
+        for image_id, services in self._get_services_by_image_id(release):
+            for serv in services:
+                ecs = self._ecs(
+                    region_name=serv.get('region_name'),
+                    role_arn=serv.get('role_arn')
+                )
+
+                matching_service = ecs.find_matching_service(
+                    service_id=serv["id"],
+                    environment_id=environment_id
+                )
+
+                try:
+                    result[image_id].append(matching_service["serviceArn"])
+                except TypeError:
+                    assert matching_service is None, matching_service
+
+        return dict(result)
 
     def get_ecs_services(self, release, environment_id):
         def _get_service(service):
