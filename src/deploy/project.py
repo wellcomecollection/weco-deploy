@@ -271,7 +271,8 @@ class Project:
         """
         ecs_services = self.get_ecs_services(release, environment_id)
 
-        deployed_services = []
+        is_deployed = True
+
         for _, services in sorted(ecs_services.items()):
             for service in services:
                 service_tags = parse_aws_tags(service["response"]["tags"])
@@ -283,21 +284,37 @@ class Project:
                 )
                 tasks = ecs.list_service_tasks(service)
 
-                deployed_tasks = []
                 for task in tasks:
                     task_tags = parse_aws_tags(task["tags"])
 
-                    _is_task_deployed = (
-                        task_tags.get("deployment:label") == service_deployment_label
-                    ) and (
-                        task['lastStatus'] == "RUNNING"
-                    )
+                    task_name = task_tags.get("deployment:service")
+                    deployment_label = task_tags.get("deployment:label")
 
-                    deployed_tasks.append(_is_task_deployed)
+                    if deployment_label != service_deployment_label:
+                        task_arn = task["taskArn"]
+                        print("")
+                        print(f"Task in {task_name} has the wrong deployment label:")
+                        print(f"Wanted:   {service_deployment_label}")
+                        print(f"Actual:   {deployment_label}")
+                        print(f"Task ARN: {task_arn}")
+                        is_deployed = False
 
-                deployed_services.append(all(deployed_tasks) and desired_task_count == len(tasks))
+                    if task["lastStatus"] != "RUNNING":
+                        print("")
+                        print(f"Task in {task_name} has the wrong status:")
+                        print("Wanted:   RUNNING")
+                        print(f"Actual:   {task['lastStatus']}")
+                        print(f"Task ARN: {task_arn}")
+                        is_deployed = False
 
-        return all(deployed_services)
+                if len(tasks) < desired_task_count:
+                    print("")
+                    print(f"Not running the correct number of tasks in {service}:")
+                    print(f"Wanted: {desired_task_count}")
+                    print(f"Actual: {len(tasks)}")
+                    is_deployed = False
+
+        return is_deployed
 
     def publish(self, image_id, label):
         # Attempt to match image to config

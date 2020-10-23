@@ -290,7 +290,7 @@ def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval
             click.echo(click.style(f"Deployment time exceeded {wait_for_seconds}s", fg="red"))
             sys.exit(1)
 
-        retry_message = f"Trying again in {interval}s, (waited {total_time_waited}s)."
+        retry_message = f"Trying again in {interval}s (waited {total_time_waited}s)."
         click.echo(click.style(retry_message, fg="yellow"))
 
         time.sleep(interval)
