@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.5.3 - 2020-10-23
+------------------
+
+Fix a bug where weco-deploy would erroneously report that region config was missing, when actually the role ARN was missing.
+
+------------------
 5.5.2 - 2020-10-23
 ------------------
 
