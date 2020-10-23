@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.5.1 - 2020-10-23
+------------------
+
+Speed up loading the table "ECS services discovered" when running the ``deploy`` command.
+
+------------------
 5.5.0 - 2020-10-22
 ------------------
 
