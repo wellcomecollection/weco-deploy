@@ -108,7 +108,6 @@ class Ecr:
         )
 
         return {
-            'repository_name': repository_name,
             'image_id': image_id,
             'ref': image.ref_uri(),
         }
