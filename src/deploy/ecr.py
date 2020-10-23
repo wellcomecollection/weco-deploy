@@ -92,25 +92,33 @@ class Ecr:
         if not account_id:
             account_id = self.account_id
 
-        result = self.ecr.describe_images(
-            registryId=account_id,
-            repositoryName=repository_name,
-            imageIds=[
-                {"imageTag": tag}
-            ]
-        )
+        try:
+            result = self.ecr.describe_images(
+                registryId=account_id,
+                repositoryName=repository_name,
+                imageIds=[
+                    {"imageTag": tag}
+                ]
+            )
 
-        image = EcrImage(
-            ecr_base_uri=self.ecr_base_uri,
-            repository_name=repository_name,
-            tag=tag,
-            describe_images_resp=result
-        )
+            image = EcrImage(
+                ecr_base_uri=self.ecr_base_uri,
+                repository_name=repository_name,
+                tag=tag,
+                describe_images_resp=result
+            )
 
-        return {
-            'image_id': image_id,
-            'ref': image.ref_uri(),
-        }
+            return {
+                'image_id': image_id,
+                'ref': image.ref_uri(),
+            }
+
+        except ClientError as e:
+            # Matching tag & digest already exists (nothing to do)
+            if not e.response['Error']['Code'] == 'ImageNotFoundException':
+                raise e
+            else:
+                return None
 
     def tag_image(self, namespace, image_id, tag, new_tag):
         repository_name = Ecr._get_repository_name(namespace, image_id)

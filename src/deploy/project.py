@@ -358,7 +358,8 @@ class Project:
                 account_id=image.get('account_id')
             )
 
-            release_images[image_details['image_id']] = image_details['ref']
+            if image_details:
+                release_images[image_details['image_id']] = image_details['ref']
 
         return release_images
 
