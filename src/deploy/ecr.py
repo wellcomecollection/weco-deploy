@@ -32,14 +32,6 @@ class EcrImage:
     def is_latest(self):
         return "latest" in self.tags
 
-    @property
-    def env_uris(self):
-        env_tags = {t for t in self.tags if t.startswith("env.")}
-        return {
-            tag.split(".")[-1]: f"{self.ecr_base_uri}/{self.repository_name}:{tag}"
-            for tag in env_tags
-        }
-
     def ref_uri(self):
         ref_tags = {t for t in self.tags if t.startswith("ref.")}
 
@@ -134,7 +126,6 @@ class Ecr:
             'image_digest': image.image_digest,
             'is_latest': image.is_latest,
             'image_id': image_id,
-            'envs': image.env_uris,
             'ref': image.ref_uri(),
         }
 

@@ -74,24 +74,6 @@ def test_latest(repository_name, tag, imageTags, is_latest):
     assert image.is_latest == is_latest
 
 
-def test_env_uris():
-    image = EcrImage(
-        ecr_base_uri="1234567890.ecr.example.aws.com",
-        repository_name="example_worker",
-        tag="123abc",
-        describe_images_resp={
-            "imageDetails": [
-                {"name": "my_image", "imageTags": ["env.prod", "env.stage"]}
-            ]
-        },
-    )
-
-    assert image.env_uris == {
-        "prod": "1234567890.ecr.example.aws.com/example_worker:env.prod",
-        "stage": "1234567890.ecr.example.aws.com/example_worker:env.stage",
-    }
-
-
 def test_no_ref_tag_is_error(ecr_base_uri, repository_name, tag):
     image = EcrImage(
         ecr_base_uri=ecr_base_uri,
