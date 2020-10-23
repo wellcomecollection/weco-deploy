@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.5.7 - 2020-10-23
+------------------
+
+weco-deploy now gives more detailed explanations of why a deployment hasn't completed.
+
+------------------
 5.5.6 - 2020-10-23
 ------------------
 
