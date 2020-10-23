@@ -125,14 +125,3 @@ def test_repository_name(ecr_base_uri, repository_name, tag):
     )
 
     assert image.repository_name == repository_name
-
-
-def test_image_digest(ecr_base_uri, repository_name, tag):
-    image = EcrImage(
-        ecr_base_uri=ecr_base_uri,
-        repository_name=repository_name,
-        tag=tag,
-        describe_images_resp={"imageDetails": [{"imageDigest": "sha256:123456789abc"}]},
-    )
-
-    assert image.image_digest == "sha256:123456789abc"

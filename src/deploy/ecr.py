@@ -45,11 +45,6 @@ class EcrImage:
     def registry_id(self):
         return self._image_details["registryId"]
 
-    @property
-    def image_digest(self):
-        return self._image_details["imageDigest"]
-
-
 
 class Ecr:
     def __init__(self, account_id, region_name, role_arn):
@@ -119,7 +114,6 @@ class Ecr:
         return {
             'registry_id': image.registry_id,
             'repository_name': repository_name,
-            'image_digest': image.image_digest,
             'image_id': image_id,
             'ref': image.ref_uri(),
         }
