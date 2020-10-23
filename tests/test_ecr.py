@@ -105,17 +105,6 @@ def test_chooses_ref_uri_arbitrarily():
     }
 
 
-def test_registry_id(ecr_base_uri, repository_name, tag):
-    image = EcrImage(
-        ecr_base_uri=ecr_base_uri,
-        repository_name=repository_name,
-        tag=tag,
-        describe_images_resp={"imageDetails": [{"registryId": "1234567890"}]},
-    )
-
-    assert image.registry_id == "1234567890"
-
-
 def test_repository_name(ecr_base_uri, repository_name, tag):
     image = EcrImage(
         ecr_base_uri=ecr_base_uri,
