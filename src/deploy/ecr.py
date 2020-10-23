@@ -3,8 +3,43 @@ import os
 
 from botocore.exceptions import ClientError
 
+from .exceptions import EcrError
 from .iam import Iam
 from .commands import cmd
+
+
+class EcrImage:
+    """
+    Convenience wrapper around a response from the ECR DescribeImages API.
+    """
+    def __init__(self, ecr_base_uri, repository_name, tag, describe_images_resp):
+        if not describe_images_resp["imageDetails"]:
+            raise EcrError(f"No matching images found for {repository_name}:{tag}!")
+
+        if len(describe_images_resp["imageDetails"]) > 1:
+            raise EcrError(f"Multiple matching images found for {repository_name}:{tag}!")
+
+        self._image_details = describe_images_resp["imageDetails"][0]
+        self.ecr_base_uri = ecr_base_uri
+        self.repository_name = repository_name
+        self.tag = tag
+
+    @property
+    def tags(self):
+        return set(self._image_details["imageTags"])
+
+    def ref_uri(self):
+        ref_tags = {t for t in self.tags if t.startswith("ref.")}
+
+        if not ref_tags:
+            raise EcrError(f"No matching ref tags found for {self.repository_name}:{self.tag}!")
+
+        # It's possible to get multiple ref tags if the same image is published
+        # at different Git commits, but there are no code changes for this image
+        # between the two commits.  If so, choose one arbitrarily.
+        ref = ref_tags.pop()
+
+        return f"{self.ecr_base_uri}/{self.repository_name}:{ref}"
 
 
 class Ecr:
@@ -65,41 +100,16 @@ class Ecr:
             ]
         )
 
-        if len(result['imageDetails']) == 0:
-            raise RuntimeError(f"No matching images found for {repository_name}:{tag}!")
-
-        if len(result['imageDetails']) > 1:
-            raise RuntimeError(f"Multiple matching images found for {repository_name}:{tag}!")
-
-        image_details = result['imageDetails'][0]
-
-        is_latest = 'latest' in image_details['imageTags']
-
-        ref_tags = [image for image in image_details['imageTags'] if image.startswith("ref.")]
-        env_tags = [image for image in image_details['imageTags'] if image.startswith("env.")]
-
-        envs = {env_tag.split('.')[-1]: self._get_full_repository_uri(
-            namespace,
-            image_id,
-            env_tag
-        ) for env_tag in env_tags}
-
-        refs = [self._get_full_repository_uri(namespace, image_id, ref_tag) for ref_tag in ref_tags]
-
-        # It is possible multiple ref tags can occur if images are published at new git refs with
-        # no image changes, deal with it gracefully - just get the first
-        if len(refs) < 1:
-            raise RuntimeError(f"No matching ref tags found for {repository_name}:{tag}!")
-        ref = refs[0]
+        image = EcrImage(
+            ecr_base_uri=self.ecr_base_uri,
+            repository_name=repository_name,
+            tag=tag,
+            describe_images_resp=result
+        )
 
         return {
-            'registry_id': image_details['registryId'],
-            'repository_name': image_details['repositoryName'],
-            'image_digest': image_details['imageDigest'],
-            'is_latest': is_latest,
             'image_id': image_id,
-            'envs': envs,
-            'ref': ref
+            'ref': image.ref_uri(),
         }
 
     def tag_image(self, namespace, image_id, tag, new_tag):
