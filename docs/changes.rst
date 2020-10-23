@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.5.4 - 2020-10-23
+------------------
+
+Make weco-deploy slightly faster when looking up Git commits.
+
+------------------
 5.5.3 - 2020-10-23
 ------------------
 
