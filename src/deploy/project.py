@@ -5,6 +5,7 @@ import uuid
 
 import yaml
 
+from . import ecr
 from .ecr import Ecr
 from .ecs import Ecs
 from .exceptions import ConfigError
@@ -348,28 +349,22 @@ class Project:
         }
 
     def get_images(self, from_label):
-        release_images = {}
-        for image in self.image_repositories:
+        image_repositories = {}
 
-            image_id = image['id']
+        for repo in self.image_repositories:
+            namespace = repo.get("namespace", self.namespace)
 
-            ecr = self._ecr(
-                account_id=image.get('account_id'),
-                region_name=image.get('region_name'),
-                role_arn=image.get('role_arn')
-            )
+            image_repositories[repo["id"]] = {
+                "account_id": repo.get("account_id", self.account_id),
+                "region_name": repo.get("region_name", self.region_name),
+                "role_arn": repo.get("role_arn", self.role_arn),
+                "repository_name": f"{namespace}/{repo['id']}"
+            }
 
-            image_details = ecr.describe_image(
-                namespace=image.get('namespace', self.namespace),
-                image_id=image_id,
-                tag=from_label,
-                account_id=image.get('account_id')
-            )
-
-            if image_details:
-                release_images[image_details['image_id']] = image_details['ref']
-
-        return release_images
+        return ecr.get_ref_tags_for_repositories(
+            image_repositories=image_repositories,
+            tag=from_label
+        )
 
     def _prepare_release(self, description, release_images):
         previous_release = self.releases_store.get_latest_release()

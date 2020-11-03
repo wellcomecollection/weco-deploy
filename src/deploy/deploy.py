@@ -18,16 +18,6 @@ DEFAULT_PROJECT_FILEPATH = ".wellcome_project"
 LOGGING_ROOT = os.path.join(os.environ["HOME"], ".local", "share", "weco-deploy")
 
 
-def _format_ecr_uri(uri):
-    image_name = uri.split("/")[2]
-    image_label, image_tag = image_name.split(":")
-
-    return {
-        'label': image_label,
-        'tag': image_tag
-    }
-
-
 @click.group()
 @click.option('--project-file', '-f', default=DEFAULT_PROJECT_FILEPATH)
 @click.option('--verbose', '-v', is_flag=True, help="Print verbose messages.")
@@ -523,9 +513,14 @@ def show_images(ctx, label):
         "tag",
     ]
 
-    for image_id, ecr_uri in images.items():
-        ecr_uri = _format_ecr_uri(ecr_uri)
-        rows.append([image_id, ecr_uri["label"], ecr_uri["tag"]])
+    for image_id, ref_tags in images.items():
+        if ref_tags:
+            # It's possible to get multiple ref tags if the same image is published
+            # at different Git commits, but there are no code changes for this image
+            # between the two commits.  If so, choose one arbitrarily.
+            rows.append([image_id, label, ref_tags.pop()])
+        else:
+            rows.append([image_id, "-", "-"])
 
     print(tabulate(rows, headers=headers))
 

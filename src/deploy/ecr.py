@@ -8,50 +8,25 @@ from .iam import Iam
 from .commands import cmd
 
 
-class EcrImage:
-    """
-    Convenience wrapper around a response from the ECR DescribeImages API.
-    """
-    def __init__(self, ecr_base_uri, repository_name, tag, describe_images_resp):
-        if not describe_images_resp["imageDetails"]:
-            raise EcrError(f"No matching images found for {repository_name}:{tag}!")
+def create_client(*, account_id, region_name, role_arn):
+    session = Iam.get_session(
+        session_name="ReleaseToolEcr",
+        role_arn=role_arn,
+        region_name=region_name
+    )
 
-        if len(describe_images_resp["imageDetails"]) > 1:
-            raise EcrError(f"Multiple matching images found for {repository_name}:{tag}!")
-
-        self._image_details = describe_images_resp["imageDetails"][0]
-        self.ecr_base_uri = ecr_base_uri
-        self.repository_name = repository_name
-        self.tag = tag
-
-    @property
-    def tags(self):
-        return set(self._image_details["imageTags"])
-
-    def ref_uri(self):
-        ref_tags = {t for t in self.tags if t.startswith("ref.")}
-
-        if not ref_tags:
-            raise EcrError(f"No matching ref tags found for {self.repository_name}:{self.tag}!")
-
-        # It's possible to get multiple ref tags if the same image is published
-        # at different Git commits, but there are no code changes for this image
-        # between the two commits.  If so, choose one arbitrarily.
-        ref = ref_tags.pop()
-
-        return f"{self.ecr_base_uri}/{self.repository_name}:{ref}"
+    return session.client("ecr")
 
 
 class Ecr:
     def __init__(self, account_id, region_name, role_arn):
         self.account_id = account_id
         self.region_name = region_name
-        self.session = Iam.get_session(
-            session_name="ReleaseToolEcr",
-            role_arn=role_arn,
-            region_name=region_name
+        self.ecr = create_client(
+            account_id=account_id,
+            region_name=region_name,
+            role_arn=role_arn
         )
-        self.ecr = self.session.client('ecr')
 
         self.ecr_base_uri = (
             f"{self.account_id}.dkr.ecr.{self.region_name}.amazonaws.com"
@@ -86,39 +61,6 @@ class Ecr:
             cmd('docker', 'rmi', remote_image_name)
 
         return remote_image_name, remote_image_tag, local_image_tag
-
-    def describe_image(self, namespace, image_id, tag, account_id=None):
-        repository_name = Ecr._get_repository_name(namespace, image_id)
-        if not account_id:
-            account_id = self.account_id
-
-        try:
-            result = self.ecr.describe_images(
-                registryId=account_id,
-                repositoryName=repository_name,
-                imageIds=[
-                    {"imageTag": tag}
-                ]
-            )
-
-            image = EcrImage(
-                ecr_base_uri=self.ecr_base_uri,
-                repository_name=repository_name,
-                tag=tag,
-                describe_images_resp=result
-            )
-
-            return {
-                'image_id': image_id,
-                'ref': image.ref_uri(),
-            }
-
-        except ClientError as e:
-            # Matching tag & digest already exists (nothing to do)
-            if not e.response['Error']['Code'] == 'ImageNotFoundException':
-                raise e
-            else:
-                return None
 
     def tag_image(self, namespace, image_id, tag, new_tag):
         repository_name = Ecr._get_repository_name(namespace, image_id)
@@ -175,3 +117,96 @@ class Ecr:
             command = ['docker', 'login', '-u', username, '-p', password, auth['proxyEndpoint']]
 
             cmd(*command)
+
+
+class NoSuchImageError(EcrError):
+    """
+    Raised when an image cannot be found.
+    """
+    pass
+
+
+class NoRefTagError(EcrError):
+    """
+    Raised when an image does not have any tags starting ``ref.``.
+    """
+    pass
+
+
+def get_ref_tags_for_image(ecr_client, *, repository_name, tag, account_id):
+    """
+    Returns the ref tags for the image with this tag.
+
+    e.g. if you look for the "latest" tag, it will return the unambiguous Git ref tag(s)
+    for this image.
+    """
+    try:
+        resp = ecr_client.describe_images(
+            registryId=account_id,
+            repositoryName=repository_name,
+            imageIds=[{"imageTag": tag}],
+        )
+    except ClientError as e:
+        if not e.response["Error"]["Code"] == "ImageNotFoundException":
+            raise e
+        else:
+            raise NoSuchImageError(
+                f"Cannot find an image in {repository_name} with tag {tag}"
+            )
+
+    assert len(resp["imageDetails"]) == 1, resp
+    image_details = resp["imageDetails"][0]
+
+    tags = set(image_details["imageTags"])
+    ref_tags = {t for t in tags if t.startswith("ref.")}
+
+    if not ref_tags:
+        raise NoRefTagError(
+            f"No matching ref tags found for {repository_name}:{tag}!"
+        )
+
+    return ref_tags
+
+
+def get_ref_tags_for_repositories(*, image_repositories, tag):
+    """
+    Returns the ref tags for all the repositories in ``image_repositories``.
+
+    Repositories should be a dict of the form:
+
+        (id) -> {
+            "account_id": (account_id),
+            "region_name": (region_name),
+            "role_arn": (role_arn),
+            "repository_name": (repository_name),
+        }
+
+    Returns a dict (id) -> set(ref_tags)
+
+    """
+    result = {}
+
+    for repo_id, repo_details in image_repositories.items():
+        account_id = repo_details["account_id"]
+        region_name = repo_details["region_name"]
+        role_arn = repo_details["role_arn"]
+
+        ecr_client = create_client(
+            account_id=account_id,
+            region_name=region_name,
+            role_arn=role_arn
+        )
+
+        try:
+            ref_uri = get_ref_tags_for_image(
+                ecr_client,
+                repository_name=repo_details["repository_name"],
+                tag=tag,
+                account_id=account_id
+            )
+        except NoSuchImageError:
+            result[repo_id] = set()
+        else:
+            result[repo_id] = ref_uri
+
+    return result
