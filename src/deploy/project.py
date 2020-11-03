@@ -1,7 +1,6 @@
 import collections
 import datetime
 import functools
-from urllib.parse import urlparse
 import uuid
 
 import yaml
@@ -15,14 +14,6 @@ from .tags import parse_aws_tags
 
 DEFAULT_ECR_NAMESPACE = "uk.ac.wellcome"
 DEFAULT_REGION_NAME = "eu-west-1"
-
-
-def _is_url(label):
-    try:
-        res = urlparse(label)
-        return all([res.scheme, res.netloc])
-    except ValueError:
-        return False
 
 
 def _load(filepath):
