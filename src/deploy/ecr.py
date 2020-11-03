@@ -163,22 +163,21 @@ def describe_image(ecr_client, ecr_base_uri, namespace, image_id, tag, account_i
             repositoryName=repository_name,
             imageIds=[{"imageTag": tag}],
         )
-
-        image = EcrImage(
-            ecr_base_uri=ecr_base_uri,
-            repository_name=repository_name,
-            tag=tag,
-            describe_images_resp=result,
-        )
-
-        return {
-            "image_id": image_id,
-            "ref": image.ref_uri(),
-        }
-
     except ClientError as e:
         # Matching tag & digest already exists (nothing to do)
         if not e.response["Error"]["Code"] == "ImageNotFoundException":  # pragma: no cover
             raise e
         else:
             return None
+
+    image = EcrImage(
+        ecr_base_uri=ecr_base_uri,
+        repository_name=repository_name,
+        tag=tag,
+        describe_images_resp=result,
+    )
+
+    return {
+        "image_id": image_id,
+        "ref": image.ref_uri(),
+    }
