@@ -204,7 +204,7 @@ def get_ref_tags_for_repositories(*, image_repositories, tag):
                 tag=tag,
                 account_id=account_id
             )
-        except NoSuchImageError as err:
+        except NoSuchImageError:
             result[repo_id] = set()
         else:
             result[repo_id] = ref_uri
