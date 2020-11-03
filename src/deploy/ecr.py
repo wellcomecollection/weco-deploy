@@ -8,6 +8,16 @@ from .iam import Iam
 from .commands import cmd
 
 
+def create_client(*, account_id, region_name, role_arn):
+    session = Iam.get_session(
+        session_name="ReleaseToolEcr",
+        role_arn=role_arn,
+        region_name=region_name
+    )
+
+    return session.client("ecr")
+
+
 class Ecr:
     def __init__(self, account_id, region_name, role_arn):
         self.account_id = account_id
@@ -176,3 +186,48 @@ def get_ref_uri_for_image(ecr_client, *, ecr_base_uri, repository_name, tag, acc
         tag=tag,
         image_details=image_details
     )
+
+
+def get_ref_uris_for_repositories(*, image_repositories, tag):
+    """
+    Returns unambiguous URIs for all the repositories in ``image_repositories``.
+
+    Repositories should be a dict of the form:
+
+        (id) -> {
+            "account_id": (account_id),
+            "region_name": (region_name),
+            "role_arn": (role_arn),
+            "repository_name": (repository_name),
+        }
+
+    Returns a dict (id) -> (ref_uri)
+
+    """
+    result = {}
+
+    for repo_id, repo_details in image_repositories.items():
+        account_id = repo_details["account_id"]
+        region_name = repo_details["region_name"]
+        role_arn = repo_details["role_arn"]
+
+        ecr_client = create_client(
+            account_id=account_id,
+            region_name=region_name,
+            role_arn=role_arn
+        )
+
+        try:
+            ref_uri = get_ref_uri_for_image(
+                ecr_client,
+                ecr_base_uri=f"{account_id}.dkr.ecr.{region_name}.amazonaws.com",
+                repository_name=repo_details["repository_name"],
+                tag=tag,
+                account_id=account_id
+            )
+        except NoSuchImageError as err:
+            pass
+        else:
+            result[repo_id] = ref_uri
+
+    return result

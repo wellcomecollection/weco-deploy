@@ -3,6 +3,7 @@ import json
 from random import random
 
 from botocore.exceptions import ClientError
+import moto
 import pytest
 
 from deploy import ecr
@@ -107,13 +108,11 @@ class TestGetRefUriForImage:
         """
         We cannot get the ref URI of an image if there is no ref tag.
         """
-        manifest = _create_image_manifest()
-
         ecr_client.create_repository(repositoryName="example_worker")
         ecr_client.put_image(
             registryId="1234567890",
             repositoryName="example_worker",
-            imageManifest=json.dumps(manifest),
+            imageManifest=json.dumps(_create_image_manifest()),
             imageTag="latest",
         )
 
@@ -125,3 +124,70 @@ class TestGetRefUriForImage:
                 tag="latest",
                 account_id="1234567890",
             )
+
+
+@moto.mock_sts()
+@moto.mock_iam()
+def test_get_ref_uris_for_repositories(ecr_client, region_name):
+    manifest1 = _create_image_manifest()
+    ecr_client.create_repository(repositoryName="example_worker1")
+    ecr_client.put_image(
+        registryId="1111111111",
+        repositoryName="example_worker1",
+        imageManifest=json.dumps(manifest1),
+        imageTag="latest",
+    )
+    ecr_client.put_image(
+        registryId="1111111111",
+        repositoryName="example_worker1",
+        imageManifest=json.dumps(manifest1),
+        imageTag="ref.111",
+    )
+
+    manifest2 = _create_image_manifest()
+    ecr_client.create_repository(repositoryName="example_worker2")
+    ecr_client.put_image(
+        registryId="2222222222",
+        repositoryName="example_worker2",
+        imageManifest=json.dumps(manifest2),
+        imageTag="latest",
+    )
+    ecr_client.put_image(
+        registryId="2222222222",
+        repositoryName="example_worker2",
+        imageManifest=json.dumps(manifest2),
+        imageTag="ref.222",
+    )
+
+    ecr_client.create_repository(repositoryName="example_worker3")
+
+    image_repositories = {
+        "example_worker1": {
+            "account_id": "1111111111",
+            "region_name": region_name,
+            "role_arn": "arn:aws:iam::1111111111:role/example-role",
+            "repository_name": "example_worker1",
+        },
+        "example_worker2": {
+            "account_id": "2222222222",
+            "region_name": region_name,
+            "role_arn": "arn:aws:iam::2222222222:role/example-role",
+            "repository_name": "example_worker2",
+        },
+        "example_worker3": {
+            "account_id": "3333333333",
+            "region_name": region_name,
+            "role_arn": "arn:aws:iam::3333333333:role/example-role",
+            "repository_name": "example_worker3",
+        },
+    }
+
+    uris = ecr.get_ref_uris_for_repositories(
+        image_repositories=image_repositories,
+        tag="latest"
+    )
+
+    assert uris == {
+        'example_worker1': '1111111111.dkr.ecr.eu-west-1.amazonaws.com/example_worker1:ref.111',
+        'example_worker2': '2222222222.dkr.ecr.eu-west-1.amazonaws.com/example_worker2:ref.222'
+    }
