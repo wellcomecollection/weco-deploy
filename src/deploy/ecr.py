@@ -22,12 +22,11 @@ class Ecr:
     def __init__(self, account_id, region_name, role_arn):
         self.account_id = account_id
         self.region_name = region_name
-        self.session = Iam.get_session(
-            session_name="ReleaseToolEcr",
-            role_arn=role_arn,
-            region_name=region_name
+        self.ecr = create_client(
+            account_id=account_id,
+            region_name=region_name,
+            role_arn=role_arn
         )
-        self.ecr = self.session.client('ecr')
 
         self.ecr_base_uri = (
             f"{self.account_id}.dkr.ecr.{self.region_name}.amazonaws.com"
