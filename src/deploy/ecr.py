@@ -53,16 +53,6 @@ class Ecr:
 
         return remote_image_name, remote_image_tag, local_image_tag
 
-    def describe_image(self, namespace, image_id, tag, account_id=None):
-        return describe_image(
-            ecr_client=self.ecr,
-            ecr_base_uri=self.ecr_base_uri,
-            namespace=namespace,
-            image_id=image_id,
-            tag=tag,
-            account_id=account_id or self.account_id
-        )
-
     def tag_image(self, namespace, image_id, tag, new_tag):
         repository_name = Ecr._get_repository_name(namespace, image_id)
 
