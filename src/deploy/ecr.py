@@ -8,40 +8,6 @@ from .iam import Iam
 from .commands import cmd
 
 
-class EcrImage:
-    """
-    Convenience wrapper around a response from the ECR DescribeImages API.
-    """
-    def __init__(self, ecr_base_uri, repository_name, tag, describe_images_resp):
-        if not describe_images_resp["imageDetails"]:
-            raise EcrError(f"No matching images found for {repository_name}:{tag}!")
-
-        if len(describe_images_resp["imageDetails"]) > 1:
-            raise EcrError(f"Multiple matching images found for {repository_name}:{tag}!")
-
-        self._image_details = describe_images_resp["imageDetails"][0]
-        self.ecr_base_uri = ecr_base_uri
-        self.repository_name = repository_name
-        self.tag = tag
-
-    @property
-    def tags(self):
-        return set(self._image_details["imageTags"])
-
-    def ref_uri(self):
-        ref_tags = {t for t in self.tags if t.startswith("ref.")}
-
-        if not ref_tags:
-            raise EcrError(f"No matching ref tags found for {self.repository_name}:{self.tag}!")
-
-        # It's possible to get multiple ref tags if the same image is published
-        # at different Git commits, but there are no code changes for this image
-        # between the two commits.  If so, choose one arbitrarily.
-        ref = ref_tags.pop()
-
-        return f"{self.ecr_base_uri}/{self.repository_name}:{ref}"
-
-
 class Ecr:
     def __init__(self, account_id, region_name, role_arn):
         self.account_id = account_id
@@ -161,6 +127,35 @@ class NoSuchImageError(EcrError):
     pass
 
 
+class NoRefTagError(EcrError):
+    """
+    Raised when an image does not have any tags starting ``ref.``.
+    """
+    pass
+
+
+def _create_ref_uri(*, ecr_base_uri, repository_name, tag, image_details):
+    """
+    Given the imageDetails from an ECR DescribeImages response, construct
+    an unambiguous ref URI.
+    """
+    tags = set(image_details["imageTags"])
+
+    ref_tags = {t for t in tags if t.startswith("ref.")}
+
+    if not ref_tags:
+        raise NoRefTagError(
+            f"No matching ref tags found for {repository_name}:{tag}!"
+        )
+
+    # It's possible to get multiple ref tags if the same image is published
+    # at different Git commits, but there are no code changes for this image
+    # between the two commits.  If so, choose one arbitrarily.
+    ref = ref_tags.pop()
+
+    return f"{ecr_base_uri}/{repository_name}:{ref}"
+
+
 def get_ref_uri_for_image(ecr_client, *, ecr_base_uri, repository_name, tag, account_id):
     """
     Returns an unambiguous URI for the image with this tag.
@@ -182,11 +177,12 @@ def get_ref_uri_for_image(ecr_client, *, ecr_base_uri, repository_name, tag, acc
                 f"Cannot find an image in {repository_name} with tag {tag}"
             )
 
-    image = EcrImage(
+    assert len(resp["imageDetails"]) == 1, resp
+    image_details = resp["imageDetails"][0]
+
+    return _create_ref_uri(
         ecr_base_uri=ecr_base_uri,
         repository_name=repository_name,
         tag=tag,
-        describe_images_resp=resp,
+        image_details=image_details
     )
-
-    return image.ref_uri()
