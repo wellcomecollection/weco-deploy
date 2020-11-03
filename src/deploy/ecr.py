@@ -88,37 +88,14 @@ class Ecr:
         return remote_image_name, remote_image_tag, local_image_tag
 
     def describe_image(self, namespace, image_id, tag, account_id=None):
-        repository_name = Ecr._get_repository_name(namespace, image_id)
-        if not account_id:
-            account_id = self.account_id
-
-        try:
-            result = self.ecr.describe_images(
-                registryId=account_id,
-                repositoryName=repository_name,
-                imageIds=[
-                    {"imageTag": tag}
-                ]
-            )
-
-            image = EcrImage(
-                ecr_base_uri=self.ecr_base_uri,
-                repository_name=repository_name,
-                tag=tag,
-                describe_images_resp=result
-            )
-
-            return {
-                'image_id': image_id,
-                'ref': image.ref_uri(),
-            }
-
-        except ClientError as e:
-            # Matching tag & digest already exists (nothing to do)
-            if not e.response['Error']['Code'] == 'ImageNotFoundException':
-                raise e
-            else:
-                return None
+        return describe_image(
+            ecr_client=self.ecr,
+            ecr_base_uri=self.ecr_base_uri,
+            namespace=namespace,
+            image_id=image_id,
+            tag=tag,
+            account_id=account_id or self.account_id
+        )
 
     def tag_image(self, namespace, image_id, tag, new_tag):
         repository_name = Ecr._get_repository_name(namespace, image_id)
@@ -175,3 +152,33 @@ class Ecr:
             command = ['docker', 'login', '-u', username, '-p', password, auth['proxyEndpoint']]
 
             cmd(*command)
+
+
+def describe_image(ecr_client, ecr_base_uri, namespace, image_id, tag, account_id):
+    repository_name = Ecr._get_repository_name(namespace, image_id)
+
+    try:
+        result = ecr_client.describe_images(
+            registryId=account_id,
+            repositoryName=repository_name,
+            imageIds=[{"imageTag": tag}],
+        )
+
+        image = EcrImage(
+            ecr_base_uri=ecr_base_uri,
+            repository_name=repository_name,
+            tag=tag,
+            describe_images_resp=result,
+        )
+
+        return {
+            "image_id": image_id,
+            "ref": image.ref_uri(),
+        }
+
+    except ClientError as e:
+        # Matching tag & digest already exists (nothing to do)
+        if not e.response["Error"]["Code"] == "ImageNotFoundException":  # pragma: no cover
+            raise e
+        else:
+            return None
