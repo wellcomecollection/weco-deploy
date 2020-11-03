@@ -3,6 +3,7 @@ import json
 from random import random
 import secrets
 
+from botocore.exceptions import ClientError
 import pytest
 
 from deploy import ecr
@@ -158,55 +159,59 @@ def _create_image_manifest():
     }
 
 
-class TestDescribeImage:
-    def test_describe_nonexistent_image_is_none(self, ecr_client):
+class TestGetRefUriForImage:
+    def test_get_nonexistent_image_is_none(self, ecr_client):
         """
         Looking up an image that doesn't exist, in a repository that does,
         returns None.
         """
-        ecr_client.create_repository(repositoryName="uk.ac.wellcome/example_worker")
+        ecr_client.create_repository(repositoryName="empty_repository")
 
-        resp = ecr.describe_image(
-            ecr_client,
-            ecr_base_uri="1234567890.ecr.example.aws.com",
-            namespace="uk.ac.wellcome",
-            image_id="example_worker",
-            tag="latest",
-            account_id="1234567890",
-        )
+        with pytest.raises(ecr.NoSuchImageError):
+            ecr.get_ref_uri_for_image(
+                ecr_client,
+                ecr_base_uri="1234567890.ecr.example.aws.com",
+                repository_name="empty_repository",
+                tag="latest",
+                account_id="1234567890",
+            )
 
-        assert resp is None
-
-    def test_describe_image(self, ecr_client, region_name):
+    def test_get_ref_uri_for_image(self, ecr_client, region_name):
         """
-        We can store an image in ECR, then retrieve it with describe_image.
+        We can store an image in ECR, then retrieve it with get_ref_uri_for_image.
         """
         manifest = _create_image_manifest()
 
-        ecr_client.create_repository(repositoryName="uk.ac.wellcome/example_worker")
+        ecr_client.create_repository(repositoryName="example_worker")
         ecr_client.put_image(
             registryId="1234567890",
-            repositoryName="uk.ac.wellcome/example_worker",
+            repositoryName="example_worker",
             imageManifest=json.dumps(manifest),
             imageTag="latest",
         )
         ecr_client.put_image(
             registryId="1234567890",
-            repositoryName="uk.ac.wellcome/example_worker",
+            repositoryName="example_worker",
             imageManifest=json.dumps(manifest),
             imageTag="ref.123",
         )
 
-        resp = ecr.describe_image(
+        ref_uri = ecr.get_ref_uri_for_image(
             ecr_client,
             ecr_base_uri="1234567890.ecr.example.aws.com",
-            namespace="uk.ac.wellcome",
-            image_id="example_worker",
+            repository_name="example_worker",
             tag="latest",
             account_id="1234567890",
         )
 
-        assert resp == {
-            "image_id": "example_worker",
-            "ref": "1234567890.ecr.example.aws.com/uk.ac.wellcome/example_worker:ref.123",
-        }
+        assert ref_uri == "1234567890.ecr.example.aws.com/example_worker:ref.123"
+
+    def test_an_unexpected_error_is_raised(self, ecr_client):
+        with pytest.raises(ClientError, match="RepositoryNotFoundException"):
+            ecr.get_ref_uri_for_image(
+                ecr_client,
+                ecr_base_uri="1234567890.ecr.example.aws.com",
+                repository_name="repo_which_does_not_exist",
+                tag="latest",
+                account_id="1234567890",
+            )

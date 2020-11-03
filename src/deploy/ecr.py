@@ -154,30 +154,39 @@ class Ecr:
             cmd(*command)
 
 
-def describe_image(ecr_client, ecr_base_uri, namespace, image_id, tag, account_id):
-    repository_name = Ecr._get_repository_name(namespace, image_id)
+class NoSuchImageError(EcrError):
+    """
+    Raised when an image cannot be found.
+    """
+    pass
 
+
+def get_ref_uri_for_image(ecr_client, *, ecr_base_uri, repository_name, tag, account_id):
+    """
+    Returns an unambiguous URI for the image with this tag.
+
+    e.g. if you look for the "latest" tag, it will return a URI that uses
+    the unambiguous Git ref tag for this image.
+    """
     try:
-        result = ecr_client.describe_images(
+        resp = ecr_client.describe_images(
             registryId=account_id,
             repositoryName=repository_name,
             imageIds=[{"imageTag": tag}],
         )
     except ClientError as e:
-        # Matching tag & digest already exists (nothing to do)
-        if not e.response["Error"]["Code"] == "ImageNotFoundException":  # pragma: no cover
+        if not e.response["Error"]["Code"] == "ImageNotFoundException":
             raise e
         else:
-            return None
+            raise NoSuchImageError(
+                f"Cannot find an image in {repository_name} with tag {tag}"
+            )
 
     image = EcrImage(
         ecr_base_uri=ecr_base_uri,
         repository_name=repository_name,
         tag=tag,
-        describe_images_resp=result,
+        describe_images_resp=resp,
     )
 
-    return {
-        "image_id": image_id,
-        "ref": image.ref_uri(),
-    }
+    return image.ref_uri()

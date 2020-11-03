@@ -6,6 +6,7 @@ import uuid
 
 import yaml
 
+from . import ecr
 from .ecr import Ecr
 from .ecs import Ecs
 from .exceptions import ConfigError
@@ -359,24 +360,30 @@ class Project:
     def get_images(self, from_label):
         release_images = {}
         for image in self.image_repositories:
-
-            image_id = image['id']
-
-            ecr = self._ecr(
+            ecr_client = self._ecr(
                 account_id=image.get('account_id'),
                 region_name=image.get('region_name'),
                 role_arn=image.get('role_arn')
             )
 
-            image_details = ecr.describe_image(
-                namespace=image.get('namespace', self.namespace),
-                image_id=image_id,
-                tag=from_label,
-                account_id=image.get('account_id')
-            )
+            image_id = image['id']
+            namespace = image.get('namespace', self.namespace)
 
-            if image_details:
-                release_images[image_details['image_id']] = image_details['ref']
+            repository_name = f"{namespace}/{image_id}"
+
+            try:
+                nam
+                ref_uri = ecr.get_ref_uri_for_image(
+                    ecr_client.ecr,
+                    ecr_base_uri=ecr_client.ecr_base_uri,
+                    repository_name=repository_name,
+                    tag=from_label,
+                    account_id=image.get('account_id')
+                )
+            except ecr.NoSuchImageError:
+                pass
+            else:
+                release_images[image_id] = ref_uri
 
         return release_images
 
