@@ -1,6 +1,6 @@
 from .iam import Iam
 from .iterators import chunked_iterable
-from .tags import parse_aws_tags
+from . import tags
 
 
 class Ecs:
@@ -73,30 +73,20 @@ class Ecs:
         Given a service (e.g. bag-unpacker) and an environment (e.g. prod),
         return the unique matching service.
         """
-        def _has_matching_tags(service):
-            service_tags = parse_aws_tags(service.get("tags", []))
-
-            return (
-                service_tags.get("deployment:service") == service_id and
-                service_tags.get("deployment:env") == environment_id
+        try:
+            return tags.find_unique_resource_matching_tags(
+                self.described_services,
+                expected_tags={
+                    "deployment:service": service_id,
+                    "deployment:env": environment_id,
+                }
             )
-
-        matched_services = [
-            service
-            for service in self.described_services
-            if _has_matching_tags(service)
-        ]
-
-        if len(matched_services) > 1:
-            raise RuntimeError(
-                f"Multiple matching services found for {service_id}/{environment_id}: "
-                f"({matched_services})!"
-            )
-
-        if len(matched_services) == 0:
+        except tags.NoMatchingResourceError:
             return None
-        else:
-            return matched_services[0]
+        except tags.MultipleMatchingResourcesError:
+            raise RuntimeError(
+                f"Multiple matching services found for {service_id}/{environment_id}!"
+            )
 
     def list_service_tasks(self, service):
         """
