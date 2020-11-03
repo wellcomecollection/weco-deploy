@@ -370,7 +370,7 @@ class Project:
                 "repository_name": f"{namespace}/{repo['id']}"
             }
 
-        return ecr.get_ref_uris_for_repositories(
+        return ecr.get_ref_tags_for_repositories(
             image_repositories=image_repositories,
             tag=from_label
         )

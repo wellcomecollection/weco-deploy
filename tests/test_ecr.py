@@ -47,7 +47,7 @@ def _create_image_manifest():
     }
 
 
-class TestGetRefUriForImage:
+class TestGetRefTagsForImage:
     def test_get_nonexistent_image_is_none(self, ecr_client):
         """
         Looking up an image that doesn't exist, in a repository that does,
@@ -56,17 +56,16 @@ class TestGetRefUriForImage:
         ecr_client.create_repository(repositoryName="empty_repository")
 
         with pytest.raises(ecr.NoSuchImageError):
-            ecr.get_ref_uri_for_image(
+            ecr.get_ref_tags_for_image(
                 ecr_client,
-                ecr_base_uri="1234567890.ecr.example.aws.com",
                 repository_name="empty_repository",
                 tag="latest",
                 account_id="1234567890",
             )
 
-    def test_get_ref_uri_for_image(self, ecr_client, region_name):
+    def test_get_ref_tags_for_image(self, ecr_client, region_name):
         """
-        We can store an image in ECR, then retrieve it with get_ref_uri_for_image.
+        We can store an image in ECR, then retrieve the ref tags on it.
         """
         manifest = _create_image_manifest()
 
@@ -83,22 +82,26 @@ class TestGetRefUriForImage:
             imageManifest=json.dumps(manifest),
             imageTag="ref.123",
         )
+        ecr_client.put_image(
+            registryId="1234567890",
+            repositoryName="example_worker",
+            imageManifest=json.dumps(manifest),
+            imageTag="ref.456",
+        )
 
-        ref_uri = ecr.get_ref_uri_for_image(
+        ref_tags = ecr.get_ref_tags_for_image(
             ecr_client,
-            ecr_base_uri="1234567890.ecr.example.aws.com",
             repository_name="example_worker",
             tag="latest",
             account_id="1234567890",
         )
 
-        assert ref_uri == "1234567890.ecr.example.aws.com/example_worker:ref.123"
+        assert ref_tags == {"ref.123", "ref.456"}
 
     def test_an_unexpected_error_is_raised(self, ecr_client):
         with pytest.raises(ClientError, match="RepositoryNotFoundException"):
-            ecr.get_ref_uri_for_image(
+            ecr.get_ref_tags_for_image(
                 ecr_client,
-                ecr_base_uri="1234567890.ecr.example.aws.com",
                 repository_name="repo_which_does_not_exist",
                 tag="latest",
                 account_id="1234567890",
@@ -117,9 +120,8 @@ class TestGetRefUriForImage:
         )
 
         with pytest.raises(ecr.NoRefTagError):
-            ecr.get_ref_uri_for_image(
+            ecr.get_ref_tags_for_image(
                 ecr_client,
-                ecr_base_uri="1234567890.ecr.example.aws.com",
                 repository_name="example_worker",
                 tag="latest",
                 account_id="1234567890",
@@ -128,7 +130,7 @@ class TestGetRefUriForImage:
 
 @moto.mock_sts()
 @moto.mock_iam()
-def test_get_ref_uris_for_repositories(ecr_client, region_name):
+def test_get_ref_tags_for_repositories(ecr_client, region_name):
     manifest1 = _create_image_manifest()
     ecr_client.create_repository(repositoryName="example_worker1")
     ecr_client.put_image(
@@ -182,12 +184,13 @@ def test_get_ref_uris_for_repositories(ecr_client, region_name):
         },
     }
 
-    uris = ecr.get_ref_uris_for_repositories(
+    uris = ecr.get_ref_tags_for_repositories(
         image_repositories=image_repositories,
         tag="latest"
     )
 
     assert uris == {
-        'example_worker1': '1111111111.dkr.ecr.eu-west-1.amazonaws.com/example_worker1:ref.111',
-        'example_worker2': '2222222222.dkr.ecr.eu-west-1.amazonaws.com/example_worker2:ref.222'
+        "example_worker1": set(["ref.111"]),
+        "example_worker2": set(["ref.222"]),
+        "example_worker3": set(),
     }

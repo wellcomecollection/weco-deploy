@@ -134,34 +134,12 @@ class NoRefTagError(EcrError):
     pass
 
 
-def _create_ref_uri(*, ecr_base_uri, repository_name, tag, image_details):
+def get_ref_tags_for_image(ecr_client, *, repository_name, tag, account_id):
     """
-    Given the imageDetails from an ECR DescribeImages response, construct
-    an unambiguous ref URI.
-    """
-    tags = set(image_details["imageTags"])
+    Returns the ref tags for the image with this tag.
 
-    ref_tags = {t for t in tags if t.startswith("ref.")}
-
-    if not ref_tags:
-        raise NoRefTagError(
-            f"No matching ref tags found for {repository_name}:{tag}!"
-        )
-
-    # It's possible to get multiple ref tags if the same image is published
-    # at different Git commits, but there are no code changes for this image
-    # between the two commits.  If so, choose one arbitrarily.
-    ref = ref_tags.pop()
-
-    return f"{ecr_base_uri}/{repository_name}:{ref}"
-
-
-def get_ref_uri_for_image(ecr_client, *, ecr_base_uri, repository_name, tag, account_id):
-    """
-    Returns an unambiguous URI for the image with this tag.
-
-    e.g. if you look for the "latest" tag, it will return a URI that uses
-    the unambiguous Git ref tag for this image.
+    e.g. if you look for the "latest" tag, it will return the unambiguous Git ref tag(s)
+    for this image.
     """
     try:
         resp = ecr_client.describe_images(
@@ -180,17 +158,20 @@ def get_ref_uri_for_image(ecr_client, *, ecr_base_uri, repository_name, tag, acc
     assert len(resp["imageDetails"]) == 1, resp
     image_details = resp["imageDetails"][0]
 
-    return _create_ref_uri(
-        ecr_base_uri=ecr_base_uri,
-        repository_name=repository_name,
-        tag=tag,
-        image_details=image_details
-    )
+    tags = set(image_details["imageTags"])
+    ref_tags = {t for t in tags if t.startswith("ref.")}
+
+    if not ref_tags:
+        raise NoRefTagError(
+            f"No matching ref tags found for {repository_name}:{tag}!"
+        )
+
+    return ref_tags
 
 
-def get_ref_uris_for_repositories(*, image_repositories, tag):
+def get_ref_tags_for_repositories(*, image_repositories, tag):
     """
-    Returns unambiguous URIs for all the repositories in ``image_repositories``.
+    Returns the ref tags for all the repositories in ``image_repositories``.
 
     Repositories should be a dict of the form:
 
@@ -201,7 +182,7 @@ def get_ref_uris_for_repositories(*, image_repositories, tag):
             "repository_name": (repository_name),
         }
 
-    Returns a dict (id) -> (ref_uri)
+    Returns a dict (id) -> set(ref_tags)
 
     """
     result = {}
@@ -218,15 +199,14 @@ def get_ref_uris_for_repositories(*, image_repositories, tag):
         )
 
         try:
-            ref_uri = get_ref_uri_for_image(
+            ref_uri = get_ref_tags_for_image(
                 ecr_client,
-                ecr_base_uri=f"{account_id}.dkr.ecr.{region_name}.amazonaws.com",
                 repository_name=repo_details["repository_name"],
                 tag=tag,
                 account_id=account_id
             )
         except NoSuchImageError as err:
-            pass
+            result[repo_id] = set()
         else:
             result[repo_id] = ref_uri
 
