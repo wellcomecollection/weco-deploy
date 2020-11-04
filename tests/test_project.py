@@ -1,3 +1,4 @@
+import datetime
 import secrets
 
 import pytest
@@ -352,3 +353,30 @@ class TestProject:
         )
 
         assert project.environment_names == {"stage": "Staging", "prod": "Prod"}
+
+    def test_get_release(self, role_arn, project_id):
+        releases = [
+            {
+                "release_id": f"release-{i}",
+                "project_id": project_id,
+                "date_created": datetime.datetime(2001, 1, i).isoformat(),
+                "last_date_deployed": datetime.datetime.now().isoformat()
+            }
+            for i in range(1, 10)
+        ]
+
+        release_store = MemoryReleaseStore()
+
+        for r in releases:
+            release_store.put_release(r)
+
+        project = Project(
+            project_id=project_id,
+            config={"role_arn": role_arn},
+            release_store=release_store
+        )
+
+        assert project.get_release("latest") == releases[-1]
+
+        for r in releases:
+            assert project.get_release(release_id=r["release_id"]) == r

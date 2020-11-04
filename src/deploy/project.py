@@ -301,7 +301,7 @@ class Project:
 
     def get_release(self, release_id):
         if release_id == "latest":
-            return self.release_store.get_latest_release()
+            return self.release_store.get_most_recent_release()
         else:
             return self.release_store.get_release(release_id)
 
