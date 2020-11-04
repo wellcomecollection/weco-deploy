@@ -86,6 +86,27 @@ def prepare_config(config, namespace=None, role_arn=None, region_name=None):
 
     assert "region_name" in config
 
+    # The image repositories are stored as a list of dicts:
+    #
+    #     [
+    #       {"id": "worker1", "services": […]},
+    #       {"id": "worker2", "services": […]},
+    #       ...
+    #     ]
+    #
+    # We don't want to change the structure, but we do want to check that IDs
+    # are unique.
+    repo_id_tally = collections.Counter()
+    for repo in config.get("image_repositories", []):
+        repo_id_tally[repo["id"]] += 1
+
+    duplicates = {repo_id for repo_id, count in repo_id_tally.items() if count > 1}
+    if duplicates:
+        raise ConfigError(
+            f"Duplicate repo{'s' if len(duplicates) > 1 else ''} "
+            f"in image_repositories: {', '.join(sorted(duplicates))}"
+        )
+
 
 class Project:
     def __init__(self, project_id, config, account_id=None, **kwargs):

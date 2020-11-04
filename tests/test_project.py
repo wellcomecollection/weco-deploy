@@ -167,3 +167,58 @@ class TestPrepareConfig:
             prepare_config(config, region_name="eu-west-1")
 
         assert len(record) == 0
+
+    def test_duplicate_image_repository_is_error(self, role_arn):
+        """
+        If the same ID appears twice in the list of image repositories, raise
+        a ConfigError.
+        """
+        config = {
+            "role_arn": role_arn,
+            "image_repositories": [
+                {"id": "worker1", "services": []},
+                {"id": "worker1", "services": []},
+                {"id": "worker2", "services": []},
+            ]
+        }
+
+        with pytest.raises(
+            ConfigError, match="Duplicate repo in image_repositories: worker1"
+        ):
+            prepare_config(config)
+
+    def test_duplicate_image_repositories_are_error(self, role_arn):
+        """
+        If the same ID appears twice in the list of image repositories, raise
+        a ConfigError.
+        """
+        config = {
+            "role_arn": role_arn,
+            "image_repositories": [
+                {"id": "worker1", "services": []},
+                {"id": "worker1", "services": []},
+                {"id": "worker2", "services": []},
+                {"id": "worker2", "services": []},
+                {"id": "worker3", "services": []},
+            ]
+        }
+
+        with pytest.raises(
+            ConfigError, match="Duplicate repos in image_repositories: worker1, worker2"
+        ):
+            prepare_config(config)
+
+    def test_does_not_warn_on_unique_image_repositories(self, role_arn):
+        """
+        If all the image repositories have unique IDs, no error is raised.
+        """
+        config = {
+            "role_arn": role_arn,
+            "image_repositories": [
+                {"id": "worker1", "services": []},
+                {"id": "worker2", "services": []},
+                {"id": "worker3", "services": []},
+            ]
+        }
+
+        prepare_config(config)
