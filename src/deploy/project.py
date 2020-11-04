@@ -185,6 +185,7 @@ class Project:
         -   region_name
         -   role_arn
         -   repository_name
+        -   services
 
         """
         result = {}
@@ -201,7 +202,7 @@ class Project:
                 "region_name": repo.get("region_name", self.region_name),
                 "role_arn": repo.get("role_arn", self.role_arn),
                 "repository_name": f"{namespace}/{repo['id']}",
-                # images?????
+                "services": repo.get("services", []),
             }
 
         assert len(result) == len(self.config.get("image_repositories", []))

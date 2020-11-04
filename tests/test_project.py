@@ -4,6 +4,7 @@ import pytest
 
 from deploy.exceptions import ConfigError
 from deploy.project import prepare_config, Projects, Project
+from deploy.release_store import MemoryReleaseStore
 
 
 def test_loading_non_existent_project_is_runtimeerror(tmpdir):
@@ -217,3 +218,62 @@ class TestPrepareConfig:
         }
 
         prepare_config(config)
+
+
+class TestProject:
+    def test_image_repositories(self, role_arn):
+        project_id = f"project-{secrets.token_hex()}"
+        config = {
+            "image_repositories": [
+                {
+                    "id": "repo1",
+                    "services": ["service1a", "service1b"],
+                    "account_id": "1111111111",
+                    "region_name": "us-east-1",
+                    "namespace": "org.wellcome",
+                    "role_arn": "arn:aws:iam::1111111111:role/publisher-role"
+                },
+                {
+                    "id": "repo2",
+                    "services": ["service2a", "service2b", "service2c"]
+                },
+                {
+                    "id": "repo3",
+                    "services": ["service3a"]
+                }
+            ],
+            "role_arn": role_arn,
+            "account_id": "1234567890",
+            "namespace": "edu.self",
+            "region_name": "eu-west-1",
+        }
+
+        project = Project(
+            project_id=project_id,
+            config=config,
+            release_store=MemoryReleaseStore()
+        )
+
+        assert project.image_repositories == {
+            "repo1": {
+                "repository_name": "org.wellcome/repo1",
+                "services": ["service1a", "service1b"],
+                "account_id": "1111111111",
+                "region_name": "us-east-1",
+                "role_arn": "arn:aws:iam::1111111111:role/publisher-role",
+            },
+            "repo2": {
+                "repository_name": "edu.self/repo2",
+                "services": ["service2a", "service2b", "service2c"],
+                "account_id": "1234567890",
+                "region_name": "eu-west-1",
+                "role_arn": role_arn,
+            },
+            "repo3": {
+                "repository_name": "edu.self/repo3",
+                "services": ["service3a"],
+                "account_id": "1234567890",
+                "region_name": "eu-west-1",
+                "role_arn": role_arn,
+            },
+        }
