@@ -61,6 +61,13 @@ class ReleaseStore(abc.ABC):
         """
         return self.get_recent_releases(count=1)[0]
 
+    @abc.abstractmethod
+    def get_recent_deployments(self, environment=None, count=10):
+        """
+        Return the most recent ``limit`` deployments in a given environment.
+        """
+        pass
+
 
 class MemoryReleaseStore(ReleaseStore):
     def __init__(self):
@@ -88,6 +95,21 @@ class MemoryReleaseStore(ReleaseStore):
             reverse=True
         )
         return sorted_releases[:count]
+
+    def get_recent_deployments(self, environment=None, count=10):
+        deployments = []
+
+        for release in self.cache.values():
+            deployments.extend(release["deployments"])
+
+        if environment:
+            deployments = [d for d in deployments if d["environment"] == environment]
+
+        return sorted(
+            deployments,
+            key=lambda d: d["date_created"],
+            reverse=True
+        )[:count]
 
 
 class DynamoReleaseStore(ReleaseStore):
@@ -142,6 +164,76 @@ class DynamoReleaseStore(ReleaseStore):
         )
 
         return query_resp["Items"]
+
+    def get_recent_deployments(self, environment=None, count=10):
+        known_deployments = []
+
+        params = {
+            "IndexName": "deployment_gsi",
+            "KeyConditionExpression": Key("project_id").eq(self.project_id),
+            # Query results are always sorted by the sort key value.  Setting
+            # this parameter to False means they are returned in descending order,
+            # i.e. newer deployments come first.
+            #
+            # The sort key on this GSI is last_date_deployed.
+            "ScanIndexForward": False,
+        }
+
+        items_seen = 0
+
+        while len(known_deployments) < count or items_seen < count:
+            resp = self.table.query(**params)
+
+            for release in resp["Items"]:
+                for deployment in release["deployments"]:
+                    deployment["release_id"] = release["release_id"]
+
+                    # Filter on environment_id - this does not play well with filter
+                    # resulting in fewer than expected items (this filters on top of
+                    # the limit) but it's hard to do better with the data structured
+                    # as it is.
+                    if environment and deployment["environment"] == environment:
+                        known_deployments.append(deployment)
+                    elif environment is None:
+                        known_deployments.append(deployment)
+
+            items_seen += len(resp["Items"])
+
+            try:
+                params["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+            except KeyError:
+                break
+
+        known_deployments = sorted(
+            known_deployments, key=lambda d: d["date_created"], reverse=True
+        )
+
+        # We then truncate the list to the limit, otherwise we might be
+        # presenting an incomplete list of deployments.
+        #
+        # Consider:
+        #
+        #   - Release A
+        #       deployed @ 1pm
+        #       deployed @ 6pm
+        #   - Release B
+        #       deployed @ 2pm
+        #   - Release C
+        #       deployed @ 5pm
+        #
+        # If we requested limit=2, then DynamoDB would return the releases
+        # with the two most recent "last_date_deployed" fields.  This would
+        # present the following timeline:
+        #
+        #   - 1pm: Release A
+        #   - 5pm: Release C
+        #   - 6pm: Release A
+        #
+        # What happened to release B???
+        #
+        # We know we have the last N deployments with no gaps, but beyond
+        # that we can't be sure.
+        return known_deployments[:count]
 
     def _create_table(self):
         self.dynamodb.create_table(

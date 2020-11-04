@@ -84,6 +84,60 @@ class ReleaseStoreTestsMixin:
 
             assert release_store.get_most_recent_release() == releases[-1]
 
+    def test_gets_recent_deployments(self, project_id):
+        with self.create_release_store(project_id) as release_store:
+            release_store.initialise()
+
+            releases = [
+                {
+                    "release_id": f"release-{secrets.token_hex()}",
+                    "project_id": project_id,
+                    "date_created": datetime.datetime.now().isoformat(),
+                    "last_date_deployed": datetime.datetime.now().isoformat(),
+                    "deployments": [
+                        {"id": "1", "environment": "prod",    "date_created": datetime.datetime(2001, 1, 1).isoformat()},
+                        {"id": "2", "environment": "prod",    "date_created": datetime.datetime(2001, 1, 2).isoformat()},
+                        {"id": "3", "environment": "staging", "date_created": datetime.datetime(2001, 1, 3).isoformat()},
+                        {"id": "4", "environment": "prod",    "date_created": datetime.datetime(2001, 1, 4).isoformat()},
+                        {"id": "5", "environment": "staging", "date_created": datetime.datetime(2001, 1, 5).isoformat()},
+                    ]
+                },
+                {
+                    "release_id": f"release-{secrets.token_hex()}",
+                    "project_id": project_id,
+                    "date_created": datetime.datetime.now().isoformat(),
+                    "last_date_deployed": datetime.datetime.now().isoformat(),
+                    "deployments": [
+                        {"id": "6", "environment": "prod",     "date_created": datetime.datetime(2001, 1, 6).isoformat()},
+                        {"id": "7", "environment": "prod",     "date_created": datetime.datetime(2001, 1, 7).isoformat()},
+                        {"id": "8", "environment": "staging",  "date_created": datetime.datetime(2001, 1, 8).isoformat()},
+                        {"id": "9", "environment": "prod",     "date_created": datetime.datetime(2001, 1, 9).isoformat()},
+                        {"id": "10", "environment": "staging", "date_created": datetime.datetime(2001, 1, 10).isoformat()},
+                    ]
+                },
+            ]
+
+            for r in releases:
+                release_store.put_release(r)
+
+            resp = release_store.get_recent_deployments(count=0)
+            assert resp == []
+
+            resp = release_store.get_recent_deployments(count=4)
+            assert [d["id"] for d in resp] == ["10", "9", "8", "7"]
+
+            resp = release_store.get_recent_deployments(count=6)
+            assert [d["id"] for d in resp] == ["10", "9", "8", "7", "6", "5"]
+
+            resp = release_store.get_recent_deployments(environment="staging")
+            assert [d["id"] for d in resp] == ["10", "8", "5", "3"]
+
+            resp = release_store.get_recent_deployments(environment="staging", count=4)
+            assert [d["id"] for d in resp] == ["10", "8", "5", "3"]
+
+            resp = release_store.get_recent_deployments(count=1, environment="prod")
+            assert [d["id"] for d in resp] == ["9"]
+
 
 class TestMemoryReleaseStore(ReleaseStoreTestsMixin):
     @contextlib.contextmanager
