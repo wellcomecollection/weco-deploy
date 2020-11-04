@@ -229,6 +229,22 @@ class Project:
         assert len(result) == len(self.config.get("image_repositories", []))
         return result
 
+    @property
+    def environment_names(self):
+        result = {}
+
+        for env in self.config.get("environments", []):
+
+            # We should have uniqueness by the checks in prepare_config(), but
+            # it doesn't hurt to check.
+            assert env["id"] not in result
+
+            assert set(env.keys()) == {"id", "name"}
+            result[env["id"]] = env["name"]
+
+        assert len(result) == len(self.config.get("environments", []))
+        return result
+
     def _ecr(self, account_id=None, region_name=None, role_arn=None):
         return Ecr(
             account_id=account_id or self.account_id,
@@ -265,16 +281,6 @@ class Project:
             "images": images,
             "deployments": []
         }
-
-    def get_environment(self, environment_id):
-        environments = {
-            e['id']: e for e in self.config.get('environments', []) if 'id' in e
-        }
-
-        if environment_id not in environments:
-            raise ValueError(f"Unknown environment. Expected '{environment_id}' in {environments}")
-
-        return environments[environment_id]
 
     def get_deployments(self, release_id, limit, environment_id):
         if release_id is not None:
@@ -557,7 +563,11 @@ class Project:
         )
 
         # Force check for valid environment
-        _ = self.get_environment(environment_id)
+        if environment_id not in self.environment_names:
+            raise ValueError(
+                f"Unknown environment. "
+                f"Got {environment_id!r}, expected {self.environment_names.keys()!r}"
+            )
 
         deployment_details = {}
 

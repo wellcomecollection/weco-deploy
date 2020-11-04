@@ -147,13 +147,11 @@ def save_deployment(deployment_result):
 
 
 def _deploy(project, release, environment_id, description, confirm=True):
-    environment = project.get_environment(environment_id)
-    env_id = environment.get('id')
-    env_name = environment.get('name', environment_id)
+    environment_name = project.environment_names[environment_id]
 
     click.echo("")
     click.echo(click.style(f"Deploying release {release['release_id']}", fg="green"))
-    click.echo(click.style(f"Targeting env: {env_id}, ({env_name})", fg="yellow"))
+    click.echo(click.style(f"Targeting env: {environment_id} ({environment_name})", fg="yellow"))
     click.echo(click.style(f"Requested by: {release['requested_by']}", fg="yellow"))
     click.echo(click.style(f"Date created: {release['date_created']}", fg="yellow"))
 
@@ -218,7 +216,7 @@ def _deploy(project, release, environment_id, description, confirm=True):
     click.echo(tabulate(rows, headers=headers))
 
     click.echo("")
-    click.echo(click.style(f"Deployed release {release['release_id']} to {env_id}, ({env_name})", fg="bright_green"))
+    click.echo(click.style(f"Deployed release {release['release_id']} to {environment_id} ({environment_name})", fg="bright_green"))
 
 
 @cli.command()

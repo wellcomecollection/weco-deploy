@@ -24,6 +24,11 @@ def role_arn():
     return f"arn:aws:iam::1234567890:role/role-{secrets.token_hex()}"
 
 
+@pytest.fixture()
+def project_id():
+    return f"project-{secrets.token_hex()}"
+
+
 class TestPrepareConfig:
     def test_uses_config_namespace(self, role_arn):
         """
@@ -272,8 +277,7 @@ class TestPrepareConfig:
 
 
 class TestProject:
-    def test_image_repositories(self, role_arn):
-        project_id = f"project-{secrets.token_hex()}"
+    def test_image_repositories(self, role_arn, project_id):
         config = {
             "image_repositories": [
                 {
@@ -328,3 +332,23 @@ class TestProject:
                 "role_arn": role_arn,
             },
         }
+
+    def test_environment_names(self, role_arn, project_id):
+        config = {
+            "environments": [
+                {"id": "stage", "name": "Staging"},
+                {"id": "prod", "name": "Prod"},
+            ],
+            "role_arn": role_arn,
+            "account_id": "1234567890",
+            "namespace": "edu.self",
+            "region_name": "eu-west-1",
+        }
+
+        project = Project(
+            project_id=project_id,
+            config=config,
+            release_store=MemoryReleaseStore()
+        )
+
+        assert project.environment_names == {"stage": "Staging", "prod": "Prod"}
