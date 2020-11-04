@@ -131,8 +131,7 @@ class Project:
             if 'account_id' not in self.config:
                 self.config['account_id'] = self.user_details['caller_identity']['account_id']
 
-        # Initialise project level vars
-        self.image_repositories = self.config.get('image_repositories', [])
+        assert "account_id" in self.config
 
         # Create required services
         self.releases_store = DynamoDbReleaseStore(
@@ -163,6 +162,38 @@ class Project:
     @property
     def namespace(self):
         return self.config["namespace"]
+
+    @property
+    def image_repositories(self):
+        """
+        Gets all the image repositories in the config, keyed by ID.
+
+        Every repository will have the following keys:
+
+        -   account_id
+        -   region_name
+        -   role_arn
+        -   repository_name
+
+        """
+        result = {}
+
+        for repo in self.config.get("image_repositories", []):
+            namespace = repo.get("namespace", self.namespace)
+
+            # We should have uniqueness by the checks in prepare_config(), but
+            # it doesn't hurt to check.
+            assert repo["id"] not in result, repo["id"]
+
+            result[repo["id"]] = {
+                "account_id": repo.get("account_id", self.account_id),
+                "region_name": repo.get("region_name", self.region_name),
+                "role_arn": repo.get("role_arn", self.role_arn),
+                "repository_name": f"{namespace}/{repo['id']}"
+            }
+
+        assert len(result) == len(self.config.get("image_repositories", []))
+        return result
 
     def _ecr(self, account_id=None, region_name=None, role_arn=None):
         return Ecr(
@@ -201,17 +232,6 @@ class Project:
             "deployments": []
         }
 
-    def _match_image_id(self, image_id):
-        matched_images = [image for image in self.image_repositories if image['id'] == image_id]
-
-        if len(matched_images) > 1:
-            raise RuntimeError(f"Multiple matching images found for {image_id}: ({matched_images}!")
-
-        if matched_images:
-            return matched_images[0]
-        else:
-            return None
-
     def get_environment(self, environment_id):
         environments = {
             e['id']: e for e in self.config.get('environments', []) if 'id' in e
@@ -247,11 +267,9 @@ class Project:
         Generates a set of tuples (image_id, List[services])
         """
         for image_id, _ in release["images"].items():
-            # TODO: self.image_repositories should be a dict, not a list
-            matched_image = self._match_image_id(image_id)
-
-            # TODO: Should this ever happen?
-            if matched_image is None:
+            try:
+                matched_image = self.image_repositories[image_id]
+            except KeyError:
                 continue
 
             try:
@@ -306,15 +324,17 @@ class Project:
         matched_services = {}
         for image_id, _ in release['images'].items():
             # Attempt to match deployment image id to config and override service_ids
-            matched_image = self._match_image_id(image_id)
+            try:
+                matched_image = self.image_repositories[image_id]
+            except KeyError:
+                continue
 
             available_services = []
 
-            if matched_image:
-                services = matched_image.get('services', [])
+            services = matched_image.get('services', [])
 
-                available_services = [_get_service(service) for service in services]
-                available_services = [service for service in available_services if service["response"]]
+            available_services = [_get_service(service) for service in services]
+            available_services = [service for service in available_services if service["response"]]
 
             if available_services:
                 matched_services[image_id] = available_services
@@ -376,30 +396,20 @@ class Project:
 
     def publish(self, image_id, label):
         # Attempt to match image to config
-        matched_image = self._match_image_id(image_id)
-
-        # Assume default account id & namespace
-        account_id = self.account_id
-        namespace = self.namespace
-
-        # If we find a match, set overrides
-        if matched_image:
-            # Check if namespace/account_id is overridden for this image
-            namespace = matched_image.get('namespace', self.namespace)
-            account_id = matched_image.get('account_id', self.account_id)
+        matched_image = self.image_repositories[image_id]
 
         # Create an ECR client for the correct account
-        ecr = self._ecr(account_id)
+        ecr = self._ecr(matched_image["account_id"])
 
         ecr.login()
 
         remote_uri, remote_tag, local_tag = ecr.publish_image(
-            namespace=namespace,
+            namespace=matched_image["namespace"],
             image_id=image_id,
         )
 
         tag_result = ecr.tag_image(
-            namespace=namespace,
+            namespace=matched_image["namespace"],
             image_id=image_id,
             tag=remote_tag,
             new_tag=label
@@ -415,20 +425,8 @@ class Project:
         }
 
     def get_images(self, from_label):
-        image_repositories = {}
-
-        for repo in self.image_repositories:
-            namespace = repo.get("namespace", self.namespace)
-
-            image_repositories[repo["id"]] = {
-                "account_id": repo.get("account_id", self.account_id),
-                "region_name": repo.get("region_name", self.region_name),
-                "role_arn": repo.get("role_arn", self.role_arn),
-                "repository_name": f"{namespace}/{repo['id']}"
-            }
-
         return ecr.get_ref_tags_for_repositories(
-            image_repositories=image_repositories,
+            image_repositories=self.image_repositories,
             tag=from_label
         )
 
@@ -491,14 +489,16 @@ class Project:
         old_tag = image_name.split(":")[-1]
         new_tag = f"env.{environment_id}"
 
-        matched_image = self._match_image_id(image_id)
-        if matched_image:
+        try:
+            matched_image = self.image_repositories[image_id]
             ecr = self._ecr(
-                account_id=matched_image.get('account_id'),
-                region_name=matched_image.get('region_name'),
-                role_arn=matched_image.get('role_arn'),
+                account_id=matched_image["account_id"],
+                region_name=matched_image["region_name"],
+                role_arn=matched_image["role_arn"],
             )
-        else:
+        except KeyError:
+            # TODO: Does it make sense to create an ECR client if we don't
+            # have an ECR repo to tag in?
             ecr = self._ecr()
 
         return ecr.tag_image(
