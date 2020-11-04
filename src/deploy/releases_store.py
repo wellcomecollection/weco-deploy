@@ -2,8 +2,8 @@ from .release_store import DynamoReleaseStore
 
 
 class DynamoDbReleaseStore:
-    def __init__(self, **kwargs):
-        self._underlying = DynamoReleaseStore(project_id)
+    def __init__(self, project_id, **kwargs):
+        self._underlying = DynamoReleaseStore(project_id, **kwargs)
 
     def describe_initialisation(self):
         return self._underlying.describe_initialisation()

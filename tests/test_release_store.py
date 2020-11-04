@@ -2,7 +2,6 @@ import abc
 import contextlib
 import datetime
 import secrets
-import uuid
 
 from botocore.exceptions import ParamValidationError
 import moto
@@ -95,11 +94,11 @@ class ReleaseStoreTestsMixin:
                     "date_created": datetime.datetime.now().isoformat(),
                     "last_date_deployed": datetime.datetime.now().isoformat(),
                     "deployments": [
-                        {"id": "1", "environment": "prod",    "date_created": datetime.datetime(2001, 1, 1).isoformat()},
-                        {"id": "2", "environment": "prod",    "date_created": datetime.datetime(2001, 1, 2).isoformat()},
-                        {"id": "3", "environment": "staging", "date_created": datetime.datetime(2001, 1, 3).isoformat()},
-                        {"id": "4", "environment": "prod",    "date_created": datetime.datetime(2001, 1, 4).isoformat()},
-                        {"id": "5", "environment": "staging", "date_created": datetime.datetime(2001, 1, 5).isoformat()},
+                        {"id": "1", "date_created": datetime.datetime(2001, 1, 1).isoformat(), "environment": "prod"},
+                        {"id": "2", "date_created": datetime.datetime(2001, 1, 2).isoformat(), "environment": "prod"},
+                        {"id": "3", "date_created": datetime.datetime(2001, 1, 3).isoformat(), "environment": "staging"},
+                        {"id": "4", "date_created": datetime.datetime(2001, 1, 4).isoformat(), "environment": "prod"},
+                        {"id": "5", "date_created": datetime.datetime(2001, 1, 5).isoformat(), "environment": "staging"},
                     ]
                 },
                 {
@@ -108,11 +107,11 @@ class ReleaseStoreTestsMixin:
                     "date_created": datetime.datetime.now().isoformat(),
                     "last_date_deployed": datetime.datetime.now().isoformat(),
                     "deployments": [
-                        {"id": "6", "environment": "prod",     "date_created": datetime.datetime(2001, 1, 6).isoformat()},
-                        {"id": "7", "environment": "prod",     "date_created": datetime.datetime(2001, 1, 7).isoformat()},
-                        {"id": "8", "environment": "staging",  "date_created": datetime.datetime(2001, 1, 8).isoformat()},
-                        {"id": "9", "environment": "prod",     "date_created": datetime.datetime(2001, 1, 9).isoformat()},
-                        {"id": "10", "environment": "staging", "date_created": datetime.datetime(2001, 1, 10).isoformat()},
+                        {"id": "6", "date_created": datetime.datetime(2001, 1, 6).isoformat(), "environment": "prod"},
+                        {"id": "7", "date_created": datetime.datetime(2001, 1, 7).isoformat(), "environment": "prod"},
+                        {"id": "8", "date_created": datetime.datetime(2001, 1, 8).isoformat(), "environment": "staging"},
+                        {"id": "9", "date_created": datetime.datetime(2001, 1, 9).isoformat(), "environment": "prod"},
+                        {"id": "10", "date_created": datetime.datetime(2001, 1, 10).isoformat(), "environment": "staging"},
                     ]
                 },
             ]

@@ -1,7 +1,6 @@
 import abc
 
 from boto3.dynamodb.conditions import Key
-from botocore.exceptions import ClientError
 
 from . import iam
 from .exceptions import WecoDeployError
