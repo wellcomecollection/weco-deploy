@@ -3,6 +3,44 @@ from .iterators import chunked_iterable
 from . import tags
 
 
+def list_cluster_arns_in_account(ecs_client):
+    """
+    Generates the ARN of every ECS cluster in an account.
+    """
+    paginator = ecs_client.get_paginator("list_clusters")
+
+    for page in paginator.paginate():
+        yield from page["clusterArns"]
+
+
+def list_service_arns_in_cluster(ecs_client, *, cluster):
+    """
+    Generates the ARN of every ECS service in a cluster.
+    """
+    paginator = ecs_client.get_paginator("list_services")
+
+    for page in paginator.paginate(cluster=cluster):
+        yield from page["serviceArns"]
+
+
+def describe_services(ecs_client):
+    """
+    Describe all the ECS services in an account.
+    """
+    for cluster in list_cluster_arns_in_account(ecs_client):
+        service_arns = list_service_arns_in_cluster(ecs_client, cluster=cluster)
+
+        # We can specify up to 10 services in a single DescribeServices API call.
+        for service_set in chunked_iterable(service_arns, size=10):
+            resp = ecs_client.describe_services(
+                cluster=cluster,
+                services=service_set,
+                include=["TAGS"]
+            )
+
+            yield from resp["services"]
+
+
 class Ecs:
     def __init__(self, region_name, role_arn):
         session = Iam.get_session(
@@ -11,41 +49,7 @@ class Ecs:
             region_name=region_name
         )
         self.ecs = session.client('ecs')
-        self.described_services = []
-        self._load_described_services()
-
-    def _load_described_services(self):
-        for cluster_arn in self.list_cluster_arns():
-            service_arns = self.list_service_arns(cluster_arn=cluster_arn)
-
-            # We can specify up to 10 services in a single DescribeServices API call.
-            for service_set in chunked_iterable(service_arns, size=10):
-                resp = self.ecs.describe_services(
-                    cluster=cluster_arn,
-                    services=service_set,
-                    include=["TAGS"]
-                )
-
-                for service_description in resp["services"]:
-                    self.described_services.append(service_description)
-
-    def list_cluster_arns(self):
-        """
-        Generates the ARN of every ECS cluster in an account.
-        """
-        paginator = self.ecs.get_paginator("list_clusters")
-
-        for page in paginator.paginate():
-            yield from page["clusterArns"]
-
-    def list_service_arns(self, *, cluster_arn):
-        """
-        Generates the ARN of every ECS service in a cluster.
-        """
-        paginator = self.ecs.get_paginator("list_services")
-
-        for page in paginator.paginate(cluster=cluster_arn):
-            yield from page["serviceArns"]
+        self._described_services = list(describe_services(self.ecs))
 
     def redeploy_service(self, cluster_arn, service_arn, deployment_label):
         response = self.ecs.update_service(
@@ -75,7 +79,7 @@ class Ecs:
         """
         try:
             return tags.find_unique_resource_matching_tags(
-                self.described_services,
+                self._described_services,
                 expected_tags={
                     "deployment:service": service_id,
                     "deployment:env": environment_id,
