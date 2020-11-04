@@ -58,7 +58,7 @@ class DynamoDbReleaseStore:
         except KeyError:
             raise RuntimeError(f"No such release: {release_id}")
 
-    def get_recent_deployments(self, limit=10):
+    def get_recent_deployments(self, environment_id=None, limit=10):
         """
         Returns the N most recent deployments.
         """
@@ -79,7 +79,16 @@ class DynamoDbReleaseStore:
         for release in resp["Items"]:
             for deployment in release["deployments"]:
                 deployment["release_id"] = release["release_id"]
-                known_deployments.append(deployment)
+
+                # Filter on environment_id - this does not play well with filter
+                # resulting in fewer than expected items (this filters on top of
+                # the limit) but it's hard to do better with the data structured
+                # as it is.
+                if environment_id:
+                    if deployment["environment"] == environment_id:
+                        known_deployments.append(deployment)
+                else:
+                    known_deployments.append(deployment)
 
         known_deployments = sorted(
             known_deployments, key=lambda d: d["date_created"], reverse=True
