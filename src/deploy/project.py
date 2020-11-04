@@ -93,8 +93,6 @@ class Project:
             role_arn=self.role_arn
         )
 
-        self.prepared_releases = {}
-
         # Ensure release store is available
         self.releases_store.initialise()
 
