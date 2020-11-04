@@ -138,6 +138,66 @@ class ReleaseStoreTestsMixin:
             resp = release_store.get_recent_deployments(count=1, environment="prod")
             assert [d["id"] for d in resp] == ["9"]
 
+    def test_can_add_deployment(self, project_id):
+        release = {
+            "release_id": f"release-{secrets.token_hex()}",
+            "project_id": project_id,
+            "date_created": datetime.datetime.now().isoformat(),
+            "last_date_deployed": datetime.datetime(2001, 1, 1).isoformat(),
+            "deployments": []
+        }
+
+        with self.create_release_store(project_id) as release_store:
+            release_store.initialise()
+            release_store.put_release(release)
+
+            deployment = {
+                "id": "1",
+                "environment": "prod",
+                "date_created": datetime.datetime.now().isoformat()
+            }
+
+            release_store.add_deployment(
+                release_id=release["release_id"],
+                deployment=deployment
+            )
+
+            stored_release = release_store.get_release(release["release_id"])
+            assert stored_release["deployments"] == [deployment]
+            assert stored_release["last_date_deployed"] == deployment["date_created"]
+
+    def test_adding_deployment_preserves_existing_deployments(self, project_id):
+        release = {
+            "release_id": f"release-{secrets.token_hex()}",
+            "project_id": project_id,
+            "date_created": datetime.datetime.now().isoformat(),
+            "last_date_deployed": datetime.datetime(2001, 1, 1).isoformat(),
+            "deployments": [
+                {"id": "1", "environment": "prod"},
+                {"id": "2", "environment": "staging"},
+                {"id": "3", "environment": "prod"},
+            ]
+        }
+
+        with self.create_release_store(project_id) as release_store:
+            release_store.initialise()
+            release_store.put_release(release)
+
+            deployment = {
+                "id": "4",
+                "environment": "prod",
+                "date_created": datetime.datetime.now().isoformat()
+            }
+
+            release_store.add_deployment(
+                release_id=release["release_id"],
+                deployment=deployment
+            )
+
+            stored_release = release_store.get_release(release["release_id"])
+            assert len(stored_release["deployments"]) == 4
+            assert stored_release["last_date_deployed"] == deployment["date_created"]
+
 
 class TestMemoryReleaseStore(ReleaseStoreTestsMixin):
     @contextlib.contextmanager

@@ -49,7 +49,7 @@ class ReleaseStore(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_recent_releases(self, count):
+    def get_recent_releases(self, *, count):
         """
         Return the most recent ``count`` releases, as sorted by creation date.
         """
@@ -62,9 +62,16 @@ class ReleaseStore(abc.ABC):
         return self.get_recent_releases(count=1)[0]
 
     @abc.abstractmethod
-    def get_recent_deployments(self, environment=None, count=10):
+    def get_recent_deployments(self, *, environment=None, count=10):
         """
         Return the most recent ``limit`` deployments in a given environment.
+        """
+        pass
+
+    @abc.abstractmethod
+    def add_deployment(self, *, release_id, deployment):
+        """
+        Store a new deployment.
         """
         pass
 
@@ -88,7 +95,7 @@ class MemoryReleaseStore(ReleaseStore):
         except KeyError:
             raise ReleaseNotFoundError(release_id)
 
-    def get_recent_releases(self, count):
+    def get_recent_releases(self, *, count):
         sorted_releases = sorted(
             self.cache.values(),
             key=lambda c: c["date_created"],
@@ -96,7 +103,7 @@ class MemoryReleaseStore(ReleaseStore):
         )
         return sorted_releases[:count]
 
-    def get_recent_deployments(self, environment=None, count=10):
+    def get_recent_deployments(self, *, environment=None, count=10):
         deployments = []
 
         for release in self.cache.values():
@@ -110,6 +117,10 @@ class MemoryReleaseStore(ReleaseStore):
             key=lambda d: d["date_created"],
             reverse=True
         )[:count]
+
+    def add_deployment(self, *, release_id, deployment):
+        self.cache[release_id]["deployments"].append(deployment)
+        self.cache[release_id]["last_date_deployed"] = deployment["date_created"]
 
 
 class DynamoReleaseStore(ReleaseStore):
@@ -149,7 +160,7 @@ class DynamoReleaseStore(ReleaseStore):
         except KeyError:
             raise ReleaseNotFoundError(release_id)
 
-    def get_recent_releases(self, count):
+    def get_recent_releases(self, *, count):
         # The GSI project_gsi uses date_created as a range key, so we can
         # sort by the contents of this column.
         query_resp = self.table.query(
@@ -165,7 +176,7 @@ class DynamoReleaseStore(ReleaseStore):
 
         return query_resp["Items"]
 
-    def get_recent_deployments(self, environment=None, count=10):
+    def get_recent_deployments(self, *, environment=None, count=10):
         known_deployments = []
 
         params = {
@@ -234,6 +245,30 @@ class DynamoReleaseStore(ReleaseStore):
         # We know we have the last N deployments with no gaps, but beyond
         # that we can't be sure.
         return known_deployments[:count]
+
+    def add_deployment(self, *, release_id, deployment):
+        self.table.update_item(
+            Key={
+                'release_id': release_id
+            },
+            UpdateExpression="SET #deployments = list_append(#deployments, :d)",
+            ExpressionAttributeNames={
+                '#deployments': 'deployments',
+            },
+            ExpressionAttributeValues={
+                ':d': [deployment],
+            }
+        )
+
+        self.table.update_item(
+            Key={
+                'release_id': release_id
+            },
+            UpdateExpression="SET last_date_deployed = :d",
+            ExpressionAttributeValues={
+                ':d': deployment['date_created'],
+            }
+        )
 
     def _create_table(self):
         self.dynamodb.create_table(
