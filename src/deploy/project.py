@@ -2,6 +2,7 @@ import collections
 import datetime
 import functools
 import uuid
+import warnings
 
 import yaml
 
@@ -38,30 +39,62 @@ class Projects:
         return Project(project_id=project_id, config=config, **kwargs)
 
 
+def prepare_config(config, namespace=None, role_arn=None, region_name=None):
+    """
+    Prepare the config.  Fill in overrides or defaults as necessary.
+    """
+    # We always want a namespace to be set.  Read it from the initial config
+    # if possible, or use the override or default if not.
+    if namespace and ("namespace" in config) and (config["namespace"] != namespace):
+        warnings.warn(
+            f"Preferring override namespace {namespace} "
+            f"to namespace in config {config['namespace']}"
+        )
+        config["namespace"] = namespace
+    elif "namespace" not in config:
+        config["namespace"] = namespace or DEFAULT_ECR_NAMESPACE
+
+    assert "namespace" in config
+
+    # We always want a role_arn to be set.  Read it from the initial config,
+    # or raise an error if not -- there's no way to pick a sensible default.
+    if role_arn:
+        if ("role_arn" in config) and (config["role_arn"] != role_arn):
+            warnings.warn(
+                f"Preferring override role_arn {role_arn} "
+                f"to role_arn in config {config['role_arn']}"
+            )
+            config["role_arn"] = role_arn
+        elif "role_arn" not in config:
+            config["role_arn"] = role_arn
+
+    if "role_arn" not in config:
+        raise ConfigError("role_arn is not set!")
+
+    assert "role_arn" in config
+
+    # We always want a region_name to be set.  Read it from the initial config
+    # if possible, or use the override or default if not.
+    if region_name and ("region_name" in config) and (config["region_name"] != region_name):
+        warnings.warn(
+            f"Preferring override region_name {region_name} "
+            f"to region_name in config {config['region_name']}"
+        )
+        config["region_name"] = region_name
+    elif "region_name" not in config:
+        config["region_name"] = region_name or DEFAULT_REGION_NAME
+
+    assert "region_name" in config
+
+
 class Project:
-    def __init__(self, project_id, config, region_name=None, role_arn=None, account_id=None, namespace=None):
+    def __init__(self, project_id, config, account_id=None, **kwargs):
         self.id = project_id
+
+        prepare_config(config, **kwargs)
         self.config = config
 
         self.config['id'] = project_id
-
-        if namespace:
-            self.config['namespace'] = namespace
-        else:
-            if 'namespace' not in self.config:
-                self.config['namespace'] = DEFAULT_ECR_NAMESPACE
-
-        if role_arn:
-            self.config['role_arn'] = role_arn
-        else:
-            if 'role_arn' not in self.config:
-                raise ConfigError("role_arn is not set!")
-
-        if region_name:
-            self.config['region_name'] = region_name
-        else:
-            if 'region_name' not in self.config:
-                self.config['region_name'] = DEFAULT_REGION_NAME
 
         iam = Iam(
             self.config['role_arn'],
