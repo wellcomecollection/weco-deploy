@@ -4,6 +4,12 @@ Changelog
 
 This is a record of all releases of weco-deploy.
 
+------------------
+5.6.0 - 2020-11-04
+------------------
+
+Adds an --environment-id filter to show-deployments command. This allows a better view on deployments when looking for example for the last good prod deploy.
+
 -------------------
 5.5.13 - 2020-11-04
 -------------------
