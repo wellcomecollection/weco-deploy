@@ -309,18 +309,13 @@ class Project:
         """
         Generates a set of tuples (image_id, List[services])
         """
-        for image_id, _ in release["images"].items():
+        for image_id in release["images"]:
             try:
                 matched_image = self.image_repositories[image_id]
             except KeyError:
                 continue
 
-            try:
-                services = matched_image["services"]
-            except KeyError:
-                continue
-
-            yield (image_id, services)
+            yield (image_id, matched_image["services"])
 
     def get_ecs_service_arns(self, release, environment_id):
         """
