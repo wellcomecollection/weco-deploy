@@ -10,7 +10,7 @@ from . import ecr, iam
 from .ecr import Ecr
 from .ecs import Ecs
 from .exceptions import ConfigError
-from .releases_store import DynamoDbReleaseStore
+from .release_store import DynamoReleaseStore
 from .tags import parse_aws_tags
 
 DEFAULT_ECR_NAMESPACE = "uk.ac.wellcome"
@@ -35,7 +35,19 @@ class Projects:
         except KeyError:
             raise ConfigError(f"No matching project {project_id} in {self.projects}")
 
-        return Project(project_id=project_id, config=config, **kwargs)
+        prepare_config(config, **kwargs)
+
+        release_store = DynamoReleaseStore(
+            project_id=project_id,
+            region_name=config["region_name"],
+            role_arn=config["role_arn"]
+        )
+
+        return Project(
+            project_id=project_id,
+            config=config,
+            release_store=release_store
+        )
 
 
 def prepare_config(
@@ -134,21 +146,13 @@ def prepare_config(
 
 
 class Project:
-    def __init__(self, project_id, config, **kwargs):
-        prepare_config(config, **kwargs)
+    def __init__(self, project_id, config, release_store):
         self.config = config
 
-        self.config['id'] = project_id
+        self.config["id"] = project_id
 
-        # Create required services
-        self.releases_store = DynamoDbReleaseStore(
-            project_id=self.id,
-            region_name=self.region_name,
-            role_arn=self.role_arn
-        )
-
-        # Ensure release store is available
-        self.releases_store.initialise()
+        self.release_store = release_store
+        self.release_store.initialise()
 
     @property
     def id(self):
@@ -196,7 +200,8 @@ class Project:
                 "account_id": repo.get("account_id", self.account_id),
                 "region_name": repo.get("region_name", self.region_name),
                 "role_arn": repo.get("role_arn", self.role_arn),
-                "repository_name": f"{namespace}/{repo['id']}"
+                "repository_name": f"{namespace}/{repo['id']}",
+                # images?????
             }
 
         assert len(result) == len(self.config.get("image_repositories", []))
@@ -251,14 +256,14 @@ class Project:
 
     def get_deployments(self, release_id, limit, environment_id):
         if release_id is not None:
-            release = self.releases_store.get_release(release_id)
+            release = self.release_store.get_release(release_id)
 
             for d in release["deployments"]:
                 d["release_id"] = release_id
 
             deployments = release_id["deployments"]
         else:
-            deployments = self.releases_store.get_recent_deployments(
+            deployments = self.release_store.get_recent_deployments(
                 environment_id=environment_id,
                 limit=limit
             )
@@ -268,9 +273,9 @@ class Project:
 
     def get_release(self, release_id):
         if release_id == "latest":
-            return self.releases_store.get_latest_release()
+            return self.release_store.get_latest_release()
         else:
-            return self.releases_store.get_release(release_id)
+            return self.release_store.get_release(release_id)
 
     def _get_services_by_image_id(self, release):
         """
@@ -441,14 +446,14 @@ class Project:
         )
 
     def _prepare_release(self, description, release_images):
-        previous_release = self.releases_store.get_latest_release()
+        previous_release = self.release_store.get_latest_release()
 
         new_release = self._create_release(
             description=description,
             images=release_images
         )
 
-        self.releases_store.put_release(new_release)
+        self.release_store.put_release(new_release)
 
         return {"previous_release": previous_release, "new_release": new_release}
 
@@ -571,6 +576,6 @@ class Project:
 
         deployment = self._create_deployment(environment_id, deployment_details, description)
 
-        self.releases_store.add_deployment(release['release_id'], deployment)
+        self.release_store.add_deployment(release['release_id'], deployment)
 
         return deployment

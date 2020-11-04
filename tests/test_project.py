@@ -18,11 +18,6 @@ def test_loading_non_existent_project_is_runtimeerror(tmpdir):
         project.load(project_id="doesnotexist")
 
 
-def test_no_role_arn_is_error():
-    with pytest.raises(ConfigError, match="role_arn is not set!"):
-        Project(project_id="my_project", config={})
-
-
 @pytest.fixture()
 def role_arn():
     return f"arn:aws:iam::1234567890:role/role-{secrets.token_hex()}"
