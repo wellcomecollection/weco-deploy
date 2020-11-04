@@ -3,13 +3,13 @@ import os
 
 from botocore.exceptions import ClientError
 
+from . import iam
 from .exceptions import EcrError
-from .iam import Iam
 from .commands import cmd
 
 
 def create_client(*, account_id, region_name, role_arn):
-    session = Iam.get_session(
+    session = iam.get_session(
         session_name="ReleaseToolEcr",
         role_arn=role_arn,
         region_name=region_name

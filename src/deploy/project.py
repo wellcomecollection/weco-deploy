@@ -6,12 +6,11 @@ import warnings
 
 import yaml
 
-from . import ecr
+from . import ecr, iam
 from .ecr import Ecr
 from .ecs import Ecs
 from .exceptions import ConfigError
 from .releases_store import DynamoDbReleaseStore
-from .iam import Iam
 from .tags import parse_aws_tags
 
 DEFAULT_ECR_NAMESPACE = "uk.ac.wellcome"
@@ -39,7 +38,13 @@ class Projects:
         return Project(project_id=project_id, config=config, **kwargs)
 
 
-def prepare_config(config, namespace=None, role_arn=None, region_name=None):
+def prepare_config(
+    config,
+    namespace=None,
+    role_arn=None,
+    region_name=None,
+    account_id=None
+):
     """
     Prepare the config.  Fill in overrides or defaults as necessary.
     """
@@ -107,31 +112,33 @@ def prepare_config(config, namespace=None, role_arn=None, region_name=None):
             f"in image_repositories: {', '.join(sorted(duplicates))}"
         )
 
+    # We always want an account_id to be set.  Read it from the initial config
+    # if possible, or use the override or guess it from the role ARN if not.
+    if account_id and ("account_id" in config) and (config["account_id"] != account_id):
+        warnings.warn(
+            f"Preferring override account_id {account_id} "
+            f"to account_id in config {config['account_id']}"
+        )
+        config["account_id"] = account_id
+
+    iam_role_account_id = iam.get_account_id(config["role_arn"])
+    if ("account_id" in config) and (config["account_id"] != iam_role_account_id):
+        warnings.warn(
+            f"Account ID {account_id} does not match the role {config['role_arn']}"
+        )
+
+    if "account_id" not in config:
+        config["account_id"] = iam_role_account_id
+
+    assert "account_id" in config
+
 
 class Project:
-    def __init__(self, project_id, config, account_id=None, **kwargs):
+    def __init__(self, project_id, config, **kwargs):
         prepare_config(config, **kwargs)
         self.config = config
 
         self.config['id'] = project_id
-
-        iam = Iam(
-            self.config['role_arn'],
-            self.config['region_name']
-        )
-
-        self.user_details = {
-            'caller_identity': iam.caller_identity(),
-            'underlying_caller_identity': iam.caller_identity(underlying=True)
-        }
-
-        if account_id:
-            self.config['account_id'] = account_id
-        else:
-            if 'account_id' not in self.config:
-                self.config['account_id'] = self.user_details['caller_identity']['account_id']
-
-        assert "account_id" in self.config
 
         # Create required services
         self.releases_store = DynamoDbReleaseStore(
@@ -213,7 +220,7 @@ class Project:
         return {
             "environment": environment_id,
             "date_created": datetime.datetime.utcnow().isoformat(),
-            "requested_by": self.user_details['underlying_caller_identity']['arn'],
+            "requested_by": iam.get_underlying_role_arn(),
             "description": description,
             "details": details
         }
@@ -226,7 +233,7 @@ class Project:
             "project_id": self.id,
             "project_name": self.config.get('name', 'unnamed'),
             "date_created": datetime.datetime.utcnow().isoformat(),
-            "requested_by": self.user_details['underlying_caller_identity']['arn'],
+            "requested_by": iam.get_underlying_role_arn(),
             "description": description,
             "images": images,
             "deployments": []

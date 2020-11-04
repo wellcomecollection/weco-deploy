@@ -1,14 +1,14 @@
 from botocore.exceptions import ClientError
 from boto3.dynamodb.conditions import Key
 
-from .iam import Iam
+from . import iam
 
 
 class DynamoDbReleaseStore:
     def __init__(self, project_id, region_name, role_arn):
         self.project_id = project_id
         self.table_name = f"wellcome-releases-{project_id}"
-        self.session = Iam.get_session(
+        self.session = iam.get_session(
             session_name="ReleaseToolDynamoDbReleaseStore",
             role_arn=role_arn,
             region_name=region_name

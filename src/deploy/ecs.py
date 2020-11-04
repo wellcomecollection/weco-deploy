@@ -1,6 +1,5 @@
-from .iam import Iam
+from . import iam, tags
 from .iterators import chunked_iterable
-from . import tags
 
 
 def list_cluster_arns_in_account(ecs_client):
@@ -43,7 +42,7 @@ def describe_services(ecs_client):
 
 class Ecs:
     def __init__(self, region_name, role_arn):
-        session = Iam.get_session(
+        session = iam.get_session(
             session_name="ReleaseToolEcs",
             role_arn=role_arn,
             region_name=region_name
