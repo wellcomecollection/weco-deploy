@@ -111,10 +111,6 @@ class Project:
                 self.config['account_id'] = self.user_details['caller_identity']['account_id']
 
         # Initialise project level vars
-        self.role_arn = self.config['role_arn']
-        self.region_name = self.config['region_name']
-        self.account_id = self.config['account_id']
-        self.namespace = self.config['namespace']
         self.image_repositories = self.config.get('image_repositories', [])
 
         # Create required services
@@ -130,6 +126,22 @@ class Project:
     @property
     def id(self):
         return self.config["id"]
+
+    @property
+    def role_arn(self):
+        return self.config["role_arn"]
+
+    @property
+    def region_name(self):
+        return self.config["region_name"]
+
+    @property
+    def account_id(self):
+        return self.config["account_id"]
+
+    @property
+    def namespace(self):
+        return self.config["namespace"]
 
     def _ecr(self, account_id=None, region_name=None, role_arn=None):
         return Ecr(
