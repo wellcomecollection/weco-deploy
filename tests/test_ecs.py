@@ -1,6 +1,10 @@
 import pytest
 
-from deploy.ecs import list_cluster_arns_in_account, list_service_arns_in_cluster
+from deploy.ecs import (
+    describe_services,
+    list_cluster_arns_in_account,
+    list_service_arns_in_cluster
+)
 
 
 @pytest.fixture(scope="session")
@@ -44,3 +48,15 @@ def test_list_service_arns_in_cluster(ecs_client, ecs_stack):
         "arn:aws:ecs:eu-west-1:012345678910:service/service2b",
         "arn:aws:ecs:eu-west-1:012345678910:service/service2c",
     ]
+
+
+def test_describe_services(ecs_client, ecs_stack):
+    service_descriptions = list(describe_services(ecs_client))
+
+    assert len(service_descriptions) == 5
+    assert all("tags" in desc for desc in service_descriptions)
+
+    actual_service_names = [desc["serviceName"] for desc in service_descriptions]
+    expected_service_names = ecs_stack["services"]["cluster1"] + ecs_stack["services"]["cluster2"]
+
+    assert actual_service_names == expected_service_names

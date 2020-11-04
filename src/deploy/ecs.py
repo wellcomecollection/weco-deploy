@@ -23,6 +23,24 @@ def list_service_arns_in_cluster(ecs_client, *, cluster):
         yield from page["serviceArns"]
 
 
+def describe_services(ecs_client):
+    """
+    Describe all the ECS services in an account.
+    """
+    for cluster in list_cluster_arns_in_account(ecs_client):
+        service_arns = list_service_arns_in_cluster(ecs_client, cluster=cluster)
+
+        # We can specify up to 10 services in a single DescribeServices API call.
+        for service_set in chunked_iterable(service_arns, size=10):
+            resp = ecs_client.describe_services(
+                cluster=cluster,
+                services=service_set,
+                include=["TAGS"]
+            )
+
+            yield from resp["services"]
+
+
 class Ecs:
     def __init__(self, region_name, role_arn):
         session = Iam.get_session(
@@ -31,22 +49,7 @@ class Ecs:
             region_name=region_name
         )
         self.ecs = session.client('ecs')
-        self.described_services = []
-        self._load_described_services()
-
-    def _load_described_services(self):
-        for cluster in list_cluster_arns_in_account(self.ecs):
-            service_arns = list_service_arns_in_cluster(self.ecs, cluster=cluster)
-
-            # We can specify up to 10 services in a single DescribeServices API call.
-            for service_set in chunked_iterable(service_arns, size=10):
-                resp = self.ecs.describe_services(
-                    cluster=cluster,
-                    services=service_set,
-                    include=["TAGS"]
-                )
-
-                self.described_services.extend(resp["services"])
+        self._described_services = list(describe_services(self.ecs))
 
     def redeploy_service(self, cluster_arn, service_arn, deployment_label):
         response = self.ecs.update_service(
@@ -76,7 +79,7 @@ class Ecs:
         """
         try:
             return tags.find_unique_resource_matching_tags(
-                self.described_services,
+                self._described_services,
                 expected_tags={
                     "deployment:service": service_id,
                     "deployment:env": environment_id,
