@@ -89,8 +89,6 @@ def prepare_config(config, namespace=None, role_arn=None, region_name=None):
 
 class Project:
     def __init__(self, project_id, config, account_id=None, **kwargs):
-        self.id = project_id
-
         prepare_config(config, **kwargs)
         self.config = config
 
@@ -128,6 +126,10 @@ class Project:
 
         # Ensure release store is available
         self.releases_store.initialise()
+
+    @property
+    def id(self):
+        return self.config["id"]
 
     def _ecr(self, account_id=None, region_name=None, role_arn=None):
         return Ecr(
