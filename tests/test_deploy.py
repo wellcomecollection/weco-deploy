@@ -1,6 +1,5 @@
 import datetime
 import json
-import secrets
 import textwrap
 
 from click.testing import CliRunner

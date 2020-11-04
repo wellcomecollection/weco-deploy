@@ -83,7 +83,6 @@ class ReleaseStoreTestsMixin:
 
             assert release_store.get_most_recent_release() == releases[-1]
 
-
     def test_get_most_recent_release_if_no_releases_is_error(self, project_id):
         with self.create_release_store(project_id) as release_store:
             release_store.initialise()
