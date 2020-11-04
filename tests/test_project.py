@@ -1,5 +1,4 @@
 import datetime
-import secrets
 
 import pytest
 
@@ -18,16 +17,6 @@ def test_loading_non_existent_project_is_runtimeerror(tmpdir):
 
     with pytest.raises(ConfigError, match="No matching project doesnotexist"):
         project.load(project_id="doesnotexist")
-
-
-@pytest.fixture()
-def role_arn():
-    return f"arn:aws:iam::1234567890:role/role-{secrets.token_hex()}"
-
-
-@pytest.fixture()
-def project_id():
-    return f"project-{secrets.token_hex()}"
 
 
 class TestPrepareConfig:
