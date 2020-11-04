@@ -157,7 +157,7 @@ def prepare_config(
     iam_role_account_id = iam.get_account_id(config["role_arn"])
     if ("account_id" in config) and (config["account_id"] != iam_role_account_id):
         warnings.warn(
-            f"Account ID {account_id} does not match the role {config['role_arn']}"
+            f"Account ID {config['account_id']} does not match the role {config['role_arn']}"
         )
 
     if "account_id" not in config:
