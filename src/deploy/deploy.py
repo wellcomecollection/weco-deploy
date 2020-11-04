@@ -9,7 +9,7 @@ from dateutil.parser import parse
 from pprint import pprint
 from tabulate import tabulate
 
-from . import git
+from . import git, iam
 from .pretty_printing import pprint_date
 from .project import Projects
 
@@ -65,8 +65,8 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_name, account_id
 
     config = project.config
 
-    user_arn = project.user_details['caller_identity']['arn']
-    underlying_user_arn = project.user_details['underlying_caller_identity']['arn']
+    user_arn = project.role_arn
+    underlying_user_arn = iam.get_underlying_role_arn()
 
     if verbose:
         click.echo(click.style(f"Loaded {project_file}:", fg="cyan"))
@@ -463,10 +463,9 @@ def show_release(ctx, release_id):
 
 @cli.command()
 @click.argument('release_id', required=False)
-@click.option('--environment-id', required=False)
 @click.option('--limit', required=False, default=10)
 @click.pass_context
-def show_deployments(ctx, release_id, environment_id, limit):
+def show_deployments(ctx, release_id, limit):
     project = ctx.obj['project']
 
     rows = []
@@ -479,11 +478,7 @@ def show_deployments(ctx, release_id, environment_id, limit):
         "description"
     ]
 
-    for deployment in project.get_deployments(
-            release_id=release_id,
-            environment_id=environment_id,
-            limit=limit
-    ):
+    for deployment in project.get_deployments(release_id=release_id, limit=limit):
         rows.append(
             [
                 deployment["release_id"],
