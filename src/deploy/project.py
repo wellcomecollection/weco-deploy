@@ -124,6 +124,27 @@ def prepare_config(
             f"in image_repositories: {', '.join(sorted(duplicates))}"
         )
 
+    # The environments are stored as a list of dicts:
+    #
+    #     [
+    #       {"id": "stage", "name": […]},
+    #       {"id": "prod", "name": […]},
+    #       ...
+    #     ]
+    #
+    # We don't want to change the structure, but we do want to check that IDs
+    # are unique.
+    env_id_tally = collections.Counter()
+    for env in config.get("environments", []):
+        env_id_tally[env["id"]] += 1
+
+    duplicates = {env_id for env_id, count in env_id_tally.items() if count > 1}
+    if duplicates:
+        raise ConfigError(
+            f"Duplicate environment{'s' if len(duplicates) > 1 else ''} "
+            f"in config: {', '.join(sorted(duplicates))}"
+        )
+
     # We always want an account_id to be set.  Read it from the initial config
     # if possible, or use the override or guess it from the role ARN if not.
     if account_id and ("account_id" in config) and (config["account_id"] != account_id):

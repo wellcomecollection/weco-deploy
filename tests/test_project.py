@@ -219,6 +219,57 @@ class TestPrepareConfig:
 
         prepare_config(config)
 
+    def test_duplicate_environment_is_error(self, role_arn):
+        """
+        If the same ID appears twice in the list of environments, raise a ConfigError.
+        """
+        config = {
+            "role_arn": role_arn,
+            "environments": [
+                {"id": "stage", "name": "Staging"},
+                {"id": "stage", "name": "Staging"},
+                {"id": "prod", "name": "Prod"},
+            ]
+        }
+
+        with pytest.raises(ConfigError, match="Duplicate environment in config: stage"):
+            prepare_config(config)
+
+    def test_duplicate_environments_are_error(self, role_arn):
+        """
+        If the same ID appears twice in the list of environments, raise a ConfigError.
+        """
+        config = {
+            "role_arn": role_arn,
+            "environments": [
+                {"id": "stage", "name": "Staging"},
+                {"id": "stage", "name": "Staging"},
+                {"id": "prod", "name": "Prod"},
+                {"id": "prod", "name": "Prod"},
+                {"id": "dev", "name": "Dev"},
+            ]
+        }
+
+        with pytest.raises(
+            ConfigError, match="Duplicate environments in config: prod, stage"
+        ):
+            prepare_config(config)
+
+    def test_does_not_warn_on_unique_environments(self, role_arn):
+        """
+        If all the environments have unique IDs, no error is raised.
+        """
+        config = {
+            "role_arn": role_arn,
+            "environments": [
+                {"id": "stage", "name": "Staging"},
+                {"id": "prod", "name": "Prod"},
+                {"id": "dev", "name": "Dev"},
+            ]
+        }
+
+        prepare_config(config)
+
 
 class TestProject:
     def test_image_repositories(self, role_arn):
