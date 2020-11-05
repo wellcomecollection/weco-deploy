@@ -58,7 +58,10 @@ class ReleaseStore(abc.ABC):
         """
         Return the most recent release, as sorted by creation date.
         """
-        return self.get_recent_releases(count=1)[0]
+        try:
+            return self.get_recent_releases(count=1)[0]
+        except IndexError:
+            raise ReleaseNotFoundError("There are no releases yet")
 
     @abc.abstractmethod
     def get_recent_deployments(self, *, environment=None, count=10):

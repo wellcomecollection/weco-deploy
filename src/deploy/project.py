@@ -10,7 +10,7 @@ from . import ecr, iam
 from .ecr import Ecr
 from .ecs import Ecs
 from .exceptions import ConfigError
-from .releases_store import DynamoDbReleaseStore
+from .release_store import DynamoReleaseStore
 from .tags import parse_aws_tags
 
 DEFAULT_ECR_NAMESPACE = "uk.ac.wellcome"
@@ -35,7 +35,19 @@ class Projects:
         except KeyError:
             raise ConfigError(f"No matching project {project_id} in {self.projects}")
 
-        return Project(project_id=project_id, config=config, **kwargs)
+        prepare_config(config, **kwargs)
+
+        release_store = DynamoReleaseStore(
+            project_id=project_id,
+            region_name=config["region_name"],
+            role_arn=config["role_arn"]
+        )
+
+        return Project(
+            project_id=project_id,
+            config=config,
+            release_store=release_store
+        )
 
 
 def prepare_config(
@@ -112,6 +124,27 @@ def prepare_config(
             f"in image_repositories: {', '.join(sorted(duplicates))}"
         )
 
+    # The environments are stored as a list of dicts:
+    #
+    #     [
+    #       {"id": "stage", "name": […]},
+    #       {"id": "prod", "name": […]},
+    #       ...
+    #     ]
+    #
+    # We don't want to change the structure, but we do want to check that IDs
+    # are unique.
+    env_id_tally = collections.Counter()
+    for env in config.get("environments", []):
+        env_id_tally[env["id"]] += 1
+
+    duplicates = {env_id for env_id, count in env_id_tally.items() if count > 1}
+    if duplicates:
+        raise ConfigError(
+            f"Duplicate environment{'s' if len(duplicates) > 1 else ''} "
+            f"in config: {', '.join(sorted(duplicates))}"
+        )
+
     # We always want an account_id to be set.  Read it from the initial config
     # if possible, or use the override or guess it from the role ARN if not.
     if account_id and ("account_id" in config) and (config["account_id"] != account_id):
@@ -124,7 +157,7 @@ def prepare_config(
     iam_role_account_id = iam.get_account_id(config["role_arn"])
     if ("account_id" in config) and (config["account_id"] != iam_role_account_id):
         warnings.warn(
-            f"Account ID {account_id} does not match the role {config['role_arn']}"
+            f"Account ID {config['account_id']} does not match the role {config['role_arn']}"
         )
 
     if "account_id" not in config:
@@ -134,21 +167,13 @@ def prepare_config(
 
 
 class Project:
-    def __init__(self, project_id, config, **kwargs):
-        prepare_config(config, **kwargs)
+    def __init__(self, project_id, config, release_store):
         self.config = config
 
-        self.config['id'] = project_id
+        self.config["id"] = project_id
 
-        # Create required services
-        self.releases_store = DynamoDbReleaseStore(
-            project_id=self.id,
-            region_name=self.region_name,
-            role_arn=self.role_arn
-        )
-
-        # Ensure release store is available
-        self.releases_store.initialise()
+        self.release_store = release_store
+        self.release_store.initialise()
 
     @property
     def id(self):
@@ -181,6 +206,7 @@ class Project:
         -   region_name
         -   role_arn
         -   repository_name
+        -   services
 
         """
         result = {}
@@ -196,10 +222,27 @@ class Project:
                 "account_id": repo.get("account_id", self.account_id),
                 "region_name": repo.get("region_name", self.region_name),
                 "role_arn": repo.get("role_arn", self.role_arn),
-                "repository_name": f"{namespace}/{repo['id']}"
+                "repository_name": f"{namespace}/{repo['id']}",
+                "services": repo.get("services", []),
             }
 
         assert len(result) == len(self.config.get("image_repositories", []))
+        return result
+
+    @property
+    def environment_names(self):
+        result = {}
+
+        for env in self.config.get("environments", []):
+
+            # We should have uniqueness by the checks in prepare_config(), but
+            # it doesn't hurt to check.
+            assert env["id"] not in result
+
+            assert set(env.keys()) == {"id", "name"}
+            result[env["id"]] = env["name"]
+
+        assert len(result) == len(self.config.get("environments", []))
         return result
 
     def _ecr(self, account_id=None, region_name=None, role_arn=None):
@@ -239,26 +282,16 @@ class Project:
             "deployments": []
         }
 
-    def get_environment(self, environment_id):
-        environments = {
-            e['id']: e for e in self.config.get('environments', []) if 'id' in e
-        }
-
-        if environment_id not in environments:
-            raise ValueError(f"Unknown environment. Expected '{environment_id}' in {environments}")
-
-        return environments[environment_id]
-
     def get_deployments(self, release_id, limit, environment_id):
         if release_id is not None:
-            release = self.releases_store.get_release(release_id)
+            release = self.release_store.get_release(release_id)
 
             for d in release["deployments"]:
                 d["release_id"] = release_id
 
             deployments = release_id["deployments"]
         else:
-            deployments = self.releases_store.get_recent_deployments(
+            deployments = self.release_store.get_recent_deployments(
                 environment_id=environment_id,
                 limit=limit
             )
@@ -268,26 +301,21 @@ class Project:
 
     def get_release(self, release_id):
         if release_id == "latest":
-            return self.releases_store.get_latest_release()
+            return self.release_store.get_most_recent_release()
         else:
-            return self.releases_store.get_release(release_id)
+            return self.release_store.get_release(release_id)
 
     def _get_services_by_image_id(self, release):
         """
         Generates a set of tuples (image_id, List[services])
         """
-        for image_id, _ in release["images"].items():
+        for image_id in release["images"]:
             try:
                 matched_image = self.image_repositories[image_id]
             except KeyError:
                 continue
 
-            try:
-                services = matched_image["services"]
-            except KeyError:
-                continue
-
-            yield (image_id, services)
+            yield (image_id, matched_image["services"])
 
     def get_ecs_service_arns(self, release, environment_id):
         """
@@ -441,14 +469,14 @@ class Project:
         )
 
     def _prepare_release(self, description, release_images):
-        previous_release = self.releases_store.get_latest_release()
+        previous_release = self.release_store.get_latest_release()
 
         new_release = self._create_release(
             description=description,
             images=release_images
         )
 
-        self.releases_store.put_release(new_release)
+        self.release_store.put_release(new_release)
 
         return {"previous_release": previous_release, "new_release": new_release}
 
@@ -530,7 +558,11 @@ class Project:
         )
 
         # Force check for valid environment
-        _ = self.get_environment(environment_id)
+        if environment_id not in self.environment_names:
+            raise ValueError(
+                f"Unknown environment. "
+                f"Got {environment_id!r}, expected {self.environment_names.keys()!r}"
+            )
 
         deployment_details = {}
 
@@ -571,6 +603,6 @@ class Project:
 
         deployment = self._create_deployment(environment_id, deployment_details, description)
 
-        self.releases_store.add_deployment(release['release_id'], deployment)
+        self.release_store.add_deployment(release['release_id'], deployment)
 
         return deployment

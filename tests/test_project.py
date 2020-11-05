@@ -1,9 +1,10 @@
-import secrets
+import datetime
 
 import pytest
 
 from deploy.exceptions import ConfigError
 from deploy.project import prepare_config, Projects, Project
+from deploy.release_store import MemoryReleaseStore
 
 
 def test_loading_non_existent_project_is_runtimeerror(tmpdir):
@@ -16,16 +17,6 @@ def test_loading_non_existent_project_is_runtimeerror(tmpdir):
 
     with pytest.raises(ConfigError, match="No matching project doesnotexist"):
         project.load(project_id="doesnotexist")
-
-
-def test_no_role_arn_is_error():
-    with pytest.raises(ConfigError, match="role_arn is not set!"):
-        Project(project_id="my_project", config={})
-
-
-@pytest.fixture()
-def role_arn():
-    return f"arn:aws:iam::1234567890:role/role-{secrets.token_hex()}"
 
 
 class TestPrepareConfig:
@@ -222,3 +213,231 @@ class TestPrepareConfig:
         }
 
         prepare_config(config)
+
+    def test_duplicate_environment_is_error(self, role_arn):
+        """
+        If the same ID appears twice in the list of environments, raise a ConfigError.
+        """
+        config = {
+            "role_arn": role_arn,
+            "environments": [
+                {"id": "stage", "name": "Staging"},
+                {"id": "stage", "name": "Staging"},
+                {"id": "prod", "name": "Prod"},
+            ]
+        }
+
+        with pytest.raises(ConfigError, match="Duplicate environment in config: stage"):
+            prepare_config(config)
+
+    def test_duplicate_environments_are_error(self, role_arn):
+        """
+        If the same ID appears twice in the list of environments, raise a ConfigError.
+        """
+        config = {
+            "role_arn": role_arn,
+            "environments": [
+                {"id": "stage", "name": "Staging"},
+                {"id": "stage", "name": "Staging"},
+                {"id": "prod", "name": "Prod"},
+                {"id": "prod", "name": "Prod"},
+                {"id": "dev", "name": "Dev"},
+            ]
+        }
+
+        with pytest.raises(
+            ConfigError, match="Duplicate environments in config: prod, stage"
+        ):
+            prepare_config(config)
+
+    def test_does_not_warn_on_unique_environments(self, role_arn):
+        """
+        If all the environments have unique IDs, no error is raised.
+        """
+        config = {
+            "role_arn": role_arn,
+            "environments": [
+                {"id": "stage", "name": "Staging"},
+                {"id": "prod", "name": "Prod"},
+                {"id": "dev", "name": "Dev"},
+            ]
+        }
+
+        prepare_config(config)
+
+    def test_uses_config_account_id(self):
+        config = {
+            "role_arn": "arn:aws:iam::1234567890:role/example-role",
+            "account_id": "1234567890"
+        }
+
+        prepare_config(config)
+        assert config["account_id"] == "1234567890"
+
+    def test_allows_overriding_account_id(self):
+        """
+        If there is no account_id in the initial config, but an override account_id
+        is supplied, that account_id is added to the config.
+        """
+        config = {"role_arn": "arn:aws:iam::1234567890:role/example-role"}
+        prepare_config(config, account_id="1234567890")
+        assert config["account_id"] == "1234567890"
+
+    def test_warns_if_account_id_conflict(self):
+        """
+        If there is an account_id in the initial config, and a different override
+        is supplied, then a warning is shown.
+        """
+        config = {
+            "role_arn": "arn:aws:iam::1234567890:role/example-role",
+            "account_id": "1111111111"
+        }
+        with pytest.warns(UserWarning, match="Preferring override account_id"):
+            prepare_config(config, account_id="1234567890")
+
+        assert config["account_id"] == "1234567890"
+
+    def test_does_not_warn_if_account_id_match(self):
+        """
+        If there is an account_id in the initial config, and it matches the override,
+        then no warning is shown.
+        """
+        config = {
+            "role_arn": "arn:aws:iam::1234567890:role/example-role",
+            "account_id": "1234567890"
+        }
+
+        with pytest.warns(None) as record:
+            prepare_config(config, account_id="1234567890")
+
+        assert len(record) == 0
+
+    def test_warns_if_account_if_does_not_match_role_arn(self):
+        """
+        If the account_id does not match the role ARN, then a warning is shown.
+        """
+        config = {
+            "role_arn": "arn:aws:iam::1234567890:role/example-role",
+            "account_id": "1111111111"
+        }
+        with pytest.warns(
+            UserWarning,
+            match="Account ID 1111111111 does not match the role"
+        ):
+            prepare_config(config)
+
+    def test_uses_account_id_from_role_if_none_specified(self):
+        """
+        If the account_id is not explicitly specified, the one in the role ARN is used.
+        """
+        config = {
+            "role_arn": "arn:aws:iam::1234567890:role/example-role",
+        }
+        prepare_config(config)
+
+        assert config["account_id"] == "1234567890"
+
+
+class TestProject:
+    def test_image_repositories(self, role_arn, project_id):
+        config = {
+            "image_repositories": [
+                {
+                    "id": "repo1",
+                    "services": ["service1a", "service1b"],
+                    "account_id": "1111111111",
+                    "region_name": "us-east-1",
+                    "namespace": "org.wellcome",
+                    "role_arn": "arn:aws:iam::1111111111:role/publisher-role"
+                },
+                {
+                    "id": "repo2",
+                    "services": ["service2a", "service2b", "service2c"]
+                },
+                {
+                    "id": "repo3",
+                    "services": ["service3a"]
+                }
+            ],
+            "role_arn": role_arn,
+            "account_id": "1234567890",
+            "namespace": "edu.self",
+            "region_name": "eu-west-1",
+        }
+
+        project = Project(
+            project_id=project_id,
+            config=config,
+            release_store=MemoryReleaseStore()
+        )
+
+        assert project.image_repositories == {
+            "repo1": {
+                "repository_name": "org.wellcome/repo1",
+                "services": ["service1a", "service1b"],
+                "account_id": "1111111111",
+                "region_name": "us-east-1",
+                "role_arn": "arn:aws:iam::1111111111:role/publisher-role",
+            },
+            "repo2": {
+                "repository_name": "edu.self/repo2",
+                "services": ["service2a", "service2b", "service2c"],
+                "account_id": "1234567890",
+                "region_name": "eu-west-1",
+                "role_arn": role_arn,
+            },
+            "repo3": {
+                "repository_name": "edu.self/repo3",
+                "services": ["service3a"],
+                "account_id": "1234567890",
+                "region_name": "eu-west-1",
+                "role_arn": role_arn,
+            },
+        }
+
+    def test_environment_names(self, role_arn, project_id):
+        config = {
+            "environments": [
+                {"id": "stage", "name": "Staging"},
+                {"id": "prod", "name": "Prod"},
+            ],
+            "role_arn": role_arn,
+            "account_id": "1234567890",
+            "namespace": "edu.self",
+            "region_name": "eu-west-1",
+        }
+
+        project = Project(
+            project_id=project_id,
+            config=config,
+            release_store=MemoryReleaseStore()
+        )
+
+        assert project.environment_names == {"stage": "Staging", "prod": "Prod"}
+
+    def test_get_release(self, role_arn, project_id):
+        releases = [
+            {
+                "release_id": f"release-{i}",
+                "project_id": project_id,
+                "date_created": datetime.datetime(2001, 1, i).isoformat(),
+                "last_date_deployed": datetime.datetime.now().isoformat()
+            }
+            for i in range(1, 10)
+        ]
+
+        release_store = MemoryReleaseStore()
+
+        for r in releases:
+            release_store.put_release(r)
+
+        project = Project(
+            project_id=project_id,
+            config={"role_arn": role_arn},
+            release_store=release_store
+        )
+
+        assert project.get_release("latest") == releases[-1]
+
+        for r in releases:
+            assert project.get_release(release_id=r["release_id"]) == r

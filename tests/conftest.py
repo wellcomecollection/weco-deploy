@@ -1,4 +1,5 @@
 import os
+import secrets
 
 import boto3
 import moto
@@ -8,6 +9,16 @@ import pytest
 @pytest.fixture(scope="session")
 def region_name():
     return "eu-west-1"
+
+
+@pytest.fixture()
+def project_id():
+    return f"project-{secrets.token_hex()}"
+
+
+@pytest.fixture()
+def role_arn():
+    return f"arn:aws:iam::1234567890:role/role-{secrets.token_hex()}"
 
 
 @pytest.fixture(scope="session")
