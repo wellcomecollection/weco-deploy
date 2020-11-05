@@ -151,7 +151,7 @@ def test_show_deployments(project_id, release_store, wellcome_project_file):
         ["--project-file", wellcome_project_file, "show-deployments"]
     )
 
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
     assert len(result.output.splitlines()) == 7  # 2 header + 5 deployments
     assert "No description provided" not in result.output
 
@@ -161,7 +161,7 @@ def test_show_deployments(project_id, release_store, wellcome_project_file):
         ["--project-file", wellcome_project_file, "show-deployments", "release-1"]
     )
 
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
     assert len(result.output.splitlines()) == 4  # 2 header + 2 deployments
     assert "release-2" not in result.output
 
@@ -171,5 +171,14 @@ def test_show_deployments(project_id, release_store, wellcome_project_file):
         ["--project-file", wellcome_project_file, "show-deployments", "--limit=3"]
     )
 
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
     assert len(result.output.splitlines()) == 5  # 2 header + 3 deployments
+
+    # Check that we can filter by environment
+    result = runner.invoke(
+        cli,
+        ["--project-file", wellcome_project_file, "show-deployments", "--environment-id=staging"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert len(result.output.splitlines()) == 3  # 2 header + 1 deployment

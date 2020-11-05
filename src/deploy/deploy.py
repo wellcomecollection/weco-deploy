@@ -461,9 +461,10 @@ def show_release(ctx, release_id):
 
 @cli.command()
 @click.argument('release_id', required=False)
+@click.option('--environment-id', required=False)
 @click.option('--limit', required=False, default=10)
 @click.pass_context
-def show_deployments(ctx, release_id, limit):
+def show_deployments(ctx, release_id, environment_id, limit):
     project = ctx.obj['project']
 
     rows = []
@@ -476,7 +477,11 @@ def show_deployments(ctx, release_id, limit):
         "description"
     ]
 
-    for deployment in project.get_deployments(release_id=release_id, limit=limit):
+    for deployment in project.get_deployments(
+        release_id=release_id,
+        environment_id=environment_id,
+        limit=limit
+    ):
         rows.append(
             [
                 deployment["release_id"],
