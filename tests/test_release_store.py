@@ -73,11 +73,11 @@ class ReleaseStoreTestsMixin:
             for r in releases:
                 release_store.put_release(r)
 
-            assert release_store.get_recent_releases(count=3) == [
+            assert release_store.get_recent_releases(limit=3) == [
                 releases[-1], releases[-2], releases[-3]
             ]
 
-            assert release_store.get_recent_releases(count=5) == [
+            assert release_store.get_recent_releases(limit=5) == [
                 releases[-1], releases[-2], releases[-3], releases[-4], releases[-5]
             ]
 
@@ -126,22 +126,22 @@ class ReleaseStoreTestsMixin:
             for r in releases:
                 release_store.put_release(r)
 
-            resp = release_store.get_recent_deployments(count=0)
+            resp = release_store.get_recent_deployments(limit=0)
             assert resp == []
 
-            resp = release_store.get_recent_deployments(count=4)
+            resp = release_store.get_recent_deployments(limit=4)
             assert [d["id"] for d in resp] == ["10", "9", "8", "7"]
 
-            resp = release_store.get_recent_deployments(count=6)
+            resp = release_store.get_recent_deployments(limit=6)
             assert [d["id"] for d in resp] == ["10", "9", "8", "7", "6", "5"]
 
             resp = release_store.get_recent_deployments(environment="staging")
             assert [d["id"] for d in resp] == ["10", "8", "5", "3"]
 
-            resp = release_store.get_recent_deployments(environment="staging", count=4)
+            resp = release_store.get_recent_deployments(environment="staging", limit=4)
             assert [d["id"] for d in resp] == ["10", "8", "5", "3"]
 
-            resp = release_store.get_recent_deployments(count=1, environment="prod")
+            resp = release_store.get_recent_deployments(environment="prod", limit=1)
             assert [d["id"] for d in resp] == ["9"]
 
     def test_can_add_deployment(self, project_id):

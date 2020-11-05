@@ -286,13 +286,15 @@ class Project:
         if release_id is not None:
             release = self.release_store.get_release(release_id)
 
+            # TODO: I think the release ID is already stored on the deployments.
+            # Can we remove this loop?
             for d in release["deployments"]:
-                d["release_id"] = release_id
+                assert d["release_id"] == release_id
 
-            deployments = release_id["deployments"]
+            deployments = release["deployments"]
         else:
             deployments = self.release_store.get_recent_deployments(
-                environment_id=environment_id,
+                environment=environment_id,
                 limit=limit
             )
 
@@ -603,6 +605,9 @@ class Project:
 
         deployment = self._create_deployment(environment_id, deployment_details, description)
 
-        self.release_store.add_deployment(release['release_id'], deployment)
+        self.release_store.add_deployment(
+            release_id=release['release_id'],
+            deployment=deployment
+        )
 
         return deployment

@@ -48,9 +48,9 @@ class ReleaseStore(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_recent_releases(self, *, count):
+    def get_recent_releases(self, *, limit):
         """
-        Return the most recent ``count`` releases, as sorted by creation date.
+        Return the most recent ``limit`` releases, as sorted by creation date.
         """
         pass
 
@@ -59,12 +59,12 @@ class ReleaseStore(abc.ABC):
         Return the most recent release, as sorted by creation date.
         """
         try:
-            return self.get_recent_releases(count=1)[0]
+            return self.get_recent_releases(limit=1)[0]
         except IndexError:
             raise ReleaseNotFoundError("There are no releases yet")
 
     @abc.abstractmethod
-    def get_recent_deployments(self, *, environment=None, count=10):
+    def get_recent_deployments(self, *, environment=None, limit=10):
         """
         Return the most recent ``limit`` deployments in a given environment.
         """
@@ -97,15 +97,15 @@ class MemoryReleaseStore(ReleaseStore):
         except KeyError:
             raise ReleaseNotFoundError(release_id)
 
-    def get_recent_releases(self, *, count):
+    def get_recent_releases(self, *, limit):
         sorted_releases = sorted(
             self.cache.values(),
             key=lambda c: c["date_created"],
             reverse=True
         )
-        return sorted_releases[:count]
+        return sorted_releases[:limit]
 
-    def get_recent_deployments(self, *, environment=None, count=10):
+    def get_recent_deployments(self, *, environment=None, limit=10):
         deployments = []
 
         for release in self.cache.values():
@@ -118,7 +118,7 @@ class MemoryReleaseStore(ReleaseStore):
             deployments,
             key=lambda d: d["date_created"],
             reverse=True
-        )[:count]
+        )[:limit]
 
     def add_deployment(self, *, release_id, deployment):
         self.cache[release_id]["deployments"].append(deployment)
@@ -162,13 +162,13 @@ class DynamoReleaseStore(ReleaseStore):
         except KeyError:
             raise ReleaseNotFoundError(release_id)
 
-    def get_recent_releases(self, *, count):
+    def get_recent_releases(self, *, limit):
         # The GSI project_gsi uses date_created as a range key, so we can
         # sort by the contents of this column.
         query_resp = self.table.query(
             IndexName="project_gsi",
             ScanIndexForward=False,
-            Limit=count,
+            Limit=limit,
             # Note: as far as I know, this expression is a no-op -- everything
             # in a given table will have the same release ID.  We need to have
             # a KeyConditionExpression for a Query to work, and we need a Query
@@ -178,7 +178,7 @@ class DynamoReleaseStore(ReleaseStore):
 
         return query_resp["Items"]
 
-    def get_recent_deployments(self, *, environment=None, count=10):
+    def get_recent_deployments(self, *, environment=None, limit=10):
         known_deployments = []
 
         params = {
@@ -194,7 +194,7 @@ class DynamoReleaseStore(ReleaseStore):
 
         items_seen = 0
 
-        while len(known_deployments) < count or items_seen < count:
+        while len(known_deployments) < limit or items_seen < limit:
             resp = self.table.query(**params)
 
             for release in resp["Items"]:
@@ -246,7 +246,7 @@ class DynamoReleaseStore(ReleaseStore):
         #
         # We know we have the last N deployments with no gaps, but beyond
         # that we can't be sure.
-        return known_deployments[:count]
+        return known_deployments[:limit]
 
     def add_deployment(self, *, release_id, deployment):
         self.table.update_item(
