@@ -83,3 +83,66 @@ def test_show_release(project_id, release_store, wellcome_project_file):
 
     assert result.exit_code == 0, result.output
     assert json.loads(result.output) == releases[0]
+
+
+def test_show_deployments(project_id, release_store, wellcome_project_file):
+    releases = [
+        {
+            "release_id": "release-1",
+            "project_id": project_id,
+            "date_created": datetime.datetime(2001, 1, 1).isoformat(),
+            "last_date_deployed": datetime.datetime.now().isoformat(),
+            "deployments": [
+                {
+                    "release_id": "release-1",
+                    "environment": "prod",
+                    "date_created": datetime.datetime(2001, 1, 1).isoformat(),
+                    "requested_by": "role/prod-ops",
+                    "description": "No description provided",
+                },
+                {
+                    "release_id": "release-1",
+                    "environment": "staging",
+                    "date_created": datetime.datetime(2001, 1, 2).isoformat(),
+                    "requested_by": "role/staging-peeps",
+                    "description": "Deploy release 1 to staging",
+                },
+            ]
+        },
+        {
+            "release_id": "release-2",
+            "project_id": project_id,
+            "date_created": datetime.datetime(2002, 2, 1).isoformat(),
+            "last_date_deployed": datetime.datetime.now().isoformat(),
+            "deployments": [
+                {
+                    "release_id": "release-2",
+                    "environment": "prod",
+                    "date_created": datetime.datetime(2002, 2, 1).isoformat(),
+                    "requested_by": "role/prod-ops",
+                    "description": "No description provided",
+                },
+                {
+                    "release_id": "release-2",
+                    "environment": "prod",
+                    "date_created": datetime.datetime(2002, 2, 2).isoformat(),
+                    "requested_by": "role/prod-ops",
+                    "description": "Redeploy to prod",
+                },
+            ]
+        },
+    ]
+
+    for r in releases:
+        release_store.put_release(r)
+
+    runner = CliRunner()
+
+    # Check that we can see a list of deployments
+    result = runner.invoke(
+        cli,
+        ["--project-file", wellcome_project_file, "show-deployments"]
+    )
+
+    assert result.exit_code == 0
+    assert len(result.output.splitlines()) == 6  # 2 header + 4 deployments
