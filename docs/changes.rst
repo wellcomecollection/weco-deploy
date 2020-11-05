@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.6.4 - 2020-11-05
+------------------
+
+Internal refactoring to improve testing, plus fixing bugs in the ``show-deployments`` command.
+
+------------------
 5.6.3 - 2020-11-05
 ------------------
 
