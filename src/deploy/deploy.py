@@ -498,13 +498,10 @@ def show_deployments(ctx, release_id, environment_id, limit):
 
 
 @cli.command()
-@click.option('--label', '-l', help="The label to show (e.g., latest')")
+@click.option("--label", help="The label to show", default="latest", show_default=True)
 @click.pass_context
 def show_images(ctx, label):
     project = ctx.obj['project']
-
-    if not label:
-        label = 'latest'
 
     images = project.get_images(label)
 
@@ -516,12 +513,9 @@ def show_images(ctx, label):
         "tag",
     ]
 
-    for image_id, ref_tags in images.items():
-        if ref_tags:
-            # It's possible to get multiple ref tags if the same image is published
-            # at different Git commits, but there are no code changes for this image
-            # between the two commits.  If so, choose one arbitrarily.
-            rows.append([image_id, label, ref_tags.pop()])
+    for image_id, ref_tag in images.items():
+        if ref_tag:
+            rows.append([image_id, label, ref_tag])
         else:
             rows.append([image_id, "-", "-"])
 

@@ -1,50 +1,11 @@
-import hashlib
 import json
-from random import random
 
 from botocore.exceptions import ClientError
 import moto
 import pytest
 
 from deploy import ecr
-
-
-# Taken from https://github.com/rubelw/mymoto/blob/e43ef43db676058d08855588dd52419a3554e336/moto/tests/test_ecr/test_ecr_boto3.py#L18-L21
-def _create_image_digest(contents=None):
-    if not contents:
-        contents = "docker_image{0}".format(int(random() * 10 ** 6))
-    return "sha256:%s" % hashlib.sha256(contents.encode("utf-8")).hexdigest()
-
-
-# Taken from https://github.com/rubelw/mymoto/blob/e43ef43db676058d08855588dd52419a3554e336/moto/tests/test_ecr/test_ecr_boto3.py#L24-L52
-def _create_image_manifest():
-    return {
-        "schemaVersion": 2,
-        "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-        "config": {
-            "mediaType": "application/vnd.docker.container.image.v1+json",
-            "size": 7023,
-            "digest": _create_image_digest("config"),
-        },
-        "layers": [
-            {
-                "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-                "size": 32654,
-                "digest": _create_image_digest("layer1"),
-            },
-            {
-                "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-                "size": 16724,
-                "digest": _create_image_digest("layer2"),
-            },
-            {
-                "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-                "size": 73109,
-                # randomize image digest
-                "digest": _create_image_digest(),
-            },
-        ],
-    }
+from utils import create_image_manifest
 
 
 class TestGetRefTagsForImage:
@@ -67,7 +28,7 @@ class TestGetRefTagsForImage:
         """
         We can store an image in ECR, then retrieve the ref tags on it.
         """
-        manifest = _create_image_manifest()
+        manifest = create_image_manifest()
 
         ecr_client.create_repository(repositoryName="example_worker")
         ecr_client.put_image(
@@ -115,7 +76,7 @@ class TestGetRefTagsForImage:
         ecr_client.put_image(
             registryId="1234567890",
             repositoryName="example_worker",
-            imageManifest=json.dumps(_create_image_manifest()),
+            imageManifest=json.dumps(create_image_manifest()),
             imageTag="latest",
         )
 
@@ -131,7 +92,7 @@ class TestGetRefTagsForImage:
 @moto.mock_sts()
 @moto.mock_iam()
 def test_get_ref_tags_for_repositories(ecr_client, region_name):
-    manifest1 = _create_image_manifest()
+    manifest1 = create_image_manifest()
     ecr_client.create_repository(repositoryName="example_worker1")
     ecr_client.put_image(
         registryId="1111111111",
@@ -146,7 +107,7 @@ def test_get_ref_tags_for_repositories(ecr_client, region_name):
         imageTag="ref.111",
     )
 
-    manifest2 = _create_image_manifest()
+    manifest2 = create_image_manifest()
     ecr_client.create_repository(repositoryName="example_worker2")
     ecr_client.put_image(
         registryId="2222222222",
