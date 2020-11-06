@@ -8,6 +8,7 @@ import pytest
 
 from deploy.deploy import cli
 from deploy.release_store import DynamoReleaseStore
+from utils import create_image_manifest
 
 
 @pytest.fixture
@@ -174,11 +175,42 @@ def test_show_deployments(project_id, release_store, wellcome_project_file):
     assert result.exit_code == 0, result.output
     assert len(result.output.splitlines()) == 5  # 2 header + 3 deployments
 
-    # Check that we can filter by environment
+
+def test_show_images(wellcome_project_file, release_store, ecr_client, role_arn):
+    runner = CliRunner()
+
+    ecr_client.create_repository(repositoryName="uk.ac.wellcome/repo1")
+    ecr_client.create_repository(repositoryName="uk.ac.wellcome/repo2")
+
+    for tag in ("latest", "qa"):
+        manifest = create_image_manifest()
+        ecr_client.put_image(
+            repositoryName="uk.ac.wellcome/repo1",
+            imageManifest=json.dumps(manifest),
+            imageTag=tag,
+        )
+        ecr_client.put_image(
+            repositoryName="uk.ac.wellcome/repo1",
+            imageManifest=json.dumps(manifest),
+            imageTag=f"ref.repo1_{tag}",
+        )
+
+    # Check that if a label isn't supplied, we get "latest"
     result = runner.invoke(
         cli,
-        ["--project-file", wellcome_project_file, "show-deployments", "--environment-id=staging"]
+        ["--project-file", wellcome_project_file, "show-images"]
     )
 
-    assert result.exit_code == 0, result.output
-    assert len(result.output.splitlines()) == 3  # 2 header + 1 deployment
+    assert result.exit_code == 0
+    assert len(result.output.splitlines()) == 4  # 2 header + 2 images
+    assert "ref.repo1_latest" in result.output
+
+    # Now check that we can supply --label to see a different set of images
+    result = runner.invoke(
+        cli,
+        ["--project-file", wellcome_project_file, "show-images", "--label=qa"]
+    )
+
+    assert result.exit_code == 0
+    assert len(result.output.splitlines()) == 4  # 2 header + 2 images
+    assert "ref.repo1_qa" in result.output

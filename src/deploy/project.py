@@ -465,10 +465,28 @@ class Project:
         }
 
     def get_images(self, from_label):
-        return ecr.get_ref_tags_for_repositories(
+        """
+        Returns a dict (image id) -> (Git ref tag).
+
+        Note: a single Docker image may have multiple ref tags, so the ref tag
+        is chosen arbitrarily.
+        """
+        ref_tags_resp = ecr.get_ref_tags_for_repositories(
             image_repositories=self.image_repositories,
             tag=from_label
         )
+
+        # An image might have multiple ref tags if it was pushed at multiple
+        # Git commits with the same code.  In this case, choose a ref arbitrarily.
+        result = {}
+
+        for image_id, ref_tags in ref_tags_resp.items():
+            try:
+                result[image_id] = ref_tags.pop()
+            except KeyError:  # No images
+                result[image_id] = None
+
+        return result
 
     def _prepare_release(self, description, release_images):
         previous_release = self.release_store.get_latest_release()
