@@ -26,6 +26,10 @@ ROOT = subprocess.check_output([
 NAME = "weco-deploy"
 
 
+def docker(*args):
+    subprocess.check_call(["docker"] + list(args))
+
+
 if __name__ == '__main__':
     tools.git('config', 'user.name', 'Buildkite on behalf of Wellcome Collection')
     tools.git('config', 'user.email', 'wellcomedigitalplatform@wellcome.ac.uk')
@@ -40,28 +44,26 @@ if __name__ == '__main__':
 
     image_name = "wellcome/%s:%s" % (NAME, tools.latest_version())
 
-    subprocess.check_call([
-        "docker", "build",
-        "--tag", image_name, ROOT
-    ])
+    docker("build", "--tag", image_name, ROOT)
 
     if has_release and on_master:
         # Log in to Docker Hub & push.  Be careful about this subprocess call -- if it
         # errors, the default exception would print our password to stderr.
         # See https://alexwlchan.net/2018/05/beware-logged-errors/
         try:
-            subprocess.check_call([
-                "docker", "login",
+            docker(
+                "login",
                 "--username", "wellcometravis",
                 "--password", os.environ["DOCKER_HUB_PASSWORD"]
-            ])
+            )
 
-            subprocess.check_call([
-                "docker", "build",
-                "--tag", image_name, ROOT
-            ])
+            docker("build", "--tag", image_name, ROOT)
+            docker("push", image_name)
 
-            subprocess.check_call(["docker", "push", image_name])
+            ecr_image_name = "760097843905.dkr.ecr.eu-west-1.amazonaws.com/%s" % image_name
+            docker("tag", image_name, ecr_image_name)
+            docker("push", ecr_image_name)
+
         except subprocess.CalledProcessError as err:
             print("ERROR: %r" % err)
             sys.exit(1)
