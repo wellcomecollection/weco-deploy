@@ -31,7 +31,7 @@ steps:
             - PYPI_USERNAME=wellcomedigitalplatform
             - PYPI_PASSWORD
   - wait
-  - label: "docker hub publish"
+  - label: "docker hub and ECR publish"
     if: build.branch == "master"
     plugins:
       - seek-oss/aws-sm#v2.1.0:
