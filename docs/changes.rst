@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.6.6 - 2020-11-18
+------------------
+
+weco-deploy is now published to our private ECR registry as well as Docker Hub.
+
+------------------
 5.6.5 - 2020-11-06
 ------------------
 
