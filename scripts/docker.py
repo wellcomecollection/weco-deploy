@@ -59,7 +59,7 @@ if __name__ == '__main__':
 
             docker("build", "--tag", image_name, ROOT)
             docker("push", image_name)
-            
+
             subprocess.check_call("eval $(aws ecr get-login --no-include-email)", shell=True)
 
             ecr_image_name = "760097843905.dkr.ecr.eu-west-1.amazonaws.com/%s" % image_name
