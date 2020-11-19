@@ -547,6 +547,7 @@ class Project:
 
         try:
             matched_image = self.image_repositories[image_id]
+            namespace = matched_image["namespace"]
             ecr = self._ecr(
                 account_id=matched_image["account_id"],
                 region_name=matched_image["region_name"],
@@ -556,9 +557,10 @@ class Project:
             # TODO: Does it make sense to create an ECR client if we don't
             # have an ECR repo to tag in?
             ecr = self._ecr()
+            namespace = self.namespace
 
         return ecr.tag_image(
-            namespace=self.namespace,
+            namespace=namespace,
             image_id=image_id,
             tag=old_tag,
             new_tag=new_tag
