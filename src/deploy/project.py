@@ -489,7 +489,7 @@ class Project:
         return result
 
     def _prepare_release(self, description, release_images):
-        previous_release = self.release_store.get_latest_release()
+        previous_release = self.release_store.get_most_recent_release()
 
         new_release = self._create_release(
             description=description,
