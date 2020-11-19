@@ -205,15 +205,13 @@ class Project:
         -   account_id
         -   region_name
         -   role_arn
-        -   repository_name
+        -   namespace
         -   services
 
         """
         result = {}
 
         for repo in self.config.get("image_repositories", []):
-            namespace = repo.get("namespace", self.namespace)
-
             # We should have uniqueness by the checks in prepare_config(), but
             # it doesn't hurt to check.
             assert repo["id"] not in result, repo["id"]
@@ -222,7 +220,7 @@ class Project:
                 "account_id": repo.get("account_id", self.account_id),
                 "region_name": repo.get("region_name", self.region_name),
                 "role_arn": repo.get("role_arn", self.role_arn),
-                "repository_name": f"{namespace}/{repo['id']}",
+                "namespace": repo.get("namespace", self.namespace),
                 "services": repo.get("services", []),
             }
 
