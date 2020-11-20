@@ -205,15 +205,13 @@ class Project:
         -   account_id
         -   region_name
         -   role_arn
-        -   repository_name
+        -   namespace
         -   services
 
         """
         result = {}
 
         for repo in self.config.get("image_repositories", []):
-            namespace = repo.get("namespace", self.namespace)
-
             # We should have uniqueness by the checks in prepare_config(), but
             # it doesn't hurt to check.
             assert repo["id"] not in result, repo["id"]
@@ -222,7 +220,7 @@ class Project:
                 "account_id": repo.get("account_id", self.account_id),
                 "region_name": repo.get("region_name", self.region_name),
                 "role_arn": repo.get("role_arn", self.role_arn),
-                "repository_name": f"{namespace}/{repo['id']}",
+                "namespace": repo.get("namespace", self.namespace),
                 "services": repo.get("services", []),
             }
 
@@ -489,7 +487,7 @@ class Project:
         return result
 
     def _prepare_release(self, description, release_images):
-        previous_release = self.release_store.get_latest_release()
+        previous_release = self.release_store.get_most_recent_release()
 
         new_release = self._create_release(
             description=description,
@@ -549,6 +547,7 @@ class Project:
 
         try:
             matched_image = self.image_repositories[image_id]
+            namespace = matched_image["namespace"]
             ecr = self._ecr(
                 account_id=matched_image["account_id"],
                 region_name=matched_image["region_name"],
@@ -558,9 +557,10 @@ class Project:
             # TODO: Does it make sense to create an ECR client if we don't
             # have an ECR repo to tag in?
             ecr = self._ecr()
+            namespace = self.namespace
 
         return ecr.tag_image(
-            namespace=self.namespace,
+            namespace=namespace,
             image_id=image_id,
             tag=old_tag,
             new_tag=new_tag

@@ -129,19 +129,16 @@ def test_get_ref_tags_for_repositories(ecr_client, region_name):
             "account_id": "1111111111",
             "region_name": region_name,
             "role_arn": "arn:aws:iam::1111111111:role/example-role",
-            "repository_name": "example_worker1",
         },
         "example_worker2": {
             "account_id": "2222222222",
             "region_name": region_name,
             "role_arn": "arn:aws:iam::2222222222:role/example-role",
-            "repository_name": "example_worker2",
         },
         "example_worker3": {
             "account_id": "3333333333",
             "region_name": region_name,
             "role_arn": "arn:aws:iam::3333333333:role/example-role",
-            "repository_name": "example_worker3",
         },
     }
 

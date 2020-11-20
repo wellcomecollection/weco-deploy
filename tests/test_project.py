@@ -373,21 +373,21 @@ class TestProject:
 
         assert project.image_repositories == {
             "repo1": {
-                "repository_name": "org.wellcome/repo1",
+                "namespace": "org.wellcome",
                 "services": ["service1a", "service1b"],
                 "account_id": "1111111111",
                 "region_name": "us-east-1",
                 "role_arn": "arn:aws:iam::1111111111:role/publisher-role",
             },
             "repo2": {
-                "repository_name": "edu.self/repo2",
+                "namespace": "edu.self",
                 "services": ["service2a", "service2b", "service2c"],
                 "account_id": "1234567890",
                 "region_name": "eu-west-1",
                 "role_arn": role_arn,
             },
             "repo3": {
-                "repository_name": "edu.self/repo3",
+                "namespace": "edu.self",
                 "services": ["service3a"],
                 "account_id": "1234567890",
                 "region_name": "eu-west-1",

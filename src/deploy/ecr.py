@@ -18,6 +18,13 @@ def create_client(*, account_id, region_name, role_arn):
     return session.client("ecr")
 
 
+def _get_repository_name(namespace, image_id):
+    if namespace:
+        return f"{namespace}/{image_id}"
+    else:
+        return image_id
+
+
 class Ecr:
     def __init__(self, account_id, region_name, role_arn):
         self.account_id = account_id
@@ -39,12 +46,8 @@ class Ecr:
 
         return open(release_file).read().strip()
 
-    @staticmethod
-    def _get_repository_name(namespace, image_id):
-        return f"{namespace}/{image_id}"
-
     def _get_full_repository_uri(self, namespace, image_id, tag):
-        return f"{self.ecr_base_uri}/{Ecr._get_repository_name(namespace, image_id)}:{tag}"
+        return f"{self.ecr_base_uri}/{_get_repository_name(namespace, image_id)}:{tag}"
 
     def publish_image(self, namespace, image_id):
         local_image_tag = Ecr._get_release_image_tag(image_id)
@@ -63,7 +66,7 @@ class Ecr:
         return remote_image_name, remote_image_tag, local_image_tag
 
     def tag_image(self, namespace, image_id, tag, new_tag):
-        repository_name = Ecr._get_repository_name(namespace, image_id)
+        repository_name = _get_repository_name(namespace, image_id)
 
         result = self.ecr.batch_get_image(
             registryId=self.account_id,
@@ -178,7 +181,7 @@ def get_ref_tags_for_repositories(*, image_repositories, tag):
             "account_id": (account_id),
             "region_name": (region_name),
             "role_arn": (role_arn),
-            "repository_name": (repository_name),
+            "namespace": (namespace) or None,
         }
 
     Returns a dict (id) -> set(ref_tags)
@@ -190,6 +193,8 @@ def get_ref_tags_for_repositories(*, image_repositories, tag):
         account_id = repo_details["account_id"]
         region_name = repo_details["region_name"]
         role_arn = repo_details["role_arn"]
+        namespace = repo_details.get("namespace", None)
+        repository_name = _get_repository_name(namespace, repo_id)
 
         ecr_client = create_client(
             account_id=account_id,
@@ -200,7 +205,7 @@ def get_ref_tags_for_repositories(*, image_repositories, tag):
         try:
             ref_uri = get_ref_tags_for_image(
                 ecr_client,
-                repository_name=repo_details["repository_name"],
+                repository_name=repository_name,
                 tag=tag,
                 account_id=account_id
             )
