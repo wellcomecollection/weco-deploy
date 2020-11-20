@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.6.8 - 2020-11-20
+------------------
+
+Fix inability to prepare release, and missing namespace on image_repositories
+
+------------------
 5.6.7 - 2020-11-18
 ------------------
 
