@@ -411,12 +411,12 @@ class Project:
 
                 for task in tasks:
                     task_tags = parse_aws_tags(task["tags"])
+                    task_arn = task["taskArn"]
 
                     task_name = task_tags.get("deployment:service")
                     deployment_label = task_tags.get("deployment:label")
 
                     if deployment_label != service_deployment_label:
-                        task_arn = task["taskArn"]
                         print("")
                         print(f"Task in {task_name} has the wrong deployment label:")
                         print(f"Wanted:   {service_deployment_label}")
