@@ -250,8 +250,18 @@ class Project:
             role_arn=role_arn or self.role_arn
         )
 
+    def _ecs(self, *, cached=True, **kwargs):
+        if cached:
+            return self._ecs_cached(**kwargs)
+        return self._ecs_raw(**kwargs)
+
     @functools.lru_cache()
-    def _ecs(self, region_name=None, role_arn=None):
+    def _ecs_cached(self, **kwargs):
+        return self._ecs_raw(**kwargs)
+
+    # We can't use the __wrapped__ property of an lru_cached function
+    # when that function is a class method
+    def _ecs_raw(self, region_name=None, role_arn=None):
         return Ecs(
             region_name=region_name or self.region_name,
             role_arn=role_arn or self.role_arn
@@ -342,11 +352,12 @@ class Project:
 
         return dict(result)
 
-    def get_ecs_services(self, release, environment_id):
+    def get_ecs_services(self, release, environment_id, cached=True):
         def _get_service(service):
             ecs = self._ecs(
                 region_name=service.get('region_name'),
-                role_arn=service.get('role_arn')
+                role_arn=service.get('role_arn'),
+                cached=cached
             )
 
             ecs_service = ecs.find_matching_service(
@@ -367,8 +378,6 @@ class Project:
             except KeyError:
                 continue
 
-            available_services = []
-
             services = matched_image.get('services', [])
 
             available_services = [_get_service(service) for service in services]
@@ -385,7 +394,7 @@ class Project:
         on the tasks within those services. We check that the desiredCount
         of tasks matches the running count of tasks.
         """
-        ecs_services = self.get_ecs_services(release, environment_id)
+        ecs_services = self.get_ecs_services(release, environment_id, cached=False)
 
         is_deployed = True
 
