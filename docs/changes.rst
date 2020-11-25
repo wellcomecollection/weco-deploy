@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.6.9 - 2020-11-25
+------------------
+
+Fix invalid cache that was causing deploy waiting to return early
+
+------------------
 5.6.8 - 2020-11-20
 ------------------
 
