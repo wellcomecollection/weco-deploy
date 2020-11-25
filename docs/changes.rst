@@ -4,6 +4,12 @@ Changelog
 
 This is a record of all releases of weco-deploy.
 
+-------------------
+5.6.10 - 2020-11-25
+-------------------
+
+Fix undefined variable when task is not yet running
+
 ------------------
 5.6.9 - 2020-11-25
 ------------------
