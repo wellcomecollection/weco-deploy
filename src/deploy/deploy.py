@@ -12,6 +12,7 @@ from tabulate import tabulate
 from . import git, iam
 from .pretty_printing import pprint_date
 from .project import Projects
+from .version_check import warn_if_not_latest_version
 
 DEFAULT_PROJECT_FILEPATH = ".wellcome_project"
 
@@ -30,6 +31,8 @@ LOGGING_ROOT = os.path.join(os.environ["HOME"], ".local", "share", "weco-deploy"
 @click.option('--dry-run', '-d', is_flag=True, help="Don't make changes.")
 @click.pass_context
 def cli(ctx, project_file, verbose, confirm, project_id, region_name, account_id, namespace, role_arn, dry_run):
+    warn_if_not_latest_version()
+
     try:
         projects = Projects(project_file)
     except FileNotFoundError:
