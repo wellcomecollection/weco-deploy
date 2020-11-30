@@ -27,4 +27,3 @@ def warn_if_not_latest_version():
         except Exception as e:
             click.echo(click.style("Error when checking for latest version:", fg="red"))
             click.echo(e)
-            pass
