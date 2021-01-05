@@ -42,9 +42,16 @@ if __name__ == '__main__':
     on_master = tools.is_ancestor(HEAD, MASTER)
     has_release = tools.has_release()
 
-    image_name = "wellcome/%s:%s" % (NAME, tools.latest_version())
+    major, minor, patch = tuple(map(int, tools.latest_version().split(".")))
+    tags = [
+        f"{major}.{minor}.{patch}",
+        f"{major}.{minor}",
+        f"{major}",
+    ]
+    image_names = ["wellcome/%s:%s" % (NAME, tag) for tag in tags]
+    local_image_name = image_names[0]
 
-    docker("build", "--tag", image_name, ROOT)
+    docker("build", "--tag", local_image_name, ROOT)
 
     if has_release and on_master:
         # Log in to Docker Hub & push.  Be careful about this subprocess call -- if it
@@ -56,15 +63,15 @@ if __name__ == '__main__':
                 "--username", "wellcometravis",
                 "--password", os.environ["DOCKER_HUB_PASSWORD"]
             )
-
-            docker("build", "--tag", image_name, ROOT)
-            docker("push", image_name)
-
             subprocess.check_call("eval $(aws ecr get-login --no-include-email)", shell=True)
 
-            ecr_image_name = "760097843905.dkr.ecr.eu-west-1.amazonaws.com/%s" % image_name
-            docker("tag", image_name, ecr_image_name)
-            docker("push", ecr_image_name)
+            for image_name in image_names:
+                docker("tag", local_image_name, image_name)
+                docker("push", image_name)
+
+                ecr_image_name = "760097843905.dkr.ecr.eu-west-1.amazonaws.com/%s" % image_name
+                docker("tag", local_image_name, ecr_image_name)
+                docker("push", ecr_image_name)
 
         except subprocess.CalledProcessError as err:
             print("ERROR: %r" % err)
