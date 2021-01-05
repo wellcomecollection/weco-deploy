@@ -240,6 +240,7 @@ def _deploy(project, release, environment_id, description, confirm=True):
 def deploy(ctx, release_id, environment_id, description, confirmation_wait_for, confirmation_interval):
     confirm = ctx.obj['confirm']
     project = ctx.obj['project']
+    verbose = ctx.obj['verbose']
 
     release = project.get_release(release_id)
 
@@ -256,11 +257,12 @@ def deploy(ctx, release_id, environment_id, description, confirmation_wait_for, 
         release=release,
         environment_id=environment_id,
         wait_for_seconds=confirmation_wait_for,
-        interval=confirmation_interval
+        interval=confirmation_interval,
+        verbose=verbose
     )
 
 
-def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval):
+def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval, verbose):
     total_time_waited = 0
     start_timer = time.perf_counter()
 
@@ -270,7 +272,7 @@ def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval
     click.echo(click.style(f"Checking deployment of {release_id} to {environment_id}", fg="yellow"))
     click.echo(click.style(f"Allowing {wait_for_seconds}s for deployment.", fg="yellow"))
 
-    while not project.is_release_deployed(release, environment_id):
+    while not project.is_release_deployed(release, environment_id, verbose):
         total_time_waited = int(time.perf_counter() - start_timer)
 
         exceeded_wait_time = total_time_waited >= wait_for_seconds

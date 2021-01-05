@@ -51,11 +51,11 @@ class Projects:
 
 
 def prepare_config(
-    config,
-    namespace=None,
-    role_arn=None,
-    region_name=None,
-    account_id=None
+        config,
+        namespace=None,
+        role_arn=None,
+        region_name=None,
+        account_id=None
 ):
     """
     Prepare the config.  Fill in overrides or defaults as necessary.
@@ -232,7 +232,6 @@ class Project:
         result = {}
 
         for env in self.config.get("environments", []):
-
             # We should have uniqueness by the checks in prepare_config(), but
             # it doesn't hurt to check.
             assert env["id"] not in result
@@ -388,7 +387,7 @@ class Project:
 
         return matched_services
 
-    def is_release_deployed(self, release, environment_id):
+    def is_release_deployed(self, release, environment_id, verbose=False):
         """
         Checks the `deployment:label` tag on a service matches the tags
         on the tasks within those services. We check that the desiredCount
@@ -396,11 +395,16 @@ class Project:
         """
         ecs_services = self.get_ecs_services(release, environment_id, cached=False)
 
+        def printv(str):
+            if verbose:
+                print(str)
+
         is_deployed = True
 
         for _, services in sorted(ecs_services.items()):
             for service in services:
                 service_tags = parse_aws_tags(service["response"]["tags"])
+                service_arn = service["response"]["serviceArn"]
                 service_deployment_label = service_tags["deployment:label"]
                 desired_task_count = service["response"]["desiredCount"]
                 ecs = self._ecs(
@@ -417,26 +421,26 @@ class Project:
                     deployment_label = task_tags.get("deployment:label")
 
                     if deployment_label != service_deployment_label:
-                        print("")
-                        print(f"Task in {task_name} has the wrong deployment label:")
-                        print(f"Wanted:   {service_deployment_label}")
-                        print(f"Actual:   {deployment_label}")
-                        print(f"Task ARN: {task_arn}")
+                        printv("")
+                        printv(f"Task in {task_name} has the wrong deployment label:")
+                        printv(f"Wanted:   {service_deployment_label}")
+                        printv(f"Actual:   {deployment_label}")
+                        printv(f"Task ARN: {task_arn}")
                         is_deployed = False
 
                     if task["lastStatus"] != "RUNNING":
-                        print("")
-                        print(f"Task in {task_name} has the wrong status:")
-                        print("Wanted:   RUNNING")
-                        print(f"Actual:   {task['lastStatus']}")
-                        print(f"Task ARN: {task_arn}")
+                        printv("")
+                        printv(f"Task in {task_name} has the wrong status:")
+                        printv("Wanted:   RUNNING")
+                        printv(f"Actual:   {task['lastStatus']}")
+                        printv(f"Task ARN: {task_arn}")
                         is_deployed = False
 
                 if len(tasks) < desired_task_count:
-                    print("")
-                    print(f"Not running the correct number of tasks in {service}:")
-                    print(f"Wanted: {desired_task_count}")
-                    print(f"Actual: {len(tasks)}")
+                    printv("")
+                    printv(f"Not running the correct number of tasks in {service_arn}:")
+                    printv(f"Wanted: {desired_task_count}")
+                    printv(f"Actual: {len(tasks)}")
                     is_deployed = False
 
         return is_deployed
