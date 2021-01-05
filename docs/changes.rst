@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.6.12 - 2021-01-05
+-------------------
+
+Only log task/service info when waiting for deploy if the verbose flag is set
+
+-------------------
 5.6.11 - 2020-11-30
 -------------------
 
