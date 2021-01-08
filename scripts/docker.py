@@ -36,7 +36,7 @@ if __name__ == '__main__':
     tools.add_ssh_origin()
 
     # Get latest metadata & code
-    tools.git('pull')
+    tools.git('pull', 'origin', 'master')
 
     HEAD = tools.hash_for_name('HEAD')
     MASTER = tools.hash_for_name('origin/master')
