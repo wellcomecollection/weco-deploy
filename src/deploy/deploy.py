@@ -324,8 +324,13 @@ def _display_release(release, from_label):
         #     {ecr_repo_uri}/{namespace}/{service}:ref.{git_commit}
         #
         prev_git_commit = "-------"
+        prev_release_images = None
+
         if prev_release is not None:
-            prev_git_commit = prev_release["images"].get(service, "").split(".")[-1][:7]
+            prev_release_images = prev_release["images"].get(service)
+
+        if prev_release_images is not None:
+            prev_git_commit = prev_release_images.split(".")[-1][:7]
 
         new_git_commit = image.split(".")[-1][:7]
 
