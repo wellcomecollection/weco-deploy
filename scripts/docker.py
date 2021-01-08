@@ -34,7 +34,12 @@ if __name__ == '__main__':
     tools.git('config', 'user.name', 'Buildkite on behalf of Wellcome Collection')
     tools.git('config', 'user.email', 'wellcomedigitalplatform@wellcome.ac.uk')
     tools.add_ssh_origin()
+
+    # Update tags to ensure we can calculate latest version correctly
     tools.git('fetch')
+    
+    # Dockerfile installs from local, ensure it uses latest version
+    tools.git('pull')
 
     HEAD = tools.hash_for_name('HEAD')
     MASTER = tools.hash_for_name('origin/master')
