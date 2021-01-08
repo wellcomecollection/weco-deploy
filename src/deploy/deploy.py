@@ -19,7 +19,6 @@ DEFAULT_PROJECT_FILEPATH = ".wellcome_project"
 LOGGING_ROOT = os.path.join(os.environ["HOME"], ".local", "share", "weco-deploy")
 
 
-
 @click.group()
 @click.version_option(version=current_version)
 @click.option('--project-file', '-f', default=DEFAULT_PROJECT_FILEPATH)
