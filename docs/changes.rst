@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.6.16 - 2021-01-08
+-------------------
+
+Fix issue with deploy_release step erroring
+
+-------------------
 5.6.15 - 2021-01-08
 -------------------
 
