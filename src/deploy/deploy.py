@@ -12,7 +12,7 @@ from tabulate import tabulate
 from . import git, iam
 from .pretty_printing import pprint_date
 from .project import Projects
-from .version_check import warn_if_not_latest_version
+from .version_check import warn_if_not_latest_version, current_version
 
 DEFAULT_PROJECT_FILEPATH = ".wellcome_project"
 
@@ -20,6 +20,7 @@ LOGGING_ROOT = os.path.join(os.environ["HOME"], ".local", "share", "weco-deploy"
 
 
 @click.group()
+@click.version_option(version=current_version)
 @click.option('--project-file', '-f', default=DEFAULT_PROJECT_FILEPATH)
 @click.option('--verbose', '-v', is_flag=True, help="Print verbose messages.")
 @click.option('--confirm', '-y', is_flag=True, help="Non-interactive deployment confirmation")
@@ -322,8 +323,13 @@ def _display_release(release, from_label):
         #     {ecr_repo_uri}/{namespace}/{service}:ref.{git_commit}
         #
         prev_git_commit = "-------"
+        prev_release_images = None
+
         if prev_release is not None:
-            prev_git_commit = prev_release["images"].get(service, "").split(".")[-1][:7]
+            prev_release_images = prev_release["images"].get(service)
+
+        if prev_release_images is not None:
+            prev_git_commit = prev_release_images.split(".")[-1][:7]
 
         new_git_commit = image.split(".")[-1][:7]
 
@@ -426,6 +432,7 @@ def update(ctx, release_id, service_ids, from_label):
 def release_deploy(ctx, from_label, environment_id, description, confirmation_wait_for, confirmation_interval):
     project = ctx.obj['project']
     confirm = ctx.obj['confirm']
+    verbose = ctx.obj['verbose']
 
     release = _prepare(
         project=project,
@@ -446,7 +453,8 @@ def release_deploy(ctx, from_label, environment_id, description, confirmation_wa
         release=release,
         environment_id=environment_id,
         wait_for_seconds=confirmation_wait_for,
-        interval=confirmation_interval
+        interval=confirmation_interval,
+        verbose=verbose
     )
 
 
