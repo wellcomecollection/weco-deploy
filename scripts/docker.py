@@ -34,7 +34,9 @@ if __name__ == '__main__':
     tools.git('config', 'user.name', 'Buildkite on behalf of Wellcome Collection')
     tools.git('config', 'user.email', 'wellcomedigitalplatform@wellcome.ac.uk')
     tools.add_ssh_origin()
-    tools.git('fetch')
+
+    # Get latest metadata & code
+    tools.git('pull')
 
     HEAD = tools.hash_for_name('HEAD')
     MASTER = tools.hash_for_name('origin/master')
