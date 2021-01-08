@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.6.15 - 2021-01-08
+-------------------
+
+Bump for release, fix docker script
+
+-------------------
 5.6.14 - 2021-01-08
 -------------------
 
