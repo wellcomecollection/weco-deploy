@@ -37,7 +37,7 @@ if __name__ == '__main__':
 
     # Update tags to ensure we can calculate latest version correctly
     tools.git('fetch')
-    
+
     # Dockerfile installs from local, ensure it uses latest version
     tools.git('pull')
 
