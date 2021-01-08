@@ -53,7 +53,6 @@ if __name__ == '__main__':
     image_names = ["wellcome/%s:%s" % (NAME, tag) for tag in tags]
     local_image_name = image_names[0]
 
-
     # Get latest code before we build
     tools.git('pull', 'origin', 'master')
 
