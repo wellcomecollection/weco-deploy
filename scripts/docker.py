@@ -35,8 +35,8 @@ if __name__ == '__main__':
     tools.git('config', 'user.email', 'wellcomedigitalplatform@wellcome.ac.uk')
     tools.add_ssh_origin()
 
-    # Get latest metadata & code
-    tools.git('pull', 'origin', 'master')
+    # Get latest metadata (can't pull here as need to keep RELEASE.rst to signify release)
+    tools.git('fetch')
 
     HEAD = tools.hash_for_name('HEAD')
     MASTER = tools.hash_for_name('origin/master')
@@ -52,6 +52,10 @@ if __name__ == '__main__':
     ]
     image_names = ["wellcome/%s:%s" % (NAME, tag) for tag in tags]
     local_image_name = image_names[0]
+
+
+    # Get latest code before we build
+    tools.git('pull', 'origin', 'master')
 
     docker("build", "--tag", local_image_name, ROOT)
 
