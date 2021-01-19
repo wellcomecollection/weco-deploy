@@ -10,7 +10,7 @@ from . import ecr, iam
 from .ecr import Ecr
 from .ecs import Ecs
 from .exceptions import ConfigError
-from .release_store import DynamoReleaseStore
+from .release_store import DynamoReleaseStore, ReleaseNotFoundError
 from .tags import parse_aws_tags
 
 DEFAULT_ECR_NAMESPACE = "uk.ac.wellcome"
@@ -500,7 +500,10 @@ class Project:
         return result
 
     def _prepare_release(self, description, release_images):
-        previous_release = self.release_store.get_most_recent_release()
+        try:
+            previous_release = self.release_store.get_most_recent_release()
+        except ReleaseNotFoundError:
+            previous_release = None
 
         new_release = self._create_release(
             description=description,
