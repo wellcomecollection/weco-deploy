@@ -485,5 +485,5 @@ class TestProject:
         project.get_images = patch_get_images
         prepared_release = project.prepare("stage", "Some description")
 
-        assert prepared_release["previous_release"] == None
+        assert prepared_release["previous_release"] is None
         assert prepared_release["new_release"]["images"] == get_images_return
