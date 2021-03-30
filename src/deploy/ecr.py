@@ -1,4 +1,6 @@
-from base64 import b64decode
+from abc import ABC, abstractmethod
+import base64
+import json
 import os
 
 from botocore.exceptions import ClientError
@@ -8,7 +10,7 @@ from .exceptions import EcrError
 from .commands import cmd
 
 
-def create_client(*, account_id, region_name, role_arn):
+def create_client(*, region_name, role_arn):
     session = iam.get_session(
         session_name="ReleaseToolEcr",
         role_arn=role_arn,
@@ -25,18 +27,138 @@ def _get_repository_name(namespace, image_id):
         return image_id
 
 
-class Ecr:
-    def __init__(self, account_id, region_name, role_arn):
-        self.account_id = account_id
+class AbstractEcr(ABC):
+    def __init__(self, *, resource):
+        self.resource = resource
+
+    @abstractmethod
+    def base_uri(self):
+        pass
+
+    def get_image_uri(self, *, namespace, image_id, tag):
+        repository_name = _get_repository_name(namespace, image_id)
+        return f"{self.base_uri}/{repository_name}:{tag}"
+
+    def create_client(self, *, region_name, role_arn):
+        session = iam.get_session(
+            session_name="ReleaseToolEcr",
+            role_arn=role_arn,
+            region_name=region_name
+        )
+
+        return session.client(self.resource)
+
+    @abstractmethod
+    def get_authorization_data(self):
+        """
+        Returns an "authorization token data object" that can be used to
+        authenticate with the local Docker client.
+        """
+        pass
+
+    def login(self):
+        """
+        Authenticates the local Docker client with ECR.
+        """
+        auth_data = self.get_authorization_data()
+        auth_token = base64.b64decode(auth_data["authorizationToken"]).decode()
+        username, password = auth_token.split(":")
+        command = [
+            "docker", "login", "--username", username, "--password", password,
+            auth_data["proxyEndpoint"]
+        ]
+
+        cmd(*command)
+
+    @abstractmethod
+    def get_image_manifests_for_tag(self, *, repository_name, image_tag):
+        """
+        Generates a list of image manifests for a given tag.
+        """
+        pass
+
+
+class EcrPrivate(AbstractEcr):
+    def __init__(self, *, account_id, region_name, role_arn):
+        super().__init__(resource="ecr")
+
         self.region_name = region_name
-        self.ecr = create_client(
-            account_id=account_id,
+        self.account_id = account_id
+        self.client = self.create_client(
             region_name=region_name,
             role_arn=role_arn
         )
 
+    @property
+    def base_uri(self):
+        return f"{self.account_id}.dkr.ecr.{self.region_name}.amazonaws.com"
+
+    @property
+    def registry_id(self):
+        return self.account_id
+
+    def get_authorization_data(self):
+        resp = self.client.get_authorization_token(
+            registryIds=[self.account_id]
+        )
+        assert len(resp["authorizationData"]) == 1
+        return resp["authorizationData"][0]
+
+    def get_image_manifests_for_tag(self, *, repository_name, image_tag):
+        resp = self.client.batch_get_image(
+            registryId=self.registry_id,
+            repositoryName=repository_name,
+            imageIds=[{"imageTag": image_tag}]
+        )
+
+        return [img["imageManifest"] for img in resp["images"]]
+
+
+class EcrPublic(AbstractEcr):
+    def __init__(self, *, gallery_id, role_arn):
+        super().__init__(resource="ecr-public")
+
+        self.gallery_id = gallery_id
+
+        self.client = self.create_client(
+            role_arn=role_arn,
+            # ECR Public is a global resource that lives in us-east-1,
+            # as far as I can tell.
+            region_name="us-east-1"
+        )
+
+    @property
+    def base_uri(self):
+        return f"public.ecr.aws/{self.gallery_id}"
+
+    def get_authorization_data(self):
+        resp = self.client.get_authorization_token()
+        return resp["authorizationData"]
+
+    def get_image_manifests_for_tag(self, *, repository_name, image_tag):
+        # ECR Public doesn't have an API call that returns the image manifest,
+        # so we have to go out to an experimental Docker feature.
+        # See https://docs.docker.com/engine/reference/commandline/manifest/
+        uri = f"public.ecr.aws/{self.gallery_id}/{repository_name}"
+        output = json.loads(cmd("docker", "manifest", "inspect", uri))
+
+        return [output]
+
+
+class Ecr:
+    def __init__(self, account_id, region_name, role_arn):
+        self.account_id = account_id
+        self.region_name = region_name
+        self.ecr = create_client(region_name=region_name, role_arn=role_arn)
+
         self.ecr_base_uri = (
             f"{self.account_id}.dkr.ecr.{self.region_name}.amazonaws.com"
+        )
+
+        self._underlying = EcrPrivate(
+            account_id=account_id,
+            region_name=region_name,
+            role_arn=role_arn
         )
 
     @staticmethod
@@ -46,15 +168,16 @@ class Ecr:
 
         return open(release_file).read().strip()
 
-    def _get_full_repository_uri(self, namespace, image_id, tag):
-        return f"{self.ecr_base_uri}/{_get_repository_name(namespace, image_id)}:{tag}"
-
     def publish_image(self, namespace, image_id):
         local_image_tag = Ecr._get_release_image_tag(image_id)
         local_image_name = f"{image_id}:{local_image_tag}"
 
         remote_image_tag = f"ref.{local_image_tag}"
-        remote_image_name = self._get_full_repository_uri(namespace, image_id, remote_image_tag)
+        remote_image_name = self._underlying.get_image_uri(
+            namespace=namespace,
+            image_id=image_id,
+            tag=remote_image_tag
+        )
 
         try:
             cmd('docker', 'tag', local_image_name, remote_image_name)
@@ -68,21 +191,18 @@ class Ecr:
     def tag_image(self, namespace, image_id, tag, new_tag):
         repository_name = _get_repository_name(namespace, image_id)
 
-        result = self.ecr.batch_get_image(
-            registryId=self.account_id,
-            repositoryName=repository_name,
-            imageIds=[
-                {"imageTag": tag}
-            ]
+        manifests = self._underlying.get_image_manifests_for_tag(
+            repository_name=repository_name,
+            image_tag=tag
         )
 
-        if len(result["images"]) == 0:
+        if len(manifests) == 0:
             raise RuntimeError(f"No matching images found for {repository_name}:{tag}!")
 
-        if len(result["images"]) > 1:
+        if len(manifests) > 1:
             raise RuntimeError(f"Multiple matching images found for {repository_name}:{tag}!")
 
-        image = result["images"][0]
+        existing_manifest = manifests[0]
 
         tag_operation = {
             'source': f"{repository_name}:{tag}",
@@ -94,7 +214,7 @@ class Ecr:
                 registryId=self.account_id,
                 repositoryName=repository_name,
                 imageTag=new_tag,
-                imageManifest=image['imageManifest']
+                imageManifest=existing_manifest
             )
 
             tag_operation_status = "success"
@@ -110,16 +230,7 @@ class Ecr:
         return tag_operation
 
     def login(self):
-        response = self.ecr.get_authorization_token(
-            registryIds=[self.account_id]
-        )
-
-        for auth in response['authorizationData']:
-            auth_token = b64decode(auth['authorizationToken']).decode()
-            username, password = auth_token.split(':')
-            command = ['docker', 'login', '-u', username, '-p', password, auth['proxyEndpoint']]
-
-            cmd(*command)
+        self._underlying.login()
 
 
 class NoSuchImageError(EcrError):
@@ -196,11 +307,7 @@ def get_ref_tags_for_repositories(*, image_repositories, tag):
         namespace = repo_details.get("namespace", None)
         repository_name = _get_repository_name(namespace, repo_id)
 
-        ecr_client = create_client(
-            account_id=account_id,
-            region_name=region_name,
-            role_arn=role_arn
-        )
+        ecr_client = create_client(region_name=region_name, role_arn=role_arn)
 
         try:
             ref_uri = get_ref_tags_for_image(
