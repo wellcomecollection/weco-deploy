@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 import base64
+import json
 import os
+import subprocess
 
 from botocore.exceptions import ClientError
 
@@ -37,7 +39,7 @@ class AbstractEcr(ABC):
             region_name=region_name
         )
 
-        return session.client("ecr")
+        return session.client(self.resource)
 
     @abstractmethod
     def get_authorization_data(self):
@@ -61,6 +63,13 @@ class AbstractEcr(ABC):
 
         cmd(*command)
 
+    @abstractmethod
+    def get_image_manifests_for_tag(self, *, repository_name, image_tag):
+        """
+        Generates a list of image manifests for a given tag.
+        """
+        pass
+
 
 class EcrPrivate(AbstractEcr):
     def __init__(self, *, account_id, region_name, role_arn):
@@ -69,6 +78,10 @@ class EcrPrivate(AbstractEcr):
         self.account_id = account_id
         self.client = self.create_client(region_name=region_name, role_arn=role_arn)
 
+    @property
+    def registry_id(self):
+        return self.account_id
+
     def get_authorization_data(self):
         resp = self.client.get_authorization_token(
             registryIds=[self.account_id]
@@ -76,10 +89,20 @@ class EcrPrivate(AbstractEcr):
         assert len(resp["authorizationData"]) == 1
         return resp["authorizationData"][0]
 
+    def get_image_manifests_for_tag(self, *, repository_name, image_tag):
+        resp = self.client.batch_get_image(
+            registryId=self.registry_id,
+            repositoryName=repository_name,
+            imageIds=[{"imageTag": image_tag}]
+        )
+
+        return [img["imageManifest"] for img in resp["images"]]
+
 
 class EcrPublic(AbstractEcr):
-    def __init__(self, role_arn):
+    def __init__(self, *, gallery_id, role_arn):
         super().__init__(resource="ecr-public")
+        self.gallery_id = gallery_id
 
         self.client = self.create_client(
             role_arn=role_arn,
@@ -88,9 +111,24 @@ class EcrPublic(AbstractEcr):
             region_name="us-east-1"
         )
 
+    @property
+    def registry_id(self):
+        return self.account_id
+
     def get_authorization_data(self):
         resp = self.client.get_authorization_token()
         return resp["authorizationData"]
+
+    def get_image_manifests_for_tag(self, *, repository_name, image_tag):
+        # ECR Public doesn't have an API call that returns the image manifest,
+        # so we have to go out to an experimental Docker feature.
+        # See https://docs.docker.com/engine/reference/commandline/manifest/
+        uri = f"public.ecr.aws/{self.gallery_id}/{repository_name}"
+        output = json.loads(
+            subprocess.check_output(["docker", "manifest", "inspect", uri])
+        )
+
+        return [output]
 
 
 class Ecr:
@@ -138,21 +176,18 @@ class Ecr:
     def tag_image(self, namespace, image_id, tag, new_tag):
         repository_name = _get_repository_name(namespace, image_id)
 
-        result = self.ecr.batch_get_image(
-            registryId=self.account_id,
-            repositoryName=repository_name,
-            imageIds=[
-                {"imageTag": tag}
-            ]
+        manifests = self._underlying.get_image_manifests_for_tag(
+            repository_name=repository_name,
+            image_tag=tag
         )
 
-        if len(result["images"]) == 0:
+        if len(manifests) == 0:
             raise RuntimeError(f"No matching images found for {repository_name}:{tag}!")
 
-        if len(result["images"]) > 1:
+        if len(manifests) > 1:
             raise RuntimeError(f"Multiple matching images found for {repository_name}:{tag}!")
 
-        image = result["images"][0]
+        existing_manifest = manifests[0]
 
         tag_operation = {
             'source': f"{repository_name}:{tag}",
@@ -164,7 +199,7 @@ class Ecr:
                 registryId=self.account_id,
                 repositoryName=repository_name,
                 imageTag=new_tag,
-                imageManifest=image['imageManifest']
+                imageManifest=existing_manifest
             )
 
             tag_operation_status = "success"
