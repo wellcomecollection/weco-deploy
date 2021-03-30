@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.6.18 - 2021-03-30
+-------------------
+
+This does some internal refactoring to prepare for supporting ECR Public repositories in a future release.
+
+-------------------
 5.6.17 - 2021-03-30
 -------------------
 
