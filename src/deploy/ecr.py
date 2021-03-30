@@ -111,10 +111,6 @@ class EcrPublic(AbstractEcr):
             region_name="us-east-1"
         )
 
-    @property
-    def registry_id(self):
-        return self.account_id
-
     def get_authorization_data(self):
         resp = self.client.get_authorization_token()
         return resp["authorizationData"]
