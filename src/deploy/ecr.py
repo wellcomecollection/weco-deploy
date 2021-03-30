@@ -1,4 +1,5 @@
-from base64 import b64decode
+from abc import ABC, abstractmethod
+import base64
 import os
 
 from botocore.exceptions import ClientError
@@ -25,6 +26,73 @@ def _get_repository_name(namespace, image_id):
         return image_id
 
 
+class AbstractEcr(ABC):
+    def __init__(self, *, resource):
+        self.resource = resource
+
+    def create_client(self, *, region_name, role_arn):
+        session = iam.get_session(
+            session_name="ReleaseToolEcr",
+            role_arn=role_arn,
+            region_name=region_name
+        )
+
+        return session.client("ecr")
+
+    @abstractmethod
+    def get_authorization_data(self):
+        """
+        Returns an "authorization token data object" that can be used to
+        authenticate with the local Docker client.
+        """
+        pass
+
+    def login(self):
+        """
+        Authenticates the local Docker client with ECR.
+        """
+        auth_data = self.get_authorization_data()
+        auth_token = base64.b64decode(auth_data["authorizationToken"]).decode()
+        username, password = auth_token.split(":")
+        command = [
+            "docker", "login", "--username", username, "--password", password,
+            auth_data["proxyEndpoint"]
+        ]
+
+        cmd(*command)
+
+
+class EcrPrivate(AbstractEcr):
+    def __init__(self, *, account_id, region_name, role_arn):
+        super().__init__(resource="ecr")
+
+        self.account_id = account_id
+        self.client = self.create_client(region_name=region_name, role_arn=role_arn)
+
+    def get_authorization_data(self):
+        resp = self.client.get_authorization_token(
+            registryIds=[self.account_id]
+        )
+        assert len(resp["authorizationData"]) == 1
+        return resp["authorizationData"][0]
+
+
+class EcrPublic(AbstractEcr):
+    def __init__(self, role_arn):
+        super().__init__(resource="ecr-public")
+
+        self.client = self.create_client(
+            role_arn=role_arn,
+            # ECR Public is a global resource that lives in us-east-1,
+            # as far as I can tell.
+            region_name="us-east-1"
+        )
+
+    def get_authorization_data(self):
+        resp = self.client.get_authorization_token()
+        return resp["authorizationData"]
+
+
 class Ecr:
     def __init__(self, account_id, region_name, role_arn):
         self.account_id = account_id
@@ -33,6 +101,12 @@ class Ecr:
 
         self.ecr_base_uri = (
             f"{self.account_id}.dkr.ecr.{self.region_name}.amazonaws.com"
+        )
+
+        self._underlying = EcrPrivate(
+            account_id=account_id,
+            region_name=region_name,
+            role_arn=role_arn
         )
 
     @staticmethod
@@ -106,16 +180,7 @@ class Ecr:
         return tag_operation
 
     def login(self):
-        response = self.ecr.get_authorization_token(
-            registryIds=[self.account_id]
-        )
-
-        for auth in response['authorizationData']:
-            auth_token = b64decode(auth['authorizationToken']).decode()
-            username, password = auth_token.split(':')
-            command = ['docker', 'login', '-u', username, '-p', password, auth['proxyEndpoint']]
-
-            cmd(*command)
+        self._underlying.login()
 
 
 class NoSuchImageError(EcrError):
