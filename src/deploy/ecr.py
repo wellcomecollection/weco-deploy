@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 import base64
 import json
 import os
-import subprocess
 
 from botocore.exceptions import ClientError
 
@@ -120,9 +119,7 @@ class EcrPublic(AbstractEcr):
         # so we have to go out to an experimental Docker feature.
         # See https://docs.docker.com/engine/reference/commandline/manifest/
         uri = f"public.ecr.aws/{self.gallery_id}/{repository_name}"
-        output = json.loads(
-            subprocess.check_output(["docker", "manifest", "inspect", uri])
-        )
+        output = json.loads(cmd("docker", "manifest", "inspect", uri))
 
         return [output]
 
