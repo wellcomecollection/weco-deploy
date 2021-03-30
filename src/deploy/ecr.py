@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 import base64
 import json
 import os
@@ -129,7 +129,7 @@ class EcrPublic(AbstractEcr):
 
     @property
     def base_uri(self):
-        return f"public.ecr.aws/{gallery_id}"
+        return f"public.ecr.aws/{self.gallery_id}"
 
     def get_authorization_data(self):
         resp = self.client.get_authorization_token()
