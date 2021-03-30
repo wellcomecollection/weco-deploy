@@ -8,7 +8,7 @@ from .exceptions import EcrError
 from .commands import cmd
 
 
-def create_client(*, account_id, region_name, role_arn):
+def create_client(*, region_name, role_arn):
     session = iam.get_session(
         session_name="ReleaseToolEcr",
         role_arn=role_arn,
@@ -29,11 +29,7 @@ class Ecr:
     def __init__(self, account_id, region_name, role_arn):
         self.account_id = account_id
         self.region_name = region_name
-        self.ecr = create_client(
-            account_id=account_id,
-            region_name=region_name,
-            role_arn=role_arn
-        )
+        self.ecr = create_client(region_name=region_name, role_arn=role_arn)
 
         self.ecr_base_uri = (
             f"{self.account_id}.dkr.ecr.{self.region_name}.amazonaws.com"
@@ -196,11 +192,7 @@ def get_ref_tags_for_repositories(*, image_repositories, tag):
         namespace = repo_details.get("namespace", None)
         repository_name = _get_repository_name(namespace, repo_id)
 
-        ecr_client = create_client(
-            account_id=account_id,
-            region_name=region_name,
-            role_arn=role_arn
-        )
+        ecr_client = create_client(region_name=region_name, role_arn=role_arn)
 
         try:
             ref_uri = get_ref_tags_for_image(
