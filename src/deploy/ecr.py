@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
 import base64
 import json
 import os
@@ -30,6 +30,14 @@ def _get_repository_name(namespace, image_id):
 class AbstractEcr(ABC):
     def __init__(self, *, resource):
         self.resource = resource
+
+    @abstractmethod
+    def base_uri(self):
+        pass
+
+    def get_image_uri(self, *, namespace, image_id, tag):
+        repository_name = _get_repository_name(namespace, image_id)
+        return f"{self.base_uri}/{repository_name}:{tag}"
 
     def create_client(self, *, region_name, role_arn):
         session = iam.get_session(
@@ -74,8 +82,16 @@ class EcrPrivate(AbstractEcr):
     def __init__(self, *, account_id, region_name, role_arn):
         super().__init__(resource="ecr")
 
+        self.region_name = region_name
         self.account_id = account_id
-        self.client = self.create_client(region_name=region_name, role_arn=role_arn)
+        self.client = self.create_client(
+            region_name=region_name,
+            role_arn=role_arn
+        )
+
+    @property
+    def base_uri(self):
+        return f"{self.account_id}.dkr.ecr.{self.region_name}.amazonaws.com"
 
     @property
     def registry_id(self):
@@ -101,6 +117,7 @@ class EcrPrivate(AbstractEcr):
 class EcrPublic(AbstractEcr):
     def __init__(self, *, gallery_id, role_arn):
         super().__init__(resource="ecr-public")
+
         self.gallery_id = gallery_id
 
         self.client = self.create_client(
@@ -109,6 +126,10 @@ class EcrPublic(AbstractEcr):
             # as far as I can tell.
             region_name="us-east-1"
         )
+
+    @property
+    def base_uri(self):
+        return f"public.ecr.aws/{gallery_id}"
 
     def get_authorization_data(self):
         resp = self.client.get_authorization_token()
@@ -147,15 +168,16 @@ class Ecr:
 
         return open(release_file).read().strip()
 
-    def _get_full_repository_uri(self, namespace, image_id, tag):
-        return f"{self.ecr_base_uri}/{_get_repository_name(namespace, image_id)}:{tag}"
-
     def publish_image(self, namespace, image_id):
         local_image_tag = Ecr._get_release_image_tag(image_id)
         local_image_name = f"{image_id}:{local_image_tag}"
 
         remote_image_tag = f"ref.{local_image_tag}"
-        remote_image_name = self._get_full_repository_uri(namespace, image_id, remote_image_tag)
+        remote_image_name = self._underlying.get_image_uri(
+            namespace=namespace,
+            image_id=image_id,
+            tag=remote_image_tag
+        )
 
         try:
             cmd('docker', 'tag', local_image_name, remote_image_name)
