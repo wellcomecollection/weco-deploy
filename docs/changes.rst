@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.6.17 - 2021-03-30
+-------------------
+
+No-op change to get our CI working again with python-cryptography and Rust.
+
+-------------------
 5.6.16 - 2021-01-08
 -------------------
 
