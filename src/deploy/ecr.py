@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
 import base64
 import json
 import os
@@ -39,6 +39,10 @@ def get_release_image_tag(image_id):
 class AbstractEcr(ABC):
     @abstractmethod
     def base_uri(self):
+        pass
+
+    @abstractproperty
+    def registry_id(self):
         pass
 
     def get_image_uri(self, *, namespace, image_id, tag):
@@ -96,6 +100,54 @@ class AbstractEcr(ABC):
             cmd("docker", "rmi", remote_image_name)
 
         return remote_image_name, remote_image_tag, local_image_tag
+
+    def tag_image(self, *, namespace, image_id, tag, new_tag):
+        """
+        Tag an image in ECR.
+        """
+        repository_name = _get_repository_name(namespace, image_id)
+
+        manifests = self.get_image_manifests_for_tag(
+            repository_name=repository_name,
+            image_tag=tag
+        )
+
+        if len(manifests) == 0:
+            raise RuntimeError(
+                f"No matching images found for {repository_name}:{tag}!"
+            )
+
+        if len(manifests) > 1:
+            raise RuntimeError(
+                f"Multiple matching images found for {repository_name}:{tag}!"
+            )
+
+        existing_manifest = manifests[0]
+
+        tag_operation = {
+            "source": f"{repository_name}:{tag}",
+            "target": f"{repository_name}:{new_tag}"
+        }
+
+        try:
+            self.client.put_image(
+                registryId=self.registry_id,
+                repositoryName=repository_name,
+                imageTag=new_tag,
+                imageManifest=existing_manifest
+            )
+
+            tag_operation_status = "success"
+        except ClientError as e:
+            # Matching tag & digest already exists (nothing to do)
+            if not e.response["Error"]["Code"] == "ImageAlreadyExistsException":
+                raise e
+            else:
+                tag_operation_status = "noop"
+
+        tag_operation["status"] = tag_operation_status
+
+        return tag_operation
 
 
 class EcrPrivate(AbstractEcr):
@@ -169,15 +221,11 @@ class EcrPublic(AbstractEcr):
 
 class Ecr:
     def __init__(self, account_id, region_name, role_arn):
-        self.account_id = account_id
-        self.region_name = region_name
-
         self._underlying = EcrPrivate(
             account_id=account_id,
             region_name=region_name,
             role_arn=role_arn
         )
-        self.ecr = self._underlying.client
 
     def publish_image(self, namespace, image_id):
         return self._underlying.publish_image(
@@ -186,45 +234,12 @@ class Ecr:
         )
 
     def tag_image(self, namespace, image_id, tag, new_tag):
-        repository_name = _get_repository_name(namespace, image_id)
-
-        manifests = self._underlying.get_image_manifests_for_tag(
-            repository_name=repository_name,
-            image_tag=tag
+        return self._underlying.tag_image(
+            namespace=namespace,
+            image_id=image_id,
+            tag=tag,
+            new_tag=new_tag
         )
-
-        if len(manifests) == 0:
-            raise RuntimeError(f"No matching images found for {repository_name}:{tag}!")
-
-        if len(manifests) > 1:
-            raise RuntimeError(f"Multiple matching images found for {repository_name}:{tag}!")
-
-        existing_manifest = manifests[0]
-
-        tag_operation = {
-            'source': f"{repository_name}:{tag}",
-            'target': f"{repository_name}:{new_tag}"
-        }
-
-        try:
-            self.ecr.put_image(
-                registryId=self.account_id,
-                repositoryName=repository_name,
-                imageTag=new_tag,
-                imageManifest=existing_manifest
-            )
-
-            tag_operation_status = "success"
-        except ClientError as e:
-            # Matching tag & digest already exists (nothing to do)
-            if not e.response['Error']['Code'] == 'ImageAlreadyExistsException':
-                raise e
-            else:
-                tag_operation_status = "noop"
-
-        tag_operation['status'] = tag_operation_status
-
-        return tag_operation
 
     def login(self):
         self._underlying.login()
