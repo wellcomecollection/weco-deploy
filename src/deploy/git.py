@@ -24,3 +24,10 @@ def log(commit_id, run_fetch=True):
             log(commit_id, run_fetch=False)
         else:
             return ""
+
+
+def repo_root():
+    """
+    Returns the path to the root of the repository.
+    """
+    return cmd("git", "rev-parse", "--show-toplevel")

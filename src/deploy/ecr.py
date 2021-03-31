@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
 import base64
 import json
 import os
@@ -8,16 +8,17 @@ from botocore.exceptions import ClientError
 from . import iam
 from .exceptions import EcrError
 from .commands import cmd
+from .git import repo_root
 
 
-def create_client(*, region_name, role_arn):
+def create_client(*, resource, region_name, role_arn):
     session = iam.get_session(
         session_name="ReleaseToolEcr",
         role_arn=role_arn,
         region_name=region_name
     )
 
-    return session.client("ecr")
+    return session.client(resource)
 
 
 def _get_repository_name(namespace, image_id):
@@ -27,26 +28,26 @@ def _get_repository_name(namespace, image_id):
         return image_id
 
 
-class AbstractEcr(ABC):
-    def __init__(self, *, resource):
-        self.resource = resource
+def get_release_image_tag(image_id):
+    """
+    Returns the contents of the .releases file for this image.
+    """
+    release_file = os.path.join(repo_root(), ".releases", image_id)
+    return open(release_file).read().strip()
 
+
+class AbstractEcr(ABC):
     @abstractmethod
     def base_uri(self):
+        pass
+
+    @abstractproperty
+    def registry_id(self):
         pass
 
     def get_image_uri(self, *, namespace, image_id, tag):
         repository_name = _get_repository_name(namespace, image_id)
         return f"{self.base_uri}/{repository_name}:{tag}"
-
-    def create_client(self, *, region_name, role_arn):
-        session = iam.get_session(
-            session_name="ReleaseToolEcr",
-            role_arn=role_arn,
-            region_name=region_name
-        )
-
-        return session.client(self.resource)
 
     @abstractmethod
     def get_authorization_data(self):
@@ -77,14 +78,86 @@ class AbstractEcr(ABC):
         """
         pass
 
+    def publish_image(self, *, namespace, image_id):
+        """
+        Given the namespace and ID of a local image, publish it to ECR.
+        """
+        local_image_tag = get_release_image_tag(image_id)
+        local_image_name = f"{image_id}:{local_image_tag}"
+
+        remote_image_tag = f"ref.{local_image_tag}"
+        remote_image_name = self.get_image_uri(
+            namespace=namespace,
+            image_id=image_id,
+            tag=remote_image_tag
+        )
+
+        try:
+            cmd("docker", "tag", local_image_name, remote_image_name)
+            cmd("docker", "push", remote_image_name)
+
+        finally:
+            cmd("docker", "rmi", remote_image_name)
+
+        return remote_image_name, remote_image_tag, local_image_tag
+
+    def tag_image(self, *, namespace, image_id, tag, new_tag):
+        """
+        Tag an image in ECR.
+        """
+        repository_name = _get_repository_name(namespace, image_id)
+
+        manifests = self.get_image_manifests_for_tag(
+            repository_name=repository_name,
+            image_tag=tag
+        )
+
+        if len(manifests) == 0:
+            raise RuntimeError(
+                f"No matching images found for {repository_name}:{tag}!"
+            )
+
+        if len(manifests) > 1:
+            raise RuntimeError(
+                f"Multiple matching images found for {repository_name}:{tag}!"
+            )
+
+        existing_manifest = manifests[0]
+
+        tag_operation = {
+            "source": f"{repository_name}:{tag}",
+            "target": f"{repository_name}:{new_tag}"
+        }
+
+        try:
+            self.client.put_image(
+                registryId=self.registry_id,
+                repositoryName=repository_name,
+                imageTag=new_tag,
+                imageManifest=existing_manifest
+            )
+
+            tag_operation_status = "success"
+        except ClientError as e:
+            # Matching tag & digest already exists (nothing to do)
+            if not e.response["Error"]["Code"] == "ImageAlreadyExistsException":
+                raise e
+            else:
+                tag_operation_status = "noop"
+
+        tag_operation["status"] = tag_operation_status
+
+        return tag_operation
+
 
 class EcrPrivate(AbstractEcr):
     def __init__(self, *, account_id, region_name, role_arn):
-        super().__init__(resource="ecr")
+        super().__init__()
 
         self.region_name = region_name
         self.account_id = account_id
-        self.client = self.create_client(
+        self.client = create_client(
+            resource="ecr",
             region_name=region_name,
             role_arn=role_arn
         )
@@ -116,11 +189,12 @@ class EcrPrivate(AbstractEcr):
 
 class EcrPublic(AbstractEcr):
     def __init__(self, *, gallery_id, role_arn):
-        super().__init__(resource="ecr-public")
+        super().__init__()
 
         self.gallery_id = gallery_id
 
-        self.client = self.create_client(
+        self.client = create_client(
+            resource="ecr-public",
             role_arn=role_arn,
             # ECR Public is a global resource that lives in us-east-1,
             # as far as I can tell.
@@ -147,87 +221,25 @@ class EcrPublic(AbstractEcr):
 
 class Ecr:
     def __init__(self, account_id, region_name, role_arn):
-        self.account_id = account_id
-        self.region_name = region_name
-        self.ecr = create_client(region_name=region_name, role_arn=role_arn)
-
-        self.ecr_base_uri = (
-            f"{self.account_id}.dkr.ecr.{self.region_name}.amazonaws.com"
-        )
-
         self._underlying = EcrPrivate(
             account_id=account_id,
             region_name=region_name,
             role_arn=role_arn
         )
 
-    @staticmethod
-    def _get_release_image_tag(image_id):
-        repo_root = cmd("git", "rev-parse", "--show-toplevel")
-        release_file = os.path.join(repo_root, ".releases", image_id)
-
-        return open(release_file).read().strip()
-
     def publish_image(self, namespace, image_id):
-        local_image_tag = Ecr._get_release_image_tag(image_id)
-        local_image_name = f"{image_id}:{local_image_tag}"
-
-        remote_image_tag = f"ref.{local_image_tag}"
-        remote_image_name = self._underlying.get_image_uri(
+        return self._underlying.publish_image(
             namespace=namespace,
-            image_id=image_id,
-            tag=remote_image_tag
+            image_id=image_id
         )
-
-        try:
-            cmd('docker', 'tag', local_image_name, remote_image_name)
-            cmd('docker', 'push', remote_image_name)
-
-        finally:
-            cmd('docker', 'rmi', remote_image_name)
-
-        return remote_image_name, remote_image_tag, local_image_tag
 
     def tag_image(self, namespace, image_id, tag, new_tag):
-        repository_name = _get_repository_name(namespace, image_id)
-
-        manifests = self._underlying.get_image_manifests_for_tag(
-            repository_name=repository_name,
-            image_tag=tag
+        return self._underlying.tag_image(
+            namespace=namespace,
+            image_id=image_id,
+            tag=tag,
+            new_tag=new_tag
         )
-
-        if len(manifests) == 0:
-            raise RuntimeError(f"No matching images found for {repository_name}:{tag}!")
-
-        if len(manifests) > 1:
-            raise RuntimeError(f"Multiple matching images found for {repository_name}:{tag}!")
-
-        existing_manifest = manifests[0]
-
-        tag_operation = {
-            'source': f"{repository_name}:{tag}",
-            'target': f"{repository_name}:{new_tag}"
-        }
-
-        try:
-            self.ecr.put_image(
-                registryId=self.account_id,
-                repositoryName=repository_name,
-                imageTag=new_tag,
-                imageManifest=existing_manifest
-            )
-
-            tag_operation_status = "success"
-        except ClientError as e:
-            # Matching tag & digest already exists (nothing to do)
-            if not e.response['Error']['Code'] == 'ImageAlreadyExistsException':
-                raise e
-            else:
-                tag_operation_status = "noop"
-
-        tag_operation['status'] = tag_operation_status
-
-        return tag_operation
 
     def login(self):
         self._underlying.login()
@@ -307,7 +319,11 @@ def get_ref_tags_for_repositories(*, image_repositories, tag):
         namespace = repo_details.get("namespace", None)
         repository_name = _get_repository_name(namespace, repo_id)
 
-        ecr_client = create_client(region_name=region_name, role_arn=role_arn)
+        ecr_client = create_client(
+            resource="ecr",
+            region_name=region_name,
+            role_arn=role_arn
+        )
 
         try:
             ref_uri = get_ref_tags_for_image(
