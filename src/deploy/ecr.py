@@ -11,14 +11,14 @@ from .commands import cmd
 from .git import repo_root
 
 
-def create_client(*, region_name, role_arn):
+def create_client(*, resource, region_name, role_arn):
     session = iam.get_session(
         session_name="ReleaseToolEcr",
         role_arn=role_arn,
         region_name=region_name
     )
 
-    return session.client("ecr")
+    return session.client(resource)
 
 
 def _get_repository_name(namespace, image_id):
@@ -37,9 +37,6 @@ def get_release_image_tag(image_id):
 
 
 class AbstractEcr(ABC):
-    def __init__(self, *, resource):
-        self.resource = resource
-
     @abstractmethod
     def base_uri(self):
         pass
@@ -47,15 +44,6 @@ class AbstractEcr(ABC):
     def get_image_uri(self, *, namespace, image_id, tag):
         repository_name = _get_repository_name(namespace, image_id)
         return f"{self.base_uri}/{repository_name}:{tag}"
-
-    def create_client(self, *, region_name, role_arn):
-        session = iam.get_session(
-            session_name="ReleaseToolEcr",
-            role_arn=role_arn,
-            region_name=region_name
-        )
-
-        return session.client(self.resource)
 
     @abstractmethod
     def get_authorization_data(self):
@@ -89,11 +77,12 @@ class AbstractEcr(ABC):
 
 class EcrPrivate(AbstractEcr):
     def __init__(self, *, account_id, region_name, role_arn):
-        super().__init__(resource="ecr")
+        super().__init__()
 
         self.region_name = region_name
         self.account_id = account_id
-        self.client = self.create_client(
+        self.client = create_client(
+            resource="ecr",
             region_name=region_name,
             role_arn=role_arn
         )
@@ -125,11 +114,12 @@ class EcrPrivate(AbstractEcr):
 
 class EcrPublic(AbstractEcr):
     def __init__(self, *, gallery_id, role_arn):
-        super().__init__(resource="ecr-public")
+        super().__init__()
 
         self.gallery_id = gallery_id
 
-        self.client = self.create_client(
+        self.client = create_client(
+            resource="ecr-public",
             role_arn=role_arn,
             # ECR Public is a global resource that lives in us-east-1,
             # as far as I can tell.
@@ -158,13 +148,13 @@ class Ecr:
     def __init__(self, account_id, region_name, role_arn):
         self.account_id = account_id
         self.region_name = region_name
-        self.ecr = create_client(region_name=region_name, role_arn=role_arn)
 
         self._underlying = EcrPrivate(
             account_id=account_id,
             region_name=region_name,
             role_arn=role_arn
         )
+        self.ecr = self._underlying.client
 
     def publish_image(self, namespace, image_id):
         local_image_tag = get_release_image_tag(image_id)
@@ -305,7 +295,11 @@ def get_ref_tags_for_repositories(*, image_repositories, tag):
         namespace = repo_details.get("namespace", None)
         repository_name = _get_repository_name(namespace, repo_id)
 
-        ecr_client = create_client(region_name=region_name, role_arn=role_arn)
+        ecr_client = create_client(
+            resource="ecr",
+            region_name=region_name,
+            role_arn=role_arn
+        )
 
         try:
             ref_uri = get_ref_tags_for_image(
