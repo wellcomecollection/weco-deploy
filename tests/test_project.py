@@ -441,3 +441,49 @@ class TestProject:
 
         for r in releases:
             assert project.get_release(release_id=r["release_id"]) == r
+
+    def test_prepare_no_release_available(self, role_arn, project_id):
+        release_store = MemoryReleaseStore()
+
+        config = {
+            "image_repositories": [
+                {
+                    "id": "repo1",
+                    "services": ["service1"],
+                    "account_id": "1111111111",
+                    "region_name": "us-east-1",
+                    "namespace": "org.wellcome",
+                    "role_arn": "arn:aws:iam::1111111111:role/publisher-role"
+                },
+            ],
+            "environments": [
+                {"id": "stage", "name": "Staging"},
+                {"id": "prod", "name": "Prod"},
+            ],
+            "role_arn": role_arn,
+            "account_id": "1234567890",
+            "namespace": "edu.self",
+            "region_name": "eu-west-1",
+        }
+
+        project = Project(
+            project_id=project_id,
+            config=config,
+            release_store=release_store
+        )
+
+        get_images_return = {
+            "foo": "abc"
+        }
+
+        def patch_get_images(label):
+            return get_images_return
+
+        # This is a poor way to test prepare as it relies on knowing the impl of get_images
+        # The correct way to do this is to have a mocked `Ecr` and hand that in
+        # TODO: Handle tests that interact with ECR by mocking it
+        project.get_images = patch_get_images
+        prepared_release = project.prepare("stage", "Some description")
+
+        assert prepared_release["previous_release"] is None
+        assert prepared_release["new_release"]["images"] == get_images_return

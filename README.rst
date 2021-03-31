@@ -94,6 +94,22 @@ correct metadata is available in SSM & ECR
    # To publish the local image "my_service:my_test" to "uk.ac.wellcome/my_service:my_test" in ECR
    weco-deploy publish --image-id my_service --label my_test
 
+Running tests
+~~~~~~~~~~~~~~~~~
+
+To run tests locally you can run the following commands:
+
+::
+
+   # Login to ECR using a profile that will give you write access to ECR in the platform account
+   aws ecr get-login-password --region eu-west-1 --profile platform | docker login \
+      --username AWS \
+      --password-stdin \
+      760097843905.dkr.ecr.eu-west-1.amazonaws.com
+
+   # Run the docker-compose test override
+   docker-compose -f docker-compose.yml -f docker-compose.override.test.yml up
+
 Preparing a release
 ~~~~~~~~~~~~~~~~~~~
 
