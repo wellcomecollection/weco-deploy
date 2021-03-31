@@ -184,6 +184,15 @@ class Project:
         )
 
     @property
+    @functools.lru_cache
+    def ecr(self):
+        return Ecr(
+            account_id=self.account_id,
+            region_name=self.region_name,
+            role_arn=self.role_arn
+        )
+
+    @property
     def id(self):
         return self.config["id"]
 
@@ -249,13 +258,6 @@ class Project:
 
         assert len(result) == len(self.config.get("environments", []))
         return result
-
-    def _ecr(self, account_id=None, region_name=None, role_arn=None):
-        return Ecr(
-            account_id=account_id or self.account_id,
-            region_name=region_name or self.region_name,
-            role_arn=role_arn or self.role_arn
-        )
 
     def _create_deployment(self, environment_id, details, description):
         return {
@@ -426,16 +428,14 @@ class Project:
         matched_image = self.image_repositories[image_id]
 
         # Create an ECR client for the correct account
-        ecr = self._ecr(matched_image["account_id"])
+        self.ecr.login()
 
-        ecr.login()
-
-        remote_uri, remote_tag, local_tag = ecr.publish_image(
+        remote_uri, remote_tag, local_tag = self.ecr.publish_image(
             namespace=matched_image["namespace"],
             image_id=image_id,
         )
 
-        tag_result = ecr.tag_image(
+        tag_result = self.ecr.tag_image(
             namespace=matched_image["namespace"],
             image_id=image_id,
             tag=remote_tag,
@@ -537,18 +537,12 @@ class Project:
         try:
             matched_image = self.image_repositories[image_id]
             namespace = matched_image["namespace"]
-            ecr = self._ecr(
-                account_id=matched_image["account_id"],
-                region_name=matched_image["region_name"],
-                role_arn=matched_image["role_arn"],
-            )
         except KeyError:
             # TODO: Does it make sense to create an ECR client if we don't
             # have an ECR repo to tag in?
-            ecr = self._ecr()
             namespace = self.namespace
 
-        return ecr.tag_image(
+        return self.ecr.tag_image(
             namespace=namespace,
             image_id=image_id,
             tag=old_tag,
