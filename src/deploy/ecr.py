@@ -151,10 +151,6 @@ class Ecr:
         self.region_name = region_name
         self.ecr = create_client(region_name=region_name, role_arn=role_arn)
 
-        self.ecr_base_uri = (
-            f"{self.account_id}.dkr.ecr.{self.region_name}.amazonaws.com"
-        )
-
         self._underlying = EcrPrivate(
             account_id=account_id,
             region_name=region_name,
