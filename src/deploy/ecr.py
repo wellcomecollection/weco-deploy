@@ -74,6 +74,29 @@ class AbstractEcr(ABC):
         """
         pass
 
+    def publish_image(self, *, namespace, image_id):
+        """
+        Given the namespace and ID of a local image, publish it to ECR.
+        """
+        local_image_tag = get_release_image_tag(image_id)
+        local_image_name = f"{image_id}:{local_image_tag}"
+
+        remote_image_tag = f"ref.{local_image_tag}"
+        remote_image_name = self.get_image_uri(
+            namespace=namespace,
+            image_id=image_id,
+            tag=remote_image_tag
+        )
+
+        try:
+            cmd("docker", "tag", local_image_name, remote_image_name)
+            cmd("docker", "push", remote_image_name)
+
+        finally:
+            cmd("docker", "rmi", remote_image_name)
+
+        return remote_image_name, remote_image_tag, local_image_tag
+
 
 class EcrPrivate(AbstractEcr):
     def __init__(self, *, account_id, region_name, role_arn):
@@ -157,24 +180,10 @@ class Ecr:
         self.ecr = self._underlying.client
 
     def publish_image(self, namespace, image_id):
-        local_image_tag = get_release_image_tag(image_id)
-        local_image_name = f"{image_id}:{local_image_tag}"
-
-        remote_image_tag = f"ref.{local_image_tag}"
-        remote_image_name = self._underlying.get_image_uri(
+        return self._underlying.publish_image(
             namespace=namespace,
-            image_id=image_id,
-            tag=remote_image_tag
+            image_id=image_id
         )
-
-        try:
-            cmd('docker', 'tag', local_image_name, remote_image_name)
-            cmd('docker', 'push', remote_image_name)
-
-        finally:
-            cmd('docker', 'rmi', remote_image_name)
-
-        return remote_image_name, remote_image_tag, local_image_tag
 
     def tag_image(self, namespace, image_id, tag, new_tag):
         repository_name = _get_repository_name(namespace, image_id)
