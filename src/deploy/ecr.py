@@ -8,6 +8,7 @@ from botocore.exceptions import ClientError
 from . import iam
 from .exceptions import EcrError
 from .commands import cmd
+from .git import repo_root
 
 
 def create_client(*, region_name, role_arn):
@@ -25,6 +26,14 @@ def _get_repository_name(namespace, image_id):
         return f"{namespace}/{image_id}"
     else:
         return image_id
+
+
+def get_release_image_tag(image_id):
+    """
+    Returns the contents of the .releases file for this image.
+    """
+    release_file = os.path.join(repo_root(), ".releases", image_id)
+    return open(release_file).read().strip()
 
 
 class AbstractEcr(ABC):
@@ -157,15 +166,8 @@ class Ecr:
             role_arn=role_arn
         )
 
-    @staticmethod
-    def _get_release_image_tag(image_id):
-        repo_root = cmd("git", "rev-parse", "--show-toplevel")
-        release_file = os.path.join(repo_root, ".releases", image_id)
-
-        return open(release_file).read().strip()
-
     def publish_image(self, namespace, image_id):
-        local_image_tag = Ecr._get_release_image_tag(image_id)
+        local_image_tag = get_release_image_tag(image_id)
         local_image_name = f"{image_id}:{local_image_tag}"
 
         remote_image_tag = f"ref.{local_image_tag}"
