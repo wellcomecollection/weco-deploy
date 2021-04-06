@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.6.23 - 2021-04-06
+-------------------
+
+Simplify the code slightly by removing account/registry ID overrides, which we never use in practice.  We always use the default ECR registry.
+
+-------------------
 5.6.22 - 2021-04-06
 -------------------
 
