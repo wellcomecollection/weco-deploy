@@ -135,13 +135,6 @@ class Ecs:
             'deployment_id': response['service']['deployments'][0]['id']
         }
 
-    def find_matching_service(self, **kwargs):
-        """
-        Given a service (e.g. bag-unpacker) and an environment (e.g. prod),
-        return the unique matching service.
-        """
-        return find_matching_service(self._described_services, **kwargs)
-
     def list_service_tasks(self, service):
         """
         Given a service (e.g. bag-unpacker),
