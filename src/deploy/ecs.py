@@ -1,5 +1,6 @@
 from . import iam, tags
 from .iterators import chunked_iterable
+from .models import Project
 
 
 def list_cluster_arns_in_account(ecs_client):
@@ -40,6 +41,14 @@ def describe_services(ecs_client):
             yield from resp["services"]
 
 
+class NoMatchingServiceError(Exception):
+    pass
+
+
+class MultipleMatchingServicesError(Exception):
+    pass
+
+
 def find_matching_service(
     service_descriptions, *, service_id, environment_id
 ):
@@ -56,11 +65,43 @@ def find_matching_service(
             }
         )
     except tags.NoMatchingResourceError:
-        return None
+        raise NoMatchingServiceError(
+            f"No matching service found for {service_id}/{environment_id}!"
+        )
     except tags.MultipleMatchingResourcesError:
-        raise RuntimeError(
+        raise MultipleMatchingServicesError(
             f"Multiple matching services found for {service_id}/{environment_id}!"
         )
+
+
+def find_service_arns_for_release(
+    *, project: Project, release, service_descriptions, environment_id
+):
+    """
+    Build a dictionary (image ID) -> list(service ARNs) for all the images
+    in a particular release.
+    """
+    result = {image_id: [] for image_id in release["images"]}
+
+    for image_id in release["images"]:
+        try:
+            services = project.image_repositories[image_id].services
+        except KeyError:
+            continue
+
+        for service_id in services:
+            try:
+                matching_service = find_matching_service(
+                    service_descriptions,
+                    service_id=service_id,
+                    environment_id=environment_id
+                )
+            except NoMatchingServiceError:
+                continue
+
+            result[image_id].append(matching_service["serviceArn"])
+
+    return result
 
 
 class Ecs:
