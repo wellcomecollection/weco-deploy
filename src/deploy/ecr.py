@@ -41,10 +41,6 @@ class AbstractEcr(ABC):
     def base_uri(self):
         pass
 
-    @abstractproperty
-    def registry_id(self):
-        pass
-
     def get_image_uri(self, *, namespace, image_id, tag):
         repository_name = _get_repository_name(namespace, image_id)
         return f"{self.base_uri}/{repository_name}:{tag}"
@@ -131,7 +127,6 @@ class AbstractEcr(ABC):
 
         try:
             self.client.put_image(
-                registryId=self.registry_id,
                 repositoryName=repository_name,
                 imageTag=new_tag,
                 imageManifest=existing_manifest
@@ -166,20 +161,13 @@ class EcrPrivate(AbstractEcr):
     def base_uri(self):
         return f"{self.account_id}.dkr.ecr.{self.region_name}.amazonaws.com"
 
-    @property
-    def registry_id(self):
-        return self.account_id
-
     def get_authorization_data(self):
-        resp = self.client.get_authorization_token(
-            registryIds=[self.account_id]
-        )
+        resp = self.client.get_authorization_token()
         assert len(resp["authorizationData"]) == 1
         return resp["authorizationData"][0]
 
     def get_image_manifests_for_tag(self, *, repository_name, image_tag):
         resp = self.client.batch_get_image(
-            registryId=self.registry_id,
             repositoryName=repository_name,
             imageIds=[{"imageTag": image_tag}]
         )
@@ -259,7 +247,7 @@ class NoRefTagError(EcrError):
     pass
 
 
-def get_ref_tags_for_image(ecr_client, *, repository_name, tag, account_id):
+def get_ref_tags_for_image(ecr_client, *, repository_name, tag):
     """
     Returns the ref tags for the image with this tag.
 
@@ -268,7 +256,6 @@ def get_ref_tags_for_image(ecr_client, *, repository_name, tag, account_id):
     """
     try:
         resp = ecr_client.describe_images(
-            registryId=account_id,
             repositoryName=repository_name,
             imageIds=[{"imageTag": tag}],
         )
@@ -313,7 +300,6 @@ def get_ref_tags_for_repositories(*, image_repositories, tag):
     result = {}
 
     for repo_id, repo_details in image_repositories.items():
-        account_id = repo_details["account_id"]
         region_name = repo_details["region_name"]
         role_arn = repo_details["role_arn"]
         namespace = repo_details.get("namespace", None)
@@ -327,10 +313,7 @@ def get_ref_tags_for_repositories(*, image_repositories, tag):
 
         try:
             ref_uri = get_ref_tags_for_image(
-                ecr_client,
-                repository_name=repository_name,
-                tag=tag,
-                account_id=account_id
+                ecr_client, repository_name=repository_name, tag=tag
             )
         except NoSuchImageError:
             result[repo_id] = set()
