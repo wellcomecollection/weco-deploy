@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 import base64
 import json
 import os
@@ -160,7 +160,7 @@ class EcrPrivate(AbstractEcr):
     @property
     def base_uri(self):
         account_id = iam.get_account_id(self.role_arn)
-        return f"{self.account_id}.dkr.ecr.{self.region_name}.amazonaws.com"
+        return f"{account_id}.dkr.ecr.{self.region_name}.amazonaws.com"
 
     def get_authorization_data(self):
         resp = self.client.get_authorization_token()
