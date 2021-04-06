@@ -1,24 +1,10 @@
-import collections
 import typing
 
 import attr
 import cattr
 import yaml
 
-from .exceptions import ConfigError
-
-
-def _convert_identified_list_to_dict(values):
-    """
-    Given a list of objects with a .id parameter, convert them to a dict
-    keyed with the .id.
-    """
-    id_counts = collections.Counter(v.id for v in values)
-    duplicate_ids = {id for id, count in id_counts.items() if count > 1}
-    if duplicate_ids:
-        raise ConfigError("Duplicate IDs: %s" % ", ".join(duplicate_ids))
-
-    return {v.id: v for v in values}
+from .iterators import convert_identified_list_to_dict
 
 
 @attr.s
@@ -36,17 +22,17 @@ class Service:
 class ImageRepository:
     id = attr.ib()
     services: typing.List[Service] = attr.ib(
-        factory=list, converter=_convert_identified_list_to_dict
+        factory=list, converter=convert_identified_list_to_dict
     )
 
 
 @attr.s
 class Project:
     environments: typing.List[Environment] = attr.ib(
-        converter=_convert_identified_list_to_dict
+        converter=convert_identified_list_to_dict
     )
     image_repositories: typing.List[ImageRepository] = attr.ib(
-        converter=_convert_identified_list_to_dict
+        converter=convert_identified_list_to_dict
     )
     name = attr.ib()
     role_arn = attr.ib()
