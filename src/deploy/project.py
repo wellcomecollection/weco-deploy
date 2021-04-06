@@ -227,7 +227,7 @@ class Project:
             )
 
             return {
-                'config': service,
+                'config': {"id": service_id},
                 'response': ecs_service
             }
 
