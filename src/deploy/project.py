@@ -95,6 +95,9 @@ class Project:
         self.id = project_id
         self._underlying = cattr.structure(config, models.Project)
 
+        self.config = config
+        self.config["id"] = project_id
+
         self.release_store = release_store
         self.release_store.initialise()
 
