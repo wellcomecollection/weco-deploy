@@ -40,6 +40,10 @@ class Project:
 
     aws_region_name = attr.ib(default="eu-west-1")
 
+    @property
+    def region_name(self):
+        return self.aws_region_name
+
 
 class ProjectList:
     @classmethod

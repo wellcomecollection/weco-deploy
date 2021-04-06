@@ -89,27 +89,6 @@ def prepare_config(
 
     assert "region_name" in config
 
-    # The environments are stored as a list of dicts:
-    #
-    #     [
-    #       {"id": "stage", "name": […]},
-    #       {"id": "prod", "name": […]},
-    #       ...
-    #     ]
-    #
-    # We don't want to change the structure, but we do want to check that IDs
-    # are unique.
-    env_id_tally = collections.Counter()
-    for env in config.get("environments", []):
-        env_id_tally[env["id"]] += 1
-
-    duplicates = {env_id for env_id, count in env_id_tally.items() if count > 1}
-    if duplicates:
-        raise ConfigError(
-            f"Duplicate environment{'s' if len(duplicates) > 1 else ''} "
-            f"in config: {', '.join(sorted(duplicates))}"
-        )
-
 
 class Project:
     def __init__(self, project_id, config, release_store):
@@ -145,11 +124,11 @@ class Project:
 
     @property
     def role_arn(self):
-        return self.config["role_arn"]
+        return self._underlying.role_arn
 
     @property
     def region_name(self):
-        return self.config["region_name"]
+        return self._underlying.region_name
 
     @property
     def image_repositories(self):
@@ -157,18 +136,7 @@ class Project:
 
     @property
     def environment_names(self):
-        result = {}
-
-        for env in self.config.get("environments", []):
-            # We should have uniqueness by the checks in prepare_config(), but
-            # it doesn't hurt to check.
-            assert env["id"] not in result
-
-            assert set(env.keys()) == {"id", "name"}
-            result[env["id"]] = env["name"]
-
-        assert len(result) == len(self.config.get("environments", []))
-        return result
+        return self._underlying.environments
 
     def _create_deployment(self, environment_id, details, description):
         return {

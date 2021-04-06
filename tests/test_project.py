@@ -3,7 +3,7 @@ import datetime
 import pytest
 
 from deploy.exceptions import ConfigError
-from deploy.models import ImageRepository, Service
+from deploy.models import Environment, ImageRepository, Service
 from deploy.project import prepare_config, Projects, Project
 from deploy.release_store import MemoryReleaseStore
 
@@ -111,57 +111,6 @@ class TestPrepareConfig:
 
         assert len(record) == 0
 
-    def test_duplicate_environment_is_error(self, role_arn):
-        """
-        If the same ID appears twice in the list of environments, raise a ConfigError.
-        """
-        config = {
-            "role_arn": role_arn,
-            "environments": [
-                {"id": "stage", "name": "Staging"},
-                {"id": "stage", "name": "Staging"},
-                {"id": "prod", "name": "Prod"},
-            ]
-        }
-
-        with pytest.raises(ConfigError, match="Duplicate environment in config: stage"):
-            prepare_config(config)
-
-    def test_duplicate_environments_are_error(self, role_arn):
-        """
-        If the same ID appears twice in the list of environments, raise a ConfigError.
-        """
-        config = {
-            "role_arn": role_arn,
-            "environments": [
-                {"id": "stage", "name": "Staging"},
-                {"id": "stage", "name": "Staging"},
-                {"id": "prod", "name": "Prod"},
-                {"id": "prod", "name": "Prod"},
-                {"id": "dev", "name": "Dev"},
-            ]
-        }
-
-        with pytest.raises(
-            ConfigError, match="Duplicate environments in config: prod, stage"
-        ):
-            prepare_config(config)
-
-    def test_does_not_warn_on_unique_environments(self, role_arn):
-        """
-        If all the environments have unique IDs, no error is raised.
-        """
-        config = {
-            "role_arn": role_arn,
-            "environments": [
-                {"id": "stage", "name": "Staging"},
-                {"id": "prod", "name": "Prod"},
-                {"id": "dev", "name": "Dev"},
-            ]
-        }
-
-        prepare_config(config)
-
 
 class TestProject:
     def test_image_repositories(self, role_arn, project_id):
@@ -238,7 +187,10 @@ class TestProject:
             release_store=MemoryReleaseStore()
         )
 
-        assert project.environment_names == {"stage": "Staging", "prod": "Prod"}
+        assert project.environment_names == {
+            "stage": Environment(id="stage", name="Staging"),
+            "prod": Environment(id="prod", name="Prod"),
+        }
 
     def test_get_release(self, role_arn, project_id):
         releases = [
