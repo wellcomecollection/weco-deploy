@@ -6,9 +6,8 @@ import warnings
 import cattr
 import yaml
 
-from . import ecr, iam, models
+from . import ecs, ecr, iam, models
 from .ecr import Ecr
-from .ecs import Ecs, find_matching_service, deploy_service
 from .exceptions import ConfigError
 from .release_store import DynamoReleaseStore, ReleaseNotFoundError
 from .tags import parse_aws_tags
@@ -108,18 +107,6 @@ class Project:
 
     @property
     @functools.lru_cache()
-    def ecs(self):
-        return self.ecs_no_cache
-
-    @property
-    def ecs_no_cache(self):
-        return Ecs(
-            region_name=self.region_name,
-            role_arn=self.role_arn
-        )
-
-    @property
-    @functools.lru_cache()
     def ecr(self):
         return Ecr(region_name=self.region_name, role_arn=self.role_arn)
 
@@ -189,16 +176,11 @@ class Project:
 
     def get_ecs_services(self, release, environment_id, cached=True):
         def _get_service(service_id):
-            # Sometimes we want not to use the service cache - eg when checking
-            # whether deployments succeeded, we want a fresh copy of the services
-            # information.
-            if not cached:
-                ecs = self.ecs_no_cache
-            else:
-                ecs = self.ecs
+            # We always get a fresh set of ECS service descriptions.
+            service_descriptions = ecs.describe_services(self.session)
 
-            ecs_service = find_matching_service(
-                service_descriptions=ecs._described_services,
+            ecs_service = ecs.find_matching_service(
+                service_descriptions=service_descriptions,
                 service_id=service_id,
                 environment_id=environment_id
             )
@@ -247,7 +229,7 @@ class Project:
                 service_deployment_label = service_tags["deployment:label"]
                 desired_task_count = service["response"]["desiredCount"]
 
-                tasks = list_tasks_in_service(
+                tasks = ecs.list_tasks_in_service(
                     self.session,
                     cluster_arn=service["response"]["clusterArn"],
                     service_name=service["response"]["serviceName"],
@@ -419,7 +401,7 @@ class Project:
             service_arn = service["response"]["serviceArn"]
 
             if service_arn not in ecs_services_deployed:
-                ecs_services_deployed[service_arn] = deploy_service(
+                ecs_services_deployed[service_arn] = ecs.deploy_service(
                     self.session,
                     cluster_arn=cluster_arn,
                     service_arn=service_arn,

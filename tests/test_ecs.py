@@ -12,7 +12,7 @@ from deploy.ecs import (
     NoMatchingServiceError,
 )
 from deploy.models import ImageRepository, Project, Service
-from deploy.tags import parse_aws_tags, to_aws_tags
+from deploy.tags import parse_aws_tags
 
 
 @pytest.fixture(scope="session")
@@ -263,7 +263,6 @@ def test_deploy_service(session, ecs_stack):
     assert tags == {
         "deployment:label": "testing_again"
     }
-
 
 
 def test_list_tasks_in_service(session, ecs_stack):

@@ -1,4 +1,4 @@
-from . import iam, tags
+from . import tags
 from .iterators import chunked_iterable
 from .models import Project
 
@@ -23,10 +23,11 @@ def list_service_arns_in_cluster(ecs_client, *, cluster):
         yield from page["serviceArns"]
 
 
-def describe_services(ecs_client):
+def describe_services(session):
     """
     Describe all the ECS services in an account.
     """
+    ecs_client = session.client("ecs")
     result = []
 
     for cluster in list_cluster_arns_in_account(ecs_client):
@@ -160,15 +161,3 @@ def list_tasks_in_service(session, *, cluster_arn, service_name):
         return resp["tasks"]
     else:
         return []
-
-
-
-class Ecs:
-    def __init__(self, region_name, role_arn):
-        self.session = iam.get_session(
-            session_name="ReleaseToolEcs",
-            role_arn=role_arn,
-            region_name=region_name
-        )
-        self.ecs = self.session.client('ecs')
-        self._described_services = describe_services(self.ecs)
