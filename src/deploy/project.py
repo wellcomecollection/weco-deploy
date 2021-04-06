@@ -174,7 +174,7 @@ class Project:
         else:
             return self.release_store.get_release(release_id)
 
-    def get_ecs_services(self, release, environment_id, cached=True):
+    def get_ecs_services(self, release, environment_id):
         # We always get a fresh set of ECS service descriptions.
         service_descriptions = ecs.describe_services(self.session)
 
@@ -214,7 +214,7 @@ class Project:
         on the tasks within those services. We check that the desiredCount
         of tasks matches the running count of tasks.
         """
-        ecs_services = self.get_ecs_services(release, environment_id, cached=False)
+        ecs_services = self.get_ecs_services(release, environment_id)
 
         def printv(str):
             if verbose:
