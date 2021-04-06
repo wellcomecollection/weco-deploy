@@ -83,32 +83,38 @@ class TestGetRefTagsForImage:
 @moto.mock_iam()
 def test_get_ref_tags_for_repositories(ecr_client, region_name):
     manifest1 = create_image_manifest()
-    ecr_client.create_repository(repositoryName="example_worker1")
+    ecr_client.create_repository(
+        repositoryName="uk.ac.wellcome/example_worker1"
+    )
     ecr_client.put_image(
-        repositoryName="example_worker1",
+        repositoryName="uk.ac.wellcome/example_worker1",
         imageManifest=json.dumps(manifest1),
         imageTag="latest",
     )
     ecr_client.put_image(
-        repositoryName="example_worker1",
+        repositoryName="uk.ac.wellcome/example_worker1",
         imageManifest=json.dumps(manifest1),
         imageTag="ref.111",
     )
 
     manifest2 = create_image_manifest()
-    ecr_client.create_repository(repositoryName="example_worker2")
+    ecr_client.create_repository(
+        repositoryName="uk.ac.wellcome/example_worker2"
+    )
     ecr_client.put_image(
-        repositoryName="example_worker2",
+        repositoryName="uk.ac.wellcome/example_worker2",
         imageManifest=json.dumps(manifest2),
         imageTag="latest",
     )
     ecr_client.put_image(
-        repositoryName="example_worker2",
+        repositoryName="uk.ac.wellcome/example_worker2",
         imageManifest=json.dumps(manifest2),
         imageTag="ref.222",
     )
 
-    ecr_client.create_repository(repositoryName="example_worker3")
+    ecr_client.create_repository(
+        repositoryName="uk.ac.wellcome/example_worker3"
+    )
 
     image_repositories = {
         "example_worker1": {

@@ -26,11 +26,10 @@ LOGGING_ROOT = os.path.join(os.environ["HOME"], ".local", "share", "weco-deploy"
 @click.option('--confirm', '-y', is_flag=True, help="Non-interactive deployment confirmation")
 @click.option("--project-id", '-i', help="Specify the project ID")
 @click.option("--region-name", '-i', help="Specify the AWS region name")
-@click.option("--namespace", help="Specify the project namespace")
 @click.option("--role-arn", help="Specify an AWS role to assume")
 @click.option('--dry-run', '-d', is_flag=True, help="Don't make changes.")
 @click.pass_context
-def cli(ctx, project_file, verbose, confirm, project_id, region_name, namespace, role_arn, dry_run):
+def cli(ctx, project_file, verbose, confirm, project_id, region_name, role_arn, dry_run):
     warn_if_not_latest_version()
 
     try:
@@ -61,8 +60,7 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_name, namespace,
     project = projects.load(
         project_id=project_id,
         region_name=region_name,
-        role_arn=role_arn,
-        namespace=namespace
+        role_arn=role_arn
     )
 
     config = project.config

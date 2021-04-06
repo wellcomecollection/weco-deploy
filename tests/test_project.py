@@ -20,55 +20,6 @@ def test_loading_non_existent_project_is_runtimeerror(tmpdir):
 
 
 class TestPrepareConfig:
-    def test_uses_config_namespace(self, role_arn):
-        """
-        ProjectConfig uses the namespace in the initial config.
-        """
-        config = {"namespace": "edu.self", "role_arn": role_arn}
-        prepare_config(config)
-        assert config["namespace"] == "edu.self"
-
-    def test_allows_overriding_namespace(self, role_arn):
-        """
-        If there is no namespace in the initial config, but an override namespace
-        is supplied, that namespace is added to the config.
-        """
-        config = {"role_arn": role_arn}
-        prepare_config(config, namespace="edu.self")
-        assert config["namespace"] == "edu.self"
-
-    def test_uses_default_namespace(self, role_arn):
-        """
-        If there is no namespace in the initial config, and no override is supplied,
-        then the default namespace is added to the config.
-        """
-        config = {"role_arn": role_arn}
-        prepare_config(config)
-        assert config["namespace"] == "uk.ac.wellcome"
-
-    def test_warns_if_namespace_conflict(self, role_arn):
-        """
-        If there is a namespace in the initial config, and a different override
-        is supplied, then a warning is shown.
-        """
-        config = {"namespace": "edu.self", "role_arn": role_arn}
-        with pytest.warns(UserWarning, match="Preferring override"):
-            prepare_config(config, namespace="uk.ac.wellcome")
-
-        assert config["namespace"] == "uk.ac.wellcome"
-
-    def test_does_not_warn_if_namespace_match(self, role_arn):
-        """
-        If there is a namespace in the initial config, and it matches the override,
-        then no warning is shown.
-        """
-        config = {"namespace": "edu.self", "role_arn": role_arn}
-
-        with pytest.warns(None) as record:
-            prepare_config(config, namespace="edu.self")
-
-        assert len(record) == 0
-
     def test_allows_overriding_role_arn(self, role_arn):
         """
         If there is no role_arn in the initial config, but an override role_arn
@@ -274,7 +225,6 @@ class TestProject:
                     "id": "repo1",
                     "services": ["service1a", "service1b"],
                     "region_name": "us-east-1",
-                    "namespace": "org.wellcome",
                     "role_arn": "arn:aws:iam::1111111111:role/publisher-role"
                 },
                 {
@@ -287,7 +237,6 @@ class TestProject:
                 }
             ],
             "role_arn": role_arn,
-            "namespace": "edu.self",
             "region_name": "eu-west-1",
         }
 
@@ -299,19 +248,16 @@ class TestProject:
 
         assert project.image_repositories == {
             "repo1": {
-                "namespace": "org.wellcome",
                 "services": ["service1a", "service1b"],
                 "region_name": "us-east-1",
                 "role_arn": "arn:aws:iam::1111111111:role/publisher-role",
             },
             "repo2": {
-                "namespace": "edu.self",
                 "services": ["service2a", "service2b", "service2c"],
                 "region_name": "eu-west-1",
                 "role_arn": role_arn,
             },
             "repo3": {
-                "namespace": "edu.self",
                 "services": ["service3a"],
                 "region_name": "eu-west-1",
                 "role_arn": role_arn,
@@ -325,7 +271,6 @@ class TestProject:
                 {"id": "prod", "name": "Prod"},
             ],
             "role_arn": role_arn,
-            "namespace": "edu.self",
             "region_name": "eu-west-1",
         }
 
@@ -373,7 +318,6 @@ class TestProject:
                     "id": "repo1",
                     "services": ["service1"],
                     "region_name": "us-east-1",
-                    "namespace": "org.wellcome",
                     "role_arn": "arn:aws:iam::1111111111:role/publisher-role"
                 },
             ],
@@ -382,7 +326,6 @@ class TestProject:
                 {"id": "prod", "name": "Prod"},
             ],
             "role_arn": role_arn,
-            "namespace": "edu.self",
             "region_name": "eu-west-1",
         }
 

@@ -13,7 +13,6 @@ from .exceptions import ConfigError
 from .release_store import DynamoReleaseStore, ReleaseNotFoundError
 from .tags import parse_aws_tags
 
-DEFAULT_ECR_NAMESPACE = "uk.ac.wellcome"
 DEFAULT_REGION_NAME = "eu-west-1"
 
 
@@ -53,26 +52,12 @@ class Projects:
 def prepare_config(
         config,
         *,
-        namespace=None,
         role_arn=None,
         region_name=None
 ):
     """
     Prepare the config.  Fill in overrides or defaults as necessary.
     """
-    # We always want a namespace to be set.  Read it from the initial config
-    # if possible, or use the override or default if not.
-    if namespace and ("namespace" in config) and (config["namespace"] != namespace):
-        warnings.warn(
-            f"Preferring override namespace {namespace} "
-            f"to namespace in config {config['namespace']}"
-        )
-        config["namespace"] = namespace
-    elif "namespace" not in config:
-        config["namespace"] = namespace or DEFAULT_ECR_NAMESPACE
-
-    assert "namespace" in config
-
     # We always want a role_arn to be set.  Read it from the initial config,
     # or raise an error if not -- there's no way to pick a sensible default.
     if role_arn:
@@ -181,10 +166,6 @@ class Project:
         return self.config["region_name"]
 
     @property
-    def namespace(self):
-        return self.config["namespace"]
-
-    @property
     def image_repositories(self):
         """
         Gets all the image repositories in the config, keyed by ID.
@@ -193,7 +174,6 @@ class Project:
 
         -   region_name
         -   role_arn
-        -   namespace
         -   services
 
         """
@@ -207,7 +187,6 @@ class Project:
             result[repo["id"]] = {
                 "region_name": repo.get("region_name", self.region_name),
                 "role_arn": repo.get("role_arn", self.role_arn),
-                "namespace": repo.get("namespace", self.namespace),
                 "services": repo.get("services", []),
             }
 
@@ -394,19 +373,14 @@ class Project:
         return is_deployed
 
     def publish(self, image_id, label):
-        # Attempt to match image to config
-        matched_image = self.image_repositories[image_id]
-
         # Create an ECR client for the correct account
         self.ecr.login()
 
         remote_uri, remote_tag, local_tag = self.ecr.publish_image(
-            namespace=matched_image["namespace"],
             image_id=image_id,
         )
 
         tag_result = self.ecr.tag_image(
-            namespace=matched_image["namespace"],
             image_id=image_id,
             tag=remote_tag,
             new_tag=label
@@ -504,16 +478,7 @@ class Project:
         old_tag = image_name.split(":")[-1]
         new_tag = f"env.{environment_id}"
 
-        try:
-            matched_image = self.image_repositories[image_id]
-            namespace = matched_image["namespace"]
-        except KeyError:
-            # TODO: Does it make sense to create an ECR client if we don't
-            # have an ECR repo to tag in?
-            namespace = self.namespace
-
         return self.ecr.tag_image(
-            namespace=namespace,
             image_id=image_id,
             tag=old_tag,
             new_tag=new_tag
