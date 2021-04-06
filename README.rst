@@ -37,7 +37,6 @@ following format:
         image_repositories:
         - id: my_service
           namespace: uk.ac.wellcome
-          account_id: '12345678901'
           # Optional service block for automated deployments
           # This tag needs to match the value of ECS service tag "deployment:service"
           services:

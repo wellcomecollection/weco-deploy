@@ -37,7 +37,6 @@ class Project:
     name = attr.ib()
     role_arn = attr.ib()
 
-    account_id = attr.ib(default=None, type=str)
     aws_region_name = attr.ib(default="eu-west-1")
 
 

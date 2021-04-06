@@ -15,7 +15,6 @@ calm_adapter:
     - id: calm_deletion_checker
   name: Calm Adapter
   role_arn: arn:aws:iam::123456789012:role/platform-ci
-  account_id: 123456789012
   aws_region_name: us-east-1
 
 sierra_adapter:
@@ -46,7 +45,6 @@ def test_from_path(tmpdir):
         ],
         name="Calm Adapter",
         role_arn="arn:aws:iam::123456789012:role/platform-ci",
-        account_id="123456789012",
         aws_region_name="us-east-1",
     )
 
@@ -67,8 +65,7 @@ def test_from_path(tmpdir):
         ],
         name="Sierra Adapter",
         role_arn="arn:aws:iam::760097843905:role/platform-ci",
-        # These are the default values
-        account_id=None,
+        # Default value
         aws_region_name="eu-west-1",
     )
 

@@ -146,11 +146,11 @@ class AbstractEcr(ABC):
 
 
 class EcrPrivate(AbstractEcr):
-    def __init__(self, *, account_id, region_name, role_arn):
+    def __init__(self, *, region_name, role_arn):
         super().__init__()
 
         self.region_name = region_name
-        self.account_id = account_id
+        self.role_arn = role_arn
         self.client = create_client(
             resource="ecr",
             region_name=region_name,
@@ -159,6 +159,7 @@ class EcrPrivate(AbstractEcr):
 
     @property
     def base_uri(self):
+        account_id = iam.get_account_id(self.role_arn)
         return f"{self.account_id}.dkr.ecr.{self.region_name}.amazonaws.com"
 
     def get_authorization_data(self):
@@ -208,9 +209,8 @@ class EcrPublic(AbstractEcr):
 
 
 class Ecr:
-    def __init__(self, account_id, region_name, role_arn):
+    def __init__(self, *, region_name, role_arn):
         self._underlying = EcrPrivate(
-            account_id=account_id,
             region_name=region_name,
             role_arn=role_arn
         )
@@ -288,7 +288,6 @@ def get_ref_tags_for_repositories(*, image_repositories, tag):
     Repositories should be a dict of the form:
 
         (id) -> {
-            "account_id": (account_id),
             "region_name": (region_name),
             "role_arn": (role_arn),
             "namespace": (namespace) or None,

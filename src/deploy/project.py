@@ -52,10 +52,10 @@ class Projects:
 
 def prepare_config(
         config,
+        *,
         namespace=None,
         role_arn=None,
-        region_name=None,
-        account_id=None
+        region_name=None
 ):
     """
     Prepare the config.  Fill in overrides or defaults as necessary.
@@ -145,26 +145,6 @@ def prepare_config(
             f"in config: {', '.join(sorted(duplicates))}"
         )
 
-    # We always want an account_id to be set.  Read it from the initial config
-    # if possible, or use the override or guess it from the role ARN if not.
-    if account_id and ("account_id" in config) and (config["account_id"] != account_id):
-        warnings.warn(
-            f"Preferring override account_id {account_id} "
-            f"to account_id in config {config['account_id']}"
-        )
-        config["account_id"] = account_id
-
-    iam_role_account_id = iam.get_account_id(config["role_arn"])
-    if ("account_id" in config) and (config["account_id"] != iam_role_account_id):
-        warnings.warn(
-            f"Account ID {config['account_id']} does not match the role {config['role_arn']}"
-        )
-
-    if "account_id" not in config:
-        config["account_id"] = iam_role_account_id
-
-    assert "account_id" in config
-
 
 class Project:
     def __init__(self, project_id, config, release_store):
@@ -186,11 +166,7 @@ class Project:
     @property
     @functools.lru_cache()
     def ecr(self):
-        return Ecr(
-            account_id=self.account_id,
-            region_name=self.region_name,
-            role_arn=self.role_arn
-        )
+        return Ecr(region_name=self.region_name, role_arn=self.role_arn)
 
     @property
     def id(self):
@@ -205,10 +181,6 @@ class Project:
         return self.config["region_name"]
 
     @property
-    def account_id(self):
-        return self.config["account_id"]
-
-    @property
     def namespace(self):
         return self.config["namespace"]
 
@@ -219,7 +191,6 @@ class Project:
 
         Every repository will have the following keys:
 
-        -   account_id
         -   region_name
         -   role_arn
         -   namespace
@@ -234,7 +205,6 @@ class Project:
             assert repo["id"] not in result, repo["id"]
 
             result[repo["id"]] = {
-                "account_id": repo.get("account_id", self.account_id),
                 "region_name": repo.get("region_name", self.region_name),
                 "role_arn": repo.get("role_arn", self.role_arn),
                 "namespace": repo.get("namespace", self.namespace),
