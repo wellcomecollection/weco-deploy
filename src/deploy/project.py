@@ -181,17 +181,6 @@ class Project:
         else:
             return self.release_store.get_release(release_id)
 
-    def get_ecs_service_arns(self, release, environment_id):
-        """
-        Returns a dict (image ID) -> List[service ARNs].
-        """
-        return find_service_arns_for_release(
-            project=self._underlying,
-            release=release,
-            service_descriptions=self.ecs._described_services,
-            environment_id=environment_id
-        )
-
     def get_ecs_services(self, release, environment_id, cached=True):
         def _get_service(service_id):
             # Sometimes we want not to use the service cache - eg when checking
