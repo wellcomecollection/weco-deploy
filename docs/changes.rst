@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.6.26 - 2021-04-06
+-------------------
+
+This does some refactoring to use our new models for config parsing and validation.  There should be no user-visible effect.
+
+-------------------
 5.6.25 - 2021-04-06
 -------------------
 
