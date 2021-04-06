@@ -176,8 +176,6 @@ class Project:
 
         Every repository will have the following keys:
 
-        -   region_name
-        -   role_arn
         -   services
 
         """
@@ -189,8 +187,6 @@ class Project:
             assert repo["id"] not in result, repo["id"]
 
             result[repo["id"]] = {
-                "region_name": repo.get("region_name", self.region_name),
-                "role_arn": repo.get("role_arn", self.role_arn),
                 "services": repo.get("services", []),
             }
 
@@ -415,7 +411,11 @@ class Project:
         is chosen arbitrarily.
         """
         ref_tags_resp = ecr.get_ref_tags_for_repositories(
-            image_repositories=self.image_repositories,
+            self.ecr._underlying.client,
+            image_repositories=[
+                repo["id"]
+                for repo in self.config.get("image_repositories", [])
+            ],
             tag=from_label
         )
 

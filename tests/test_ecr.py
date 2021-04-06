@@ -132,6 +132,7 @@ def test_get_ref_tags_for_repositories(ecr_client, region_name):
     }
 
     uris = ecr.get_ref_tags_for_repositories(
+        ecr_client,
         image_repositories=image_repositories,
         tag="latest"
     )
