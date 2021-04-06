@@ -2,6 +2,7 @@ import pytest
 
 from deploy.ecs import (
     describe_services,
+    find_matching_service,
     list_cluster_arns_in_account,
     list_service_arns_in_cluster
 )
@@ -60,3 +61,68 @@ def test_describe_services(ecs_client, ecs_stack):
     expected_service_names = ecs_stack["services"]["cluster1"] + ecs_stack["services"]["cluster2"]
 
     assert actual_service_names == expected_service_names
+
+
+def test_find_matching_service(ecs_client, ecs_stack):
+    service_1a = {
+        "serviceArn": "serviceArn': 'arn:aws:ecs:eu-west-1:012345678910:service/service1a",
+        "tags": [
+            {
+                "key": "deployment:service",
+                "value": "service1",
+            },
+            {
+                "key": "deployment:env",
+                "value": "prod",
+            },
+        ]
+    }
+
+    service_1b = {
+        "serviceArn": "serviceArn': 'arn:aws:ecs:eu-west-1:012345678910:service/service1b",
+        "tags": [
+            {
+                "key": "deployment:service",
+                "value": "service1",
+            },
+            {
+                "key": "deployment:env",
+                "value": "staging",
+            },
+        ]
+    }
+
+    service_1c = {
+        "serviceArn": "serviceArn': 'arn:aws:ecs:eu-west-1:012345678910:service/service1c",
+        "tags": [
+            {
+                "key": "deployment:service",
+                "value": "service1",
+            },
+            {
+                "key": "deployment:env",
+                "value": "staging",
+            },
+        ]
+    }
+
+    service_descriptions = [service_1a, service_1b, service_1c]
+
+    assert find_matching_service(
+        service_descriptions,
+        service_id="service1",
+        environment_id="prod"
+    ) == service_1a
+
+    assert find_matching_service(
+        service_descriptions,
+        service_id="service2",
+        environment_id="prod"
+    ) is None
+
+    with pytest.raises(RuntimeError, match="Multiple matching services found"):
+        find_matching_service(
+            service_descriptions,
+            service_id="service1",
+            environment_id="staging"
+        )

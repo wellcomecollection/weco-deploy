@@ -40,6 +40,29 @@ def describe_services(ecs_client):
             yield from resp["services"]
 
 
+def find_matching_service(
+    service_descriptions, *, service_id, environment_id
+):
+    """
+    Given a service (e.g. bag-unpacker) and an environment (e.g. prod),
+    return the unique matching service.
+    """
+    try:
+        return tags.find_unique_resource_matching_tags(
+            service_descriptions,
+            expected_tags={
+                "deployment:service": service_id,
+                "deployment:env": environment_id,
+            }
+        )
+    except tags.NoMatchingResourceError:
+        return None
+    except tags.MultipleMatchingResourcesError:
+        raise RuntimeError(
+            f"Multiple matching services found for {service_id}/{environment_id}!"
+        )
+
+
 class Ecs:
     def __init__(self, region_name, role_arn):
         session = iam.get_session(
@@ -71,25 +94,12 @@ class Ecs:
             'deployment_id': response['service']['deployments'][0]['id']
         }
 
-    def find_matching_service(self, *, service_id, environment_id):
+    def find_matching_service(self, **kwargs):
         """
         Given a service (e.g. bag-unpacker) and an environment (e.g. prod),
         return the unique matching service.
         """
-        try:
-            return tags.find_unique_resource_matching_tags(
-                self._described_services,
-                expected_tags={
-                    "deployment:service": service_id,
-                    "deployment:env": environment_id,
-                }
-            )
-        except tags.NoMatchingResourceError:
-            return None
-        except tags.MultipleMatchingResourcesError:
-            raise RuntimeError(
-                f"Multiple matching services found for {service_id}/{environment_id}!"
-            )
+        return find_matching_service(self._described_services, **kwargs)
 
     def list_service_tasks(self, service):
         """
