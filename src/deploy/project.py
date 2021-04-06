@@ -176,7 +176,7 @@ class Project:
         self.release_store.initialise()
 
     @property
-    @functools.lru_cache
+    @functools.lru_cache()
     def ecs(self):
         return Ecs(
             region_name=self.region_name,
@@ -184,7 +184,7 @@ class Project:
         )
 
     @property
-    @functools.lru_cache
+    @functools.lru_cache()
     def ecr(self):
         return Ecr(
             account_id=self.account_id,
