@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.6.21 - 2021-04-06
+-------------------
+
+Simplify the code slightly by removing per-image repository and per-service overrides, which we never use in practice.
+
+-------------------
 5.6.20 - 2021-03-31
 -------------------
 
