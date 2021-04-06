@@ -176,6 +176,23 @@ class Project:
         self.release_store.initialise()
 
     @property
+    @functools.lru_cache()
+    def ecs(self):
+        return Ecs(
+            region_name=self.region_name,
+            role_arn=self.role_arn
+        )
+
+    @property
+    @functools.lru_cache()
+    def ecr(self):
+        return Ecr(
+            account_id=self.account_id,
+            region_name=self.region_name,
+            role_arn=self.role_arn
+        )
+
+    @property
     def id(self):
         return self.config["id"]
 
@@ -241,30 +258,6 @@ class Project:
 
         assert len(result) == len(self.config.get("environments", []))
         return result
-
-    def _ecr(self, account_id=None, region_name=None, role_arn=None):
-        return Ecr(
-            account_id=account_id or self.account_id,
-            region_name=region_name or self.region_name,
-            role_arn=role_arn or self.role_arn
-        )
-
-    def _ecs(self, *, cached=True, **kwargs):
-        if cached:
-            return self._ecs_cached(**kwargs)
-        return self._ecs_raw(**kwargs)
-
-    @functools.lru_cache()
-    def _ecs_cached(self, **kwargs):
-        return self._ecs_raw(**kwargs)
-
-    # We can't use the __wrapped__ property of an lru_cached function
-    # when that function is a class method
-    def _ecs_raw(self, region_name=None, role_arn=None):
-        return Ecs(
-            region_name=region_name or self.region_name,
-            role_arn=role_arn or self.role_arn
-        )
 
     def _create_deployment(self, environment_id, details, description):
         return {
@@ -334,12 +327,7 @@ class Project:
 
         for image_id, services in self._get_services_by_image_id(release):
             for serv in services:
-                ecs = self._ecs(
-                    region_name=serv.get('region_name'),
-                    role_arn=serv.get('role_arn')
-                )
-
-                matching_service = ecs.find_matching_service(
+                matching_service = self.ecs.find_matching_service(
                     service_id=serv["id"],
                     environment_id=environment_id
                 )
@@ -353,13 +341,7 @@ class Project:
 
     def get_ecs_services(self, release, environment_id, cached=True):
         def _get_service(service):
-            ecs = self._ecs(
-                region_name=service.get('region_name'),
-                role_arn=service.get('role_arn'),
-                cached=cached
-            )
-
-            ecs_service = ecs.find_matching_service(
+            ecs_service = self.ecs.find_matching_service(
                 service_id=service['id'],
                 environment_id=environment_id
             )
@@ -407,11 +389,7 @@ class Project:
                 service_arn = service["response"]["serviceArn"]
                 service_deployment_label = service_tags["deployment:label"]
                 desired_task_count = service["response"]["desiredCount"]
-                ecs = self._ecs(
-                    region_name=service.get('region_name'),
-                    role_arn=service.get('role_arn')
-                )
-                tasks = ecs.list_service_tasks(service)
+                tasks = self.ecs.list_service_tasks(service)
 
                 for task in tasks:
                     task_tags = parse_aws_tags(task["tags"])
@@ -450,16 +428,14 @@ class Project:
         matched_image = self.image_repositories[image_id]
 
         # Create an ECR client for the correct account
-        ecr = self._ecr(matched_image["account_id"])
+        self.ecr.login()
 
-        ecr.login()
-
-        remote_uri, remote_tag, local_tag = ecr.publish_image(
+        remote_uri, remote_tag, local_tag = self.ecr.publish_image(
             namespace=matched_image["namespace"],
             image_id=image_id,
         )
 
-        tag_result = ecr.tag_image(
+        tag_result = self.ecr.tag_image(
             namespace=matched_image["namespace"],
             image_id=image_id,
             tag=remote_tag,
@@ -548,10 +524,7 @@ class Project:
         )
 
     def _deploy_ecs_service(self, service, deployment_label):
-        return self._ecs(
-            region_name=service['config'].get('region_name'),
-            role_arn=service['config'].get('role_arn'),
-        ).redeploy_service(
+        return self.ecs.redeploy_service(
             cluster_arn=service['response']['clusterArn'],
             service_arn=service['response']['serviceArn'],
             deployment_label=deployment_label
@@ -564,18 +537,12 @@ class Project:
         try:
             matched_image = self.image_repositories[image_id]
             namespace = matched_image["namespace"]
-            ecr = self._ecr(
-                account_id=matched_image["account_id"],
-                region_name=matched_image["region_name"],
-                role_arn=matched_image["role_arn"],
-            )
         except KeyError:
             # TODO: Does it make sense to create an ECR client if we don't
             # have an ECR repo to tag in?
-            ecr = self._ecr()
             namespace = self.namespace
 
-        return ecr.tag_image(
+        return self.ecr.tag_image(
             namespace=namespace,
             image_id=image_id,
             tag=old_tag,
