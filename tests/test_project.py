@@ -265,78 +265,6 @@ class TestPrepareConfig:
 
         prepare_config(config)
 
-    def test_uses_config_account_id(self):
-        config = {
-            "role_arn": "arn:aws:iam::1234567890:role/example-role",
-            "account_id": "1234567890"
-        }
-
-        prepare_config(config)
-        assert config["account_id"] == "1234567890"
-
-    def test_allows_overriding_account_id(self):
-        """
-        If there is no account_id in the initial config, but an override account_id
-        is supplied, that account_id is added to the config.
-        """
-        config = {"role_arn": "arn:aws:iam::1234567890:role/example-role"}
-        prepare_config(config, account_id="1234567890")
-        assert config["account_id"] == "1234567890"
-
-    def test_warns_if_account_id_conflict(self):
-        """
-        If there is an account_id in the initial config, and a different override
-        is supplied, then a warning is shown.
-        """
-        config = {
-            "role_arn": "arn:aws:iam::1234567890:role/example-role",
-            "account_id": "1111111111"
-        }
-        with pytest.warns(UserWarning, match="Preferring override account_id"):
-            prepare_config(config, account_id="1234567890")
-
-        assert config["account_id"] == "1234567890"
-
-    def test_does_not_warn_if_account_id_match(self):
-        """
-        If there is an account_id in the initial config, and it matches the override,
-        then no warning is shown.
-        """
-        config = {
-            "role_arn": "arn:aws:iam::1234567890:role/example-role",
-            "account_id": "1234567890"
-        }
-
-        with pytest.warns(None) as record:
-            prepare_config(config, account_id="1234567890")
-
-        assert len(record) == 0
-
-    def test_warns_if_account_if_does_not_match_role_arn(self):
-        """
-        If the account_id does not match the role ARN, then a warning is shown.
-        """
-        config = {
-            "role_arn": "arn:aws:iam::1234567890:role/example-role",
-            "account_id": "1111111111"
-        }
-        with pytest.warns(
-            UserWarning,
-            match="Account ID 1111111111 does not match the role"
-        ):
-            prepare_config(config)
-
-    def test_uses_account_id_from_role_if_none_specified(self):
-        """
-        If the account_id is not explicitly specified, the one in the role ARN is used.
-        """
-        config = {
-            "role_arn": "arn:aws:iam::1234567890:role/example-role",
-        }
-        prepare_config(config)
-
-        assert config["account_id"] == "1234567890"
-
 
 class TestProject:
     def test_image_repositories(self, role_arn, project_id):
@@ -345,7 +273,6 @@ class TestProject:
                 {
                     "id": "repo1",
                     "services": ["service1a", "service1b"],
-                    "account_id": "1111111111",
                     "region_name": "us-east-1",
                     "namespace": "org.wellcome",
                     "role_arn": "arn:aws:iam::1111111111:role/publisher-role"
@@ -360,7 +287,6 @@ class TestProject:
                 }
             ],
             "role_arn": role_arn,
-            "account_id": "1234567890",
             "namespace": "edu.self",
             "region_name": "eu-west-1",
         }
@@ -375,21 +301,18 @@ class TestProject:
             "repo1": {
                 "namespace": "org.wellcome",
                 "services": ["service1a", "service1b"],
-                "account_id": "1111111111",
                 "region_name": "us-east-1",
                 "role_arn": "arn:aws:iam::1111111111:role/publisher-role",
             },
             "repo2": {
                 "namespace": "edu.self",
                 "services": ["service2a", "service2b", "service2c"],
-                "account_id": "1234567890",
                 "region_name": "eu-west-1",
                 "role_arn": role_arn,
             },
             "repo3": {
                 "namespace": "edu.self",
                 "services": ["service3a"],
-                "account_id": "1234567890",
                 "region_name": "eu-west-1",
                 "role_arn": role_arn,
             },
@@ -402,7 +325,6 @@ class TestProject:
                 {"id": "prod", "name": "Prod"},
             ],
             "role_arn": role_arn,
-            "account_id": "1234567890",
             "namespace": "edu.self",
             "region_name": "eu-west-1",
         }
@@ -450,7 +372,6 @@ class TestProject:
                 {
                     "id": "repo1",
                     "services": ["service1"],
-                    "account_id": "1111111111",
                     "region_name": "us-east-1",
                     "namespace": "org.wellcome",
                     "role_arn": "arn:aws:iam::1111111111:role/publisher-role"
@@ -461,7 +382,6 @@ class TestProject:
                 {"id": "prod", "name": "Prod"},
             ],
             "role_arn": role_arn,
-            "account_id": "1234567890",
             "namespace": "edu.self",
             "region_name": "eu-west-1",
         }

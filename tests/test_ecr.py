@@ -20,8 +20,7 @@ class TestGetRefTagsForImage:
             ecr.get_ref_tags_for_image(
                 ecr_client,
                 repository_name="empty_repository",
-                tag="latest",
-                account_id="1234567890",
+                tag="latest"
             )
 
     def test_get_ref_tags_for_image(self, ecr_client, region_name):
@@ -32,19 +31,16 @@ class TestGetRefTagsForImage:
 
         ecr_client.create_repository(repositoryName="example_worker")
         ecr_client.put_image(
-            registryId="1234567890",
             repositoryName="example_worker",
             imageManifest=json.dumps(manifest),
             imageTag="latest",
         )
         ecr_client.put_image(
-            registryId="1234567890",
             repositoryName="example_worker",
             imageManifest=json.dumps(manifest),
             imageTag="ref.123",
         )
         ecr_client.put_image(
-            registryId="1234567890",
             repositoryName="example_worker",
             imageManifest=json.dumps(manifest),
             imageTag="ref.456",
@@ -53,8 +49,7 @@ class TestGetRefTagsForImage:
         ref_tags = ecr.get_ref_tags_for_image(
             ecr_client,
             repository_name="example_worker",
-            tag="latest",
-            account_id="1234567890",
+            tag="latest"
         )
 
         assert ref_tags == {"ref.123", "ref.456"}
@@ -64,8 +59,7 @@ class TestGetRefTagsForImage:
             ecr.get_ref_tags_for_image(
                 ecr_client,
                 repository_name="repo_which_does_not_exist",
-                tag="latest",
-                account_id="1234567890",
+                tag="latest"
             )
 
     def test_error_if_image_does_not_have_ref_tag(self, ecr_client, region_name):
@@ -74,7 +68,6 @@ class TestGetRefTagsForImage:
         """
         ecr_client.create_repository(repositoryName="example_worker")
         ecr_client.put_image(
-            registryId="1234567890",
             repositoryName="example_worker",
             imageManifest=json.dumps(create_image_manifest()),
             imageTag="latest",
@@ -82,10 +75,7 @@ class TestGetRefTagsForImage:
 
         with pytest.raises(ecr.NoRefTagError):
             ecr.get_ref_tags_for_image(
-                ecr_client,
-                repository_name="example_worker",
-                tag="latest",
-                account_id="1234567890",
+                ecr_client, repository_name="example_worker", tag="latest"
             )
 
 
@@ -95,13 +85,11 @@ def test_get_ref_tags_for_repositories(ecr_client, region_name):
     manifest1 = create_image_manifest()
     ecr_client.create_repository(repositoryName="example_worker1")
     ecr_client.put_image(
-        registryId="1111111111",
         repositoryName="example_worker1",
         imageManifest=json.dumps(manifest1),
         imageTag="latest",
     )
     ecr_client.put_image(
-        registryId="1111111111",
         repositoryName="example_worker1",
         imageManifest=json.dumps(manifest1),
         imageTag="ref.111",
@@ -110,13 +98,11 @@ def test_get_ref_tags_for_repositories(ecr_client, region_name):
     manifest2 = create_image_manifest()
     ecr_client.create_repository(repositoryName="example_worker2")
     ecr_client.put_image(
-        registryId="2222222222",
         repositoryName="example_worker2",
         imageManifest=json.dumps(manifest2),
         imageTag="latest",
     )
     ecr_client.put_image(
-        registryId="2222222222",
         repositoryName="example_worker2",
         imageManifest=json.dumps(manifest2),
         imageTag="ref.222",
@@ -126,17 +112,14 @@ def test_get_ref_tags_for_repositories(ecr_client, region_name):
 
     image_repositories = {
         "example_worker1": {
-            "account_id": "1111111111",
             "region_name": region_name,
             "role_arn": "arn:aws:iam::1111111111:role/example-role",
         },
         "example_worker2": {
-            "account_id": "2222222222",
             "region_name": region_name,
             "role_arn": "arn:aws:iam::2222222222:role/example-role",
         },
         "example_worker3": {
-            "account_id": "3333333333",
             "region_name": region_name,
             "role_arn": "arn:aws:iam::3333333333:role/example-role",
         },

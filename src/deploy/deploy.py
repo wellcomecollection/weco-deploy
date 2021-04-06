@@ -26,12 +26,11 @@ LOGGING_ROOT = os.path.join(os.environ["HOME"], ".local", "share", "weco-deploy"
 @click.option('--confirm', '-y', is_flag=True, help="Non-interactive deployment confirmation")
 @click.option("--project-id", '-i', help="Specify the project ID")
 @click.option("--region-name", '-i', help="Specify the AWS region name")
-@click.option("--account-id", help="Specify the AWS account ID")
 @click.option("--namespace", help="Specify the project namespace")
 @click.option("--role-arn", help="Specify an AWS role to assume")
 @click.option('--dry-run', '-d', is_flag=True, help="Don't make changes.")
 @click.pass_context
-def cli(ctx, project_file, verbose, confirm, project_id, region_name, account_id, namespace, role_arn, dry_run):
+def cli(ctx, project_file, verbose, confirm, project_id, region_name, namespace, role_arn, dry_run):
     warn_if_not_latest_version()
 
     try:
@@ -63,7 +62,6 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_name, account_id
         project_id=project_id,
         region_name=region_name,
         role_arn=role_arn,
-        account_id=account_id,
         namespace=namespace
     )
 
@@ -82,7 +80,6 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_name, account_id
             f"IN region:        {config['region_name']}",
             f"Running as role:  {user_arn}",
             f"Underlying role:  {underlying_user_arn}" if user_arn != underlying_user_arn else "",
-            f"Using account ID: {config['account_id']}"
         ]
 
         message = "\n".join([ln for ln in lines if ln])
