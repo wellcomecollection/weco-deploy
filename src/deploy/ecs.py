@@ -128,6 +128,37 @@ def deploy_service(session, *, cluster_arn, service_arn, deployment_label):
     }
 
 
+def list_tasks_in_service(session, *, cluster_arn, service_name):
+    """
+    Given the name of a service, return a list of tasks running within
+    the service.
+    """
+    ecs_client = session.client("ecs")
+
+    task_arns = []
+
+    paginator = ecs_client.get_paginator("list_tasks")
+    for page in paginator.paginate(
+        cluster=cluster_arn, serviceName=service_name
+    ):
+        task_arns.extend(page["taskArns"])
+
+    # If task_arns is empty we can't ask to describe them.
+    # TODO: This method can handle up to 100 task ARNs.  It seems unlikely
+    # we'd ever have more than that, hence not handling it properly.
+    if task_arns:
+        resp = ecs_client.describe_tasks(
+            cluster=cluster_arn,
+            tasks=task_arns,
+            include=["TAGS"]
+        )
+
+        return resp["tasks"]
+    else:
+        return []
+
+
+
 class Ecs:
     def __init__(self, region_name, role_arn):
         self.session = iam.get_session(
@@ -137,29 +168,3 @@ class Ecs:
         )
         self.ecs = self.session.client('ecs')
         self._described_services = list(describe_services(self.ecs))
-
-    def list_service_tasks(self, service):
-        """
-        Given a service (e.g. bag-unpacker),
-        return a list of tasks running within that service
-        """
-        service_name = service["response"]["serviceName"]
-        cluster_arn = service["response"]["clusterArn"]
-
-        paginator = self.ecs.get_paginator("list_tasks")
-        paginator_iter = paginator.paginate(cluster=cluster_arn, serviceName=service_name)
-        task_arns = []
-        for page in paginator_iter:
-            task_arns += page["taskArns"]
-
-        # If task_arns is empty we can't ask to describe them
-        if task_arns:
-            resp = self.ecs.describe_tasks(
-                cluster=cluster_arn,
-                tasks=task_arns,
-                include=["TAGS"]
-            )
-
-            return resp["tasks"]
-        else:
-            return []

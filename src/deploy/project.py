@@ -246,7 +246,12 @@ class Project:
                 service_arn = service["response"]["serviceArn"]
                 service_deployment_label = service_tags["deployment:label"]
                 desired_task_count = service["response"]["desiredCount"]
-                tasks = self.ecs.list_service_tasks(service)
+
+                tasks = list_tasks_in_service(
+                    self.session,
+                    cluster_arn=service["response"]["clusterArn"],
+                    service_name=service["response"]["serviceName"],
+                )
 
                 for task in tasks:
                     task_tags = parse_aws_tags(task["tags"])

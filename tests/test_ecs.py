@@ -7,11 +7,12 @@ from deploy.ecs import (
     find_service_arns_for_release,
     list_cluster_arns_in_account,
     list_service_arns_in_cluster,
+    list_tasks_in_service,
     MultipleMatchingServicesError,
     NoMatchingServiceError,
 )
 from deploy.models import ImageRepository, Project, Service
-from deploy.tags import parse_aws_tags
+from deploy.tags import parse_aws_tags, to_aws_tags
 
 
 @pytest.fixture(scope="session")
@@ -262,3 +263,20 @@ def test_deploy_service(session, ecs_stack):
     assert tags == {
         "deployment:label": "testing_again"
     }
+
+
+
+def test_list_tasks_in_service(session, ecs_stack):
+    # Annoyingly, there's no way for the StartTask API to start tasks in
+    # a named service, so we'll never find anything useful here.
+    #
+    # I'm calling the method so we get some sense checking that it's
+    # not completely broken, but it'd be nice if we could test it
+    # more thoroughly.
+
+    resp = list_tasks_in_service(
+        session,
+        cluster_arn="arn:aws:ecs:eu-west-1:012345678910:cluster/cluster1",
+        service_name="service1a"
+    )
+    assert resp == []
