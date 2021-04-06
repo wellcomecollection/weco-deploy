@@ -58,8 +58,8 @@ def test_list_service_arns_in_cluster(ecs_client, ecs_stack):
     ]
 
 
-def test_describe_services(ecs_client, ecs_stack):
-    service_descriptions = list(describe_services(ecs_client))
+def test_describe_services(session, ecs_stack):
+    service_descriptions = describe_services(session)
 
     assert len(service_descriptions) == 5
     assert all("tags" in desc for desc in service_descriptions)
