@@ -11,6 +11,9 @@ from .commands import cmd
 from .git import repo_root
 
 
+DEFAULT_NAMESPACE = "uk.ac.wellcome"
+
+
 def create_client(*, resource, region_name, role_arn):
     session = iam.get_session(
         session_name="ReleaseToolEcr",
@@ -21,11 +24,8 @@ def create_client(*, resource, region_name, role_arn):
     return session.client(resource)
 
 
-def _get_repository_name(namespace, image_id):
-    if namespace:
-        return f"{namespace}/{image_id}"
-    else:
-        return image_id
+def _get_repository_name(image_id):
+    return f"{DEFAULT_NAMESPACE}/{image_id}"
 
 
 def get_release_image_tag(image_id):
@@ -41,8 +41,8 @@ class AbstractEcr(ABC):
     def base_uri(self):
         pass
 
-    def get_image_uri(self, *, namespace, image_id, tag):
-        repository_name = _get_repository_name(namespace, image_id)
+    def get_image_uri(self, *, image_id, tag):
+        repository_name = _get_repository_name(image_id)
         return f"{self.base_uri}/{repository_name}:{tag}"
 
     @abstractmethod
@@ -74,16 +74,15 @@ class AbstractEcr(ABC):
         """
         pass
 
-    def publish_image(self, *, namespace, image_id):
+    def publish_image(self, *, image_id):
         """
-        Given the namespace and ID of a local image, publish it to ECR.
+        Given the ID of a local image, publish it to ECR.
         """
         local_image_tag = get_release_image_tag(image_id)
         local_image_name = f"{image_id}:{local_image_tag}"
 
         remote_image_tag = f"ref.{local_image_tag}"
         remote_image_name = self.get_image_uri(
-            namespace=namespace,
             image_id=image_id,
             tag=remote_image_tag
         )
@@ -97,11 +96,11 @@ class AbstractEcr(ABC):
 
         return remote_image_name, remote_image_tag, local_image_tag
 
-    def tag_image(self, *, namespace, image_id, tag, new_tag):
+    def tag_image(self, *, image_id, tag, new_tag):
         """
         Tag an image in ECR.
         """
-        repository_name = _get_repository_name(namespace, image_id)
+        repository_name = _get_repository_name(image_id)
 
         manifests = self.get_image_manifests_for_tag(
             repository_name=repository_name,
@@ -215,15 +214,11 @@ class Ecr:
             role_arn=role_arn
         )
 
-    def publish_image(self, namespace, image_id):
-        return self._underlying.publish_image(
-            namespace=namespace,
-            image_id=image_id
-        )
+    def publish_image(self, image_id):
+        return self._underlying.publish_image(image_id=image_id)
 
-    def tag_image(self, namespace, image_id, tag, new_tag):
+    def tag_image(self, image_id, tag, new_tag):
         return self._underlying.tag_image(
-            namespace=namespace,
             image_id=image_id,
             tag=tag,
             new_tag=new_tag
@@ -290,7 +285,6 @@ def get_ref_tags_for_repositories(*, image_repositories, tag):
         (id) -> {
             "region_name": (region_name),
             "role_arn": (role_arn),
-            "namespace": (namespace) or None,
         }
 
     Returns a dict (id) -> set(ref_tags)
@@ -301,8 +295,7 @@ def get_ref_tags_for_repositories(*, image_repositories, tag):
     for repo_id, repo_details in image_repositories.items():
         region_name = repo_details["region_name"]
         role_arn = repo_details["role_arn"]
-        namespace = repo_details.get("namespace", None)
-        repository_name = _get_repository_name(namespace, repo_id)
+        repository_name = _get_repository_name(repo_id)
 
         ecr_client = create_client(
             resource="ecr",
