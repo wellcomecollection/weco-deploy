@@ -31,8 +31,8 @@ def aws_credentials():
 
 
 @pytest.fixture(scope="session")
-def session(aws_credentials):
-    return boto3.Session()
+def session(aws_credentials, region_name):
+    return boto3.Session(region_name=region_name)
 
 
 @pytest.fixture(scope="session")
