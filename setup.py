@@ -23,6 +23,8 @@ with open(local_file('src/deploy/version.py')) as o:
 assert __version__ is not None
 
 install_requires = [
+    "attrs >= 20.3.0",
+    "cattrs >= 1.4.0,<2",
     'click >= 7.1.2',
     'boto3 >= 1.14.18',
     'pyyaml >= 5.3.1',

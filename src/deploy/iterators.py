@@ -1,4 +1,7 @@
+import collections
 import itertools
+
+from .exceptions import ConfigError
 
 
 def chunked_iterable(iterable, *, size):
@@ -15,3 +18,16 @@ def chunked_iterable(iterable, *, size):
         if not chunk:
             break
         yield chunk
+
+
+def convert_identified_list_to_dict(values):
+    """
+    Given a list of objects with a .id parameter, convert them to a dict
+    keyed with the .id.
+    """
+    id_counts = collections.Counter(v.id for v in values)
+    duplicate_ids = {id for id, count in id_counts.items() if count > 1}
+    if duplicate_ids:
+        raise ConfigError("Duplicate IDs: %s" % ", ".join(duplicate_ids))
+
+    return {v.id: v for v in values}
