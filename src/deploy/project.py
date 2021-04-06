@@ -175,10 +175,10 @@ class Project:
             return self.release_store.get_release(release_id)
 
     def get_ecs_services(self, release, environment_id, cached=True):
-        def _get_service(service_id):
-            # We always get a fresh set of ECS service descriptions.
-            service_descriptions = ecs.describe_services(self.session)
+        # We always get a fresh set of ECS service descriptions.
+        service_descriptions = ecs.describe_services(self.session)
 
+        def _get_service(service_id):
             ecs_service = ecs.find_matching_service(
                 service_descriptions=service_descriptions,
                 service_id=service_id,
