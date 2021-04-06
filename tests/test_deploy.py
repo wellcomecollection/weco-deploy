@@ -24,11 +24,11 @@ def wellcome_project_file(tmpdir, project_id, role_arn):
               image_repositories:
                 - id: repo1
                   services:
-                  - service1a
-                  - service1b
+                  - id: service1a
+                  - id: service1b
                 - id: repo2
                   services:
-                  - service2a
+                  - id: service2a
               name: My project
               role_arn: {role_arn}
             """))

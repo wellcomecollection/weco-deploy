@@ -4,9 +4,10 @@ import functools
 import uuid
 import warnings
 
+import cattr
 import yaml
 
-from . import ecr, iam
+from . import ecr, iam, models
 from .ecr import Ecr
 from .ecs import Ecs
 from .exceptions import ConfigError
@@ -139,6 +140,8 @@ class Project:
 
         self.release_store = release_store
         self.release_store.initialise()
+
+        self._underlying = cattr.structure(config, models.Project)
 
     @property
     @functools.lru_cache()

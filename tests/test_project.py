@@ -223,21 +223,26 @@ class TestProject:
             "image_repositories": [
                 {
                     "id": "repo1",
-                    "services": ["service1a", "service1b"],
+                    "services": [{"id": "service1a"}, {"id": "service1b"}],
                     "region_name": "us-east-1",
                     "role_arn": "arn:aws:iam::1111111111:role/publisher-role"
                 },
                 {
                     "id": "repo2",
-                    "services": ["service2a", "service2b", "service2c"]
+                    "services": [
+                        {"id": "service2a"},
+                        {"id": "service2b"},
+                        {"id": "service2c"},
+                    ]
                 },
                 {
                     "id": "repo3",
-                    "services": ["service3a"]
+                    "services": [{"id": "service3a"}]
                 }
             ],
             "role_arn": role_arn,
             "region_name": "eu-west-1",
+            "name": "Example Project",
         }
 
         project = Project(
@@ -248,19 +253,17 @@ class TestProject:
 
         assert project.image_repositories == {
             "repo1": {
-                "services": ["service1a", "service1b"],
-                "region_name": "us-east-1",
-                "role_arn": "arn:aws:iam::1111111111:role/publisher-role",
+                "services": [{"id": "service1a"}, {"id": "service1b"}],
             },
             "repo2": {
-                "services": ["service2a", "service2b", "service2c"],
-                "region_name": "eu-west-1",
-                "role_arn": role_arn,
+                "services": [
+                    {"id": "service2a"},
+                    {"id": "service2b"},
+                    {"id": "service2c"},
+                ],
             },
             "repo3": {
-                "services": ["service3a"],
-                "region_name": "eu-west-1",
-                "role_arn": role_arn,
+                "services": [{"id": "service3a"}],
             },
         }
 
@@ -272,6 +275,7 @@ class TestProject:
             ],
             "role_arn": role_arn,
             "region_name": "eu-west-1",
+            "name": "Example Project",
         }
 
         project = Project(
@@ -300,7 +304,10 @@ class TestProject:
 
         project = Project(
             project_id=project_id,
-            config={"role_arn": role_arn},
+            config={
+                "role_arn": role_arn,
+                "name": "Example Project",
+            },
             release_store=release_store
         )
 
@@ -316,7 +323,7 @@ class TestProject:
             "image_repositories": [
                 {
                     "id": "repo1",
-                    "services": ["service1"],
+                    "services": [{"id": "service1"}],
                     "region_name": "us-east-1",
                     "role_arn": "arn:aws:iam::1111111111:role/publisher-role"
                 },
@@ -327,6 +334,7 @@ class TestProject:
             ],
             "role_arn": role_arn,
             "region_name": "eu-west-1",
+            "name": "Example Project",
         }
 
         project = Project(
