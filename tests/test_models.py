@@ -112,3 +112,30 @@ def test_from_path(tmpdir):
 def test_duplicate_ids(bad_yaml):
     with pytest.raises(ConfigError, match="Duplicate IDs:"):
         ProjectList.from_text(bad_yaml)
+
+
+def test_image_repositories_default_is_empty():
+    yaml =     """
+    example_project:
+      environments:
+        - id: prod
+          name: Production
+        - id: staging
+          name: Staging
+      name: Example Project
+      role_arn: arn:aws:iam::123456789012:role/example-ci
+    """
+    p = ProjectList.from_text(yaml)
+    assert p["example_project"].image_repositories == {}
+
+
+def test_environments_default_is_empty():
+    yaml =     """
+    example_project:
+      image_repositories:
+        - id: example_project
+      name: Example Project
+      role_arn: arn:aws:iam::123456789012:role/example-ci
+    """
+    p = ProjectList.from_text(yaml)
+    assert p["example_project"].environments == {}
