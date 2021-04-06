@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.6.24 - 2021-04-06
+-------------------
+
+Fix wait-for-deploy by restoring cache-busting ability to ECS service fetcher
+
+-------------------
 5.6.23 - 2021-04-06
 -------------------
 
