@@ -342,10 +342,7 @@ class Project:
         """
         ref_tags_resp = ecr.get_ref_tags_for_repositories(
             self.ecr._underlying.client,
-            image_repositories=[
-                repo["id"]
-                for repo in self.config.get("image_repositories", [])
-            ],
+            image_repositories=self.image_repositories.keys(),
             tag=from_label
         )
 
