@@ -8,7 +8,7 @@ import yaml
 
 from . import ecr, iam, models
 from .ecr import Ecr
-from .ecs import Ecs, find_matching_service, find_service_arns_for_release
+from .ecs import Ecs, find_matching_service
 from .exceptions import ConfigError
 from .release_store import DynamoReleaseStore, ReleaseNotFoundError
 from .tags import parse_aws_tags
