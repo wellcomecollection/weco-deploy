@@ -8,7 +8,7 @@ import yaml
 
 from . import ecr, iam, models
 from .ecr import Ecr
-from .ecs import Ecs, find_matching_service
+from .ecs import Ecs, find_matching_service, deploy_service
 from .exceptions import ConfigError
 from .release_store import DynamoReleaseStore, ReleaseNotFoundError
 from .tags import parse_aws_tags
@@ -99,6 +99,12 @@ class Project:
 
         self.release_store = release_store
         self.release_store.initialise()
+
+        self.session = iam.get_session(
+            "weco-deploy-project",
+            role_arn=self.role_arn,
+            region_name=self.region_name
+        )
 
     @property
     @functools.lru_cache()
@@ -370,13 +376,6 @@ class Project:
             release_images=release_images
         )
 
-    def _deploy_ecs_service(self, service, deployment_label):
-        return self.ecs.redeploy_service(
-            cluster_arn=service['response']['clusterArn'],
-            service_arn=service['response']['serviceArn'],
-            deployment_label=deployment_label
-        )
-
     def _tag_ecr_image(self, environment_id, image_id, image_name):
         old_tag = image_name.split(":")[-1]
         new_tag = f"env.{environment_id}"
@@ -411,13 +410,18 @@ class Project:
 
         # Memoize service deployments to prevent multiple deployments
         def _ecs_deploy(service, deployment_label):
-            if service['response']['serviceArn'] not in ecs_services_deployed:
-                ecs_services_deployed[service['response']['serviceArn']] = self._deploy_ecs_service(
-                    service=service,
+            cluster_arn = service["response"]["clusterArn"]
+            service_arn = service["response"]["serviceArn"]
+
+            if service_arn not in ecs_services_deployed:
+                ecs_services_deployed[service_arn] = deploy_service(
+                    self.session,
+                    cluster_arn=cluster_arn,
+                    service_arn=service_arn,
                     deployment_label=deployment_label
                 )
 
-            return ecs_services_deployed[service['response']['serviceArn']]
+            return ecs_services_deployed[service_arn]
 
         for image_id, image_name in sorted(release['images'].items()):
             tag_result = self._tag_ecr_image(

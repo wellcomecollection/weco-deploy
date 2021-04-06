@@ -22,6 +22,22 @@ def parse_aws_tags(tags):
     return result
 
 
+def to_aws_tags(tags):
+    """
+    When you assign tags to an AWS resource, you have to use the form
+
+        [{"key": "KEY1", "value": "VALUE1"},
+         {"key": "KEY2", "value": "VALUE2"},
+         ...]
+
+    This function converts a Python-style dict() into these tags.
+    """
+    return [
+        {"key": key, "value": value}
+        for key, value in tags.items()
+    ]
+
+
 class MultipleMatchingResourcesError(ValueError):
     """
     Raised if there are multiple resources matching a given set of tags.

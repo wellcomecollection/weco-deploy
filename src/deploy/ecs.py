@@ -104,36 +104,39 @@ def find_service_arns_for_release(
     return result
 
 
+def deploy_service(session, *, cluster_arn, service_arn, deployment_label):
+    """
+    Triggers a deployment of a given service.
+    """
+    ecs_client = session.client("ecs")
+
+    resp = ecs_client.update_service(
+        cluster=cluster_arn,
+        service=service_arn,
+        forceNewDeployment=True
+    )
+
+    ecs_client.tag_resource(
+        resourceArn=service_arn,
+        tags=tags.to_aws_tags({"deployment:label": deployment_label})
+    )
+
+    return {
+        "cluster_arn": resp["service"]["clusterArn"],
+        "service_arn": resp["service"]["serviceArn"],
+        "deployment_id": resp["service"]["deployments"][0]["id"]
+    }
+
+
 class Ecs:
     def __init__(self, region_name, role_arn):
-        session = iam.get_session(
+        self.session = iam.get_session(
             session_name="ReleaseToolEcs",
             role_arn=role_arn,
             region_name=region_name
         )
-        self.ecs = session.client('ecs')
+        self.ecs = self.session.client('ecs')
         self._described_services = list(describe_services(self.ecs))
-
-    def redeploy_service(self, cluster_arn, service_arn, deployment_label):
-        response = self.ecs.update_service(
-            cluster=cluster_arn,
-            service=service_arn,
-            forceNewDeployment=True
-        )
-
-        self.ecs.tag_resource(
-            resourceArn=service_arn,
-            tags=[{
-                'key': 'deployment:label',
-                'value': deployment_label
-            }]
-        )
-
-        return {
-            'cluster_arn': response['service']['clusterArn'],
-            'service_arn': response['service']['serviceArn'],
-            'deployment_id': response['service']['deployments'][0]['id']
-        }
 
     def list_service_tasks(self, service):
         """

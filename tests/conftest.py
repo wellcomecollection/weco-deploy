@@ -31,6 +31,11 @@ def aws_credentials():
 
 
 @pytest.fixture(scope="session")
+def session(aws_credentials):
+    return boto3.Session()
+
+
+@pytest.fixture(scope="session")
 def ecr_client(aws_credentials, region_name):
     with moto.mock_ecr():
         yield boto3.client("ecr", region_name=region_name)
