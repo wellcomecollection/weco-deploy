@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.6.25 - 2021-04-06
+-------------------
+
+Simplify the code slightly by removing namespace overrides, which we never use in practice.  We always use the default namespace ``uk.ac.wellcome``.
+
+-------------------
 5.6.24 - 2021-04-06
 -------------------
 
