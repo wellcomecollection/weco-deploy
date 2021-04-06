@@ -27,6 +27,8 @@ def describe_services(ecs_client):
     """
     Describe all the ECS services in an account.
     """
+    result = []
+
     for cluster in list_cluster_arns_in_account(ecs_client):
         service_arns = list_service_arns_in_cluster(ecs_client, cluster=cluster)
 
@@ -38,7 +40,9 @@ def describe_services(ecs_client):
                 include=["TAGS"]
             )
 
-            yield from resp["services"]
+            result.extend(resp["services"])
+
+    return result
 
 
 class NoMatchingServiceError(Exception):
@@ -167,4 +171,4 @@ class Ecs:
             region_name=region_name
         )
         self.ecs = self.session.client('ecs')
-        self._described_services = list(describe_services(self.ecs))
+        self._described_services = describe_services(self.ecs)
