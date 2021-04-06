@@ -89,27 +89,6 @@ def prepare_config(
 
     assert "region_name" in config
 
-    # The image repositories are stored as a list of dicts:
-    #
-    #     [
-    #       {"id": "worker1", "services": […]},
-    #       {"id": "worker2", "services": […]},
-    #       ...
-    #     ]
-    #
-    # We don't want to change the structure, but we do want to check that IDs
-    # are unique.
-    repo_id_tally = collections.Counter()
-    for repo in config.get("image_repositories", []):
-        repo_id_tally[repo["id"]] += 1
-
-    duplicates = {repo_id for repo_id, count in repo_id_tally.items() if count > 1}
-    if duplicates:
-        raise ConfigError(
-            f"Duplicate repo{'s' if len(duplicates) > 1 else ''} "
-            f"in image_repositories: {', '.join(sorted(duplicates))}"
-        )
-
     # The environments are stored as a list of dicts:
     #
     #     [
@@ -174,27 +153,7 @@ class Project:
 
     @property
     def image_repositories(self):
-        """
-        Gets all the image repositories in the config, keyed by ID.
-
-        Every repository will have the following keys:
-
-        -   services
-
-        """
-        result = {}
-
-        for repo in self.config.get("image_repositories", []):
-            # We should have uniqueness by the checks in prepare_config(), but
-            # it doesn't hurt to check.
-            assert repo["id"] not in result, repo["id"]
-
-            result[repo["id"]] = {
-                "services": repo.get("services", []),
-            }
-
-        assert len(result) == len(self.config.get("image_repositories", []))
-        return result
+        return self._underlying.image_repositories
 
     @property
     def environment_names(self):
@@ -278,9 +237,9 @@ class Project:
         result = collections.defaultdict(list)
 
         for image_id, services in self._get_services_by_image_id(release):
-            for serv in services:
+            for service_id in services:
                 matching_service = self.ecs.find_matching_service(
-                    service_id=serv["id"],
+                    service_id=service_id,
                     environment_id=environment_id
                 )
 
@@ -292,7 +251,7 @@ class Project:
         return dict(result)
 
     def get_ecs_services(self, release, environment_id, cached=True):
-        def _get_service(service):
+        def _get_service(service_id):
             # Sometimes we want not to use the service cache - eg when checking
             # whether deployments succeeded, we want a fresh copy of the services
             # information.
@@ -302,7 +261,7 @@ class Project:
                 ecs = self.ecs
 
             ecs_service = ecs.find_matching_service(
-                service_id=service['id'],
+                service_id=service_id,
                 environment_id=environment_id
             )
 
@@ -321,7 +280,7 @@ class Project:
 
             services = matched_image.get('services', [])
 
-            available_services = [_get_service(service) for service in services]
+            available_services = [_get_service(service_id) for service_id in services]
             available_services = [service for service in available_services if service["response"]]
 
             if available_services:
