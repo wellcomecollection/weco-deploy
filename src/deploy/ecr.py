@@ -276,32 +276,19 @@ def get_ref_tags_for_image(ecr_client, *, repository_name, tag):
     return ref_tags
 
 
-def get_ref_tags_for_repositories(*, image_repositories, tag):
+def get_ref_tags_for_repositories(ecr_client, *, image_repositories, tag):
     """
     Returns the ref tags for all the repositories in ``image_repositories``.
 
-    Repositories should be a dict of the form:
-
-        (id) -> {
-            "region_name": (region_name),
-            "role_arn": (role_arn),
-        }
+    The ``image_repositories`` should be a list of repo IDs.
 
     Returns a dict (id) -> set(ref_tags)
 
     """
     result = {}
 
-    for repo_id, repo_details in image_repositories.items():
-        region_name = repo_details["region_name"]
-        role_arn = repo_details["role_arn"]
+    for repo_id in image_repositories:
         repository_name = _get_repository_name(repo_id)
-
-        ecr_client = create_client(
-            resource="ecr",
-            region_name=region_name,
-            role_arn=role_arn
-        )
 
         try:
             ref_uri = get_ref_tags_for_image(

@@ -3,6 +3,7 @@ import datetime
 import pytest
 
 from deploy.exceptions import ConfigError
+from deploy.models import Environment, ImageRepository, Service
 from deploy.project import prepare_config, Projects, Project
 from deploy.release_store import MemoryReleaseStore
 
@@ -110,112 +111,6 @@ class TestPrepareConfig:
 
         assert len(record) == 0
 
-    def test_duplicate_image_repository_is_error(self, role_arn):
-        """
-        If the same ID appears twice in the list of image repositories, raise
-        a ConfigError.
-        """
-        config = {
-            "role_arn": role_arn,
-            "image_repositories": [
-                {"id": "worker1", "services": []},
-                {"id": "worker1", "services": []},
-                {"id": "worker2", "services": []},
-            ]
-        }
-
-        with pytest.raises(
-            ConfigError, match="Duplicate repo in image_repositories: worker1"
-        ):
-            prepare_config(config)
-
-    def test_duplicate_image_repositories_are_error(self, role_arn):
-        """
-        If the same ID appears twice in the list of image repositories, raise
-        a ConfigError.
-        """
-        config = {
-            "role_arn": role_arn,
-            "image_repositories": [
-                {"id": "worker1", "services": []},
-                {"id": "worker1", "services": []},
-                {"id": "worker2", "services": []},
-                {"id": "worker2", "services": []},
-                {"id": "worker3", "services": []},
-            ]
-        }
-
-        with pytest.raises(
-            ConfigError, match="Duplicate repos in image_repositories: worker1, worker2"
-        ):
-            prepare_config(config)
-
-    def test_does_not_warn_on_unique_image_repositories(self, role_arn):
-        """
-        If all the image repositories have unique IDs, no error is raised.
-        """
-        config = {
-            "role_arn": role_arn,
-            "image_repositories": [
-                {"id": "worker1", "services": []},
-                {"id": "worker2", "services": []},
-                {"id": "worker3", "services": []},
-            ]
-        }
-
-        prepare_config(config)
-
-    def test_duplicate_environment_is_error(self, role_arn):
-        """
-        If the same ID appears twice in the list of environments, raise a ConfigError.
-        """
-        config = {
-            "role_arn": role_arn,
-            "environments": [
-                {"id": "stage", "name": "Staging"},
-                {"id": "stage", "name": "Staging"},
-                {"id": "prod", "name": "Prod"},
-            ]
-        }
-
-        with pytest.raises(ConfigError, match="Duplicate environment in config: stage"):
-            prepare_config(config)
-
-    def test_duplicate_environments_are_error(self, role_arn):
-        """
-        If the same ID appears twice in the list of environments, raise a ConfigError.
-        """
-        config = {
-            "role_arn": role_arn,
-            "environments": [
-                {"id": "stage", "name": "Staging"},
-                {"id": "stage", "name": "Staging"},
-                {"id": "prod", "name": "Prod"},
-                {"id": "prod", "name": "Prod"},
-                {"id": "dev", "name": "Dev"},
-            ]
-        }
-
-        with pytest.raises(
-            ConfigError, match="Duplicate environments in config: prod, stage"
-        ):
-            prepare_config(config)
-
-    def test_does_not_warn_on_unique_environments(self, role_arn):
-        """
-        If all the environments have unique IDs, no error is raised.
-        """
-        config = {
-            "role_arn": role_arn,
-            "environments": [
-                {"id": "stage", "name": "Staging"},
-                {"id": "prod", "name": "Prod"},
-                {"id": "dev", "name": "Dev"},
-            ]
-        }
-
-        prepare_config(config)
-
 
 class TestProject:
     def test_image_repositories(self, role_arn, project_id):
@@ -223,21 +118,26 @@ class TestProject:
             "image_repositories": [
                 {
                     "id": "repo1",
-                    "services": ["service1a", "service1b"],
+                    "services": [{"id": "service1a"}, {"id": "service1b"}],
                     "region_name": "us-east-1",
                     "role_arn": "arn:aws:iam::1111111111:role/publisher-role"
                 },
                 {
                     "id": "repo2",
-                    "services": ["service2a", "service2b", "service2c"]
+                    "services": [
+                        {"id": "service2a"},
+                        {"id": "service2b"},
+                        {"id": "service2c"},
+                    ]
                 },
                 {
                     "id": "repo3",
-                    "services": ["service3a"]
+                    "services": [{"id": "service3a"}]
                 }
             ],
             "role_arn": role_arn,
             "region_name": "eu-west-1",
+            "name": "Example Project",
         }
 
         project = Project(
@@ -247,21 +147,27 @@ class TestProject:
         )
 
         assert project.image_repositories == {
-            "repo1": {
-                "services": ["service1a", "service1b"],
-                "region_name": "us-east-1",
-                "role_arn": "arn:aws:iam::1111111111:role/publisher-role",
-            },
-            "repo2": {
-                "services": ["service2a", "service2b", "service2c"],
-                "region_name": "eu-west-1",
-                "role_arn": role_arn,
-            },
-            "repo3": {
-                "services": ["service3a"],
-                "region_name": "eu-west-1",
-                "role_arn": role_arn,
-            },
+            "repo1": ImageRepository(
+                id="repo1",
+                services=[
+                    Service(id="service1a"),
+                    Service(id="service1b"),
+                ]
+            ),
+            "repo2": ImageRepository(
+                id="repo2",
+                services=[
+                    Service(id="service2a"),
+                    Service(id="service2b"),
+                    Service(id="service2c"),
+                ]
+            ),
+            "repo3": ImageRepository(
+                id="repo3",
+                services=[
+                    Service(id="service3a")
+                ]
+            ),
         }
 
     def test_environment_names(self, role_arn, project_id):
@@ -272,6 +178,7 @@ class TestProject:
             ],
             "role_arn": role_arn,
             "region_name": "eu-west-1",
+            "name": "Example Project",
         }
 
         project = Project(
@@ -280,7 +187,10 @@ class TestProject:
             release_store=MemoryReleaseStore()
         )
 
-        assert project.environment_names == {"stage": "Staging", "prod": "Prod"}
+        assert project.environment_names == {
+            "stage": Environment(id="stage", name="Staging"),
+            "prod": Environment(id="prod", name="Prod"),
+        }
 
     def test_get_release(self, role_arn, project_id):
         releases = [
@@ -300,7 +210,10 @@ class TestProject:
 
         project = Project(
             project_id=project_id,
-            config={"role_arn": role_arn},
+            config={
+                "role_arn": role_arn,
+                "name": "Example Project",
+            },
             release_store=release_store
         )
 
@@ -316,7 +229,7 @@ class TestProject:
             "image_repositories": [
                 {
                     "id": "repo1",
-                    "services": ["service1"],
+                    "services": [{"id": "service1"}],
                     "region_name": "us-east-1",
                     "role_arn": "arn:aws:iam::1111111111:role/publisher-role"
                 },
@@ -327,6 +240,7 @@ class TestProject:
             ],
             "role_arn": role_arn,
             "region_name": "eu-west-1",
+            "name": "Example Project",
         }
 
         project = Project(

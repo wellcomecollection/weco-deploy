@@ -4,9 +4,10 @@ import functools
 import uuid
 import warnings
 
+import cattr
 import yaml
 
-from . import ecr, iam
+from . import ecr, iam, models
 from .ecr import Ecr
 from .ecs import Ecs
 from .exceptions import ConfigError
@@ -88,53 +89,13 @@ def prepare_config(
 
     assert "region_name" in config
 
-    # The image repositories are stored as a list of dicts:
-    #
-    #     [
-    #       {"id": "worker1", "services": […]},
-    #       {"id": "worker2", "services": […]},
-    #       ...
-    #     ]
-    #
-    # We don't want to change the structure, but we do want to check that IDs
-    # are unique.
-    repo_id_tally = collections.Counter()
-    for repo in config.get("image_repositories", []):
-        repo_id_tally[repo["id"]] += 1
-
-    duplicates = {repo_id for repo_id, count in repo_id_tally.items() if count > 1}
-    if duplicates:
-        raise ConfigError(
-            f"Duplicate repo{'s' if len(duplicates) > 1 else ''} "
-            f"in image_repositories: {', '.join(sorted(duplicates))}"
-        )
-
-    # The environments are stored as a list of dicts:
-    #
-    #     [
-    #       {"id": "stage", "name": […]},
-    #       {"id": "prod", "name": […]},
-    #       ...
-    #     ]
-    #
-    # We don't want to change the structure, but we do want to check that IDs
-    # are unique.
-    env_id_tally = collections.Counter()
-    for env in config.get("environments", []):
-        env_id_tally[env["id"]] += 1
-
-    duplicates = {env_id for env_id, count in env_id_tally.items() if count > 1}
-    if duplicates:
-        raise ConfigError(
-            f"Duplicate environment{'s' if len(duplicates) > 1 else ''} "
-            f"in config: {', '.join(sorted(duplicates))}"
-        )
-
 
 class Project:
     def __init__(self, project_id, config, release_store):
-        self.config = config
+        self.id = project_id
+        self._underlying = cattr.structure(config, models.Project)
 
+        self.config = config
         self.config["id"] = project_id
 
         self.release_store = release_store
@@ -158,59 +119,20 @@ class Project:
         return Ecr(region_name=self.region_name, role_arn=self.role_arn)
 
     @property
-    def id(self):
-        return self.config["id"]
-
-    @property
     def role_arn(self):
-        return self.config["role_arn"]
+        return self._underlying.role_arn
 
     @property
     def region_name(self):
-        return self.config["region_name"]
+        return self._underlying.region_name
 
     @property
     def image_repositories(self):
-        """
-        Gets all the image repositories in the config, keyed by ID.
-
-        Every repository will have the following keys:
-
-        -   region_name
-        -   role_arn
-        -   services
-
-        """
-        result = {}
-
-        for repo in self.config.get("image_repositories", []):
-            # We should have uniqueness by the checks in prepare_config(), but
-            # it doesn't hurt to check.
-            assert repo["id"] not in result, repo["id"]
-
-            result[repo["id"]] = {
-                "region_name": repo.get("region_name", self.region_name),
-                "role_arn": repo.get("role_arn", self.role_arn),
-                "services": repo.get("services", []),
-            }
-
-        assert len(result) == len(self.config.get("image_repositories", []))
-        return result
+        return self._underlying.image_repositories
 
     @property
     def environment_names(self):
-        result = {}
-
-        for env in self.config.get("environments", []):
-            # We should have uniqueness by the checks in prepare_config(), but
-            # it doesn't hurt to check.
-            assert env["id"] not in result
-
-            assert set(env.keys()) == {"id", "name"}
-            result[env["id"]] = env["name"]
-
-        assert len(result) == len(self.config.get("environments", []))
-        return result
+        return self._underlying.environments
 
     def _create_deployment(self, environment_id, details, description):
         return {
@@ -227,7 +149,7 @@ class Project:
         return {
             "release_id": release_id,
             "project_id": self.id,
-            "project_name": self.config.get('name', 'unnamed'),
+            "project_name": self._underlying.name,
             "date_created": datetime.datetime.utcnow().isoformat(),
             "requested_by": iam.get_underlying_role_arn(),
             "description": description,
@@ -279,9 +201,9 @@ class Project:
         result = collections.defaultdict(list)
 
         for image_id, services in self._get_services_by_image_id(release):
-            for serv in services:
+            for service_id in services:
                 matching_service = self.ecs.find_matching_service(
-                    service_id=serv["id"],
+                    service_id=service_id,
                     environment_id=environment_id
                 )
 
@@ -293,7 +215,7 @@ class Project:
         return dict(result)
 
     def get_ecs_services(self, release, environment_id, cached=True):
-        def _get_service(service):
+        def _get_service(service_id):
             # Sometimes we want not to use the service cache - eg when checking
             # whether deployments succeeded, we want a fresh copy of the services
             # information.
@@ -303,12 +225,12 @@ class Project:
                 ecs = self.ecs
 
             ecs_service = ecs.find_matching_service(
-                service_id=service['id'],
+                service_id=service_id,
                 environment_id=environment_id
             )
 
             return {
-                'config': service,
+                'config': {"id": service_id},
                 'response': ecs_service
             }
 
@@ -322,7 +244,7 @@ class Project:
 
             services = matched_image.get('services', [])
 
-            available_services = [_get_service(service) for service in services]
+            available_services = [_get_service(service_id) for service_id in services]
             available_services = [service for service in available_services if service["response"]]
 
             if available_services:
@@ -415,7 +337,8 @@ class Project:
         is chosen arbitrarily.
         """
         ref_tags_resp = ecr.get_ref_tags_for_repositories(
-            image_repositories=self.image_repositories,
+            self.ecr._underlying.client,
+            image_repositories=self.image_repositories.keys(),
             tag=from_label
         )
 
