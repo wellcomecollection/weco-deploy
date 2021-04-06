@@ -115,7 +115,7 @@ def test_duplicate_ids(bad_yaml):
 
 
 def test_image_repositories_default_is_empty():
-    yaml =     """
+    yaml = """
     example_project:
       environments:
         - id: prod
@@ -130,7 +130,7 @@ def test_image_repositories_default_is_empty():
 
 
 def test_environments_default_is_empty():
-    yaml =     """
+    yaml = """
     example_project:
       image_repositories:
         - id: example_project
