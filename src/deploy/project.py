@@ -92,14 +92,11 @@ def prepare_config(
 
 class Project:
     def __init__(self, project_id, config, release_store):
-        self.config = config
-
-        self.config["id"] = project_id
+        self.id = project_id
+        self._underlying = cattr.structure(config, models.Project)
 
         self.release_store = release_store
         self.release_store.initialise()
-
-        self._underlying = cattr.structure(config, models.Project)
 
     @property
     @functools.lru_cache()
@@ -117,10 +114,6 @@ class Project:
     @functools.lru_cache()
     def ecr(self):
         return Ecr(region_name=self.region_name, role_arn=self.role_arn)
-
-    @property
-    def id(self):
-        return self.config["id"]
 
     @property
     def role_arn(self):
@@ -153,7 +146,7 @@ class Project:
         return {
             "release_id": release_id,
             "project_id": self.id,
-            "project_name": self.config.get('name', 'unnamed'),
+            "project_name": self._underlying.name,
             "date_created": datetime.datetime.utcnow().isoformat(),
             "requested_by": iam.get_underlying_role_arn(),
             "description": description,
