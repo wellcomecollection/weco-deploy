@@ -158,6 +158,10 @@ class Project:
     @property
     @functools.lru_cache()
     def ecs(self):
+        return self.ecs_no_cache
+
+    @property
+    def ecs_no_cache(self):
         return Ecs(
             region_name=self.region_name,
             role_arn=self.role_arn
@@ -311,7 +315,15 @@ class Project:
 
     def get_ecs_services(self, release, environment_id, cached=True):
         def _get_service(service):
-            ecs_service = self.ecs.find_matching_service(
+            # Sometimes we want not to use the service cache - eg when checking
+            # whether deployments succeeded, we want a fresh copy of the services
+            # information.
+            if not cached:
+                ecs = self.ecs_no_cache
+            else:
+                ecs = self.ecs
+
+            ecs_service = ecs.find_matching_service(
                 service_id=service['id'],
                 environment_id=environment_id
             )
