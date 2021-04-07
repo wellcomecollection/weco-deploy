@@ -143,6 +143,31 @@ class AbstractEcr(ABC):
 
         return tag_operation
 
+    def get_ref_tags_for_repositories(self, *, image_repositories, tag):
+        """
+        Returns the ref tags for all the repositories in ``image_repositories``.
+
+        The ``image_repositories`` should be a list of repo IDs.
+
+        Returns a dict (id) -> set(ref_tags)
+
+        """
+        result = {}
+
+        for repo_id in image_repositories:
+            repository_name = _get_repository_name(repo_id)
+
+            try:
+                ref_uri = get_ref_tags_for_image(
+                    self.client, repository_name=repository_name, tag=tag
+                )
+            except NoSuchImageError:
+                result[repo_id] = set()
+            else:
+                result[repo_id] = ref_uri
+
+        return result
+
 
 class EcrPrivate(AbstractEcr):
     def __init__(self, *, region_name, role_arn):
@@ -274,29 +299,3 @@ def get_ref_tags_for_image(ecr_client, *, repository_name, tag):
         )
 
     return ref_tags
-
-
-def get_ref_tags_for_repositories(ecr_client, *, image_repositories, tag):
-    """
-    Returns the ref tags for all the repositories in ``image_repositories``.
-
-    The ``image_repositories`` should be a list of repo IDs.
-
-    Returns a dict (id) -> set(ref_tags)
-
-    """
-    result = {}
-
-    for repo_id in image_repositories:
-        repository_name = _get_repository_name(repo_id)
-
-        try:
-            ref_uri = get_ref_tags_for_image(
-                ecr_client, repository_name=repository_name, tag=tag
-            )
-        except NoSuchImageError:
-            result[repo_id] = set()
-        else:
-            result[repo_id] = ref_uri
-
-    return result

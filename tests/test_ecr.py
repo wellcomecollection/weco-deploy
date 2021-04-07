@@ -81,7 +81,7 @@ class TestGetRefTagsForImage:
 
 @moto.mock_sts()
 @moto.mock_iam()
-def test_get_ref_tags_for_repositories(ecr_client, region_name):
+def test_get_ref_tags_for_repositories(ecr_client, role_arn, region_name):
     manifest1 = create_image_manifest()
     ecr_client.create_repository(
         repositoryName="uk.ac.wellcome/example_worker1"
@@ -131,8 +131,9 @@ def test_get_ref_tags_for_repositories(ecr_client, region_name):
         },
     }
 
-    uris = ecr.get_ref_tags_for_repositories(
-        ecr_client,
+    ecr_private = ecr.EcrPrivate(role_arn=role_arn, region_name=region_name)
+
+    uris = ecr_private.get_ref_tags_for_repositories(
         image_repositories=image_repositories,
         tag="latest"
     )

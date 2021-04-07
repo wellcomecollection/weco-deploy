@@ -272,8 +272,7 @@ class Project:
         Note: a single Docker image may have multiple ref tags, so the ref tag
         is chosen arbitrarily.
         """
-        ref_tags_resp = ecr.get_ref_tags_for_repositories(
-            self.ecr._underlying.client,
+        ref_tags_resp = self.ecr._underlying.get_ref_tags_for_repositories(
             image_repositories=self.image_repositories.keys(),
             tag=from_label
         )
