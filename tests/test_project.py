@@ -3,7 +3,7 @@ import pytest
 from deploy import project
 from deploy.exceptions import ConfigError
 from deploy.models import Environment, ImageRepository, Service
-from deploy.project import Projects, Project
+from deploy.project import Projects, Project, prepare_release
 from deploy.release_store import MemoryReleaseStore
 
 
@@ -137,7 +137,14 @@ class TestProject:
         # The correct way to do this is to have a mocked `Ecr` and hand that in
         # TODO: Handle tests that interact with ECR by mocking it
         project.get_images = patch_get_images
-        prepared_release = p.prepare("stage", "Some description")
+        prepared_release = prepare_release(
+            ecr=p.ecr,
+            project_id="example-project",
+            project=p._underlying,
+            release_store=release_store,
+            from_label="stage",
+            description="Some description"
+        )
 
         assert prepared_release["previous_release"] is None
         assert prepared_release["new_release"]["images"] == get_images_return

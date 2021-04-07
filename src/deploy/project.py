@@ -7,7 +7,7 @@ import yaml
 from . import ecs, iam, models
 from .ecr import AbstractEcr, EcrPrivate
 from .exceptions import ConfigError
-from .release_store import DynamoReleaseStore
+from .release_store import ReleaseStore, DynamoReleaseStore
 from .tags import parse_aws_tags
 
 DEFAULT_REGION_NAME = "eu-west-1"
@@ -160,23 +160,6 @@ class Project:
 
         return is_deployed
 
-    def prepare(self, from_label, description):
-        release_images = get_images(
-            ecr=self.ecr,
-            project=self._underlying,
-            from_label=from_label
-        )
-
-        if not release_images:
-            raise RuntimeError(f"No images found for {self.id}/{from_label}")
-
-        return self.release_store.prepare_release(
-            project_id=self.id,
-            project=self._underlying,
-            description=description,
-            release_images=release_images
-        )
-
     def update(self, release_id, service_ids, from_label):
         release = self.release_store.get_release(release_id)
         images = get_images(
@@ -285,6 +268,32 @@ class Project:
         )
 
         return deployment
+
+
+def prepare_release(
+    *,
+    ecr: AbstractEcr,
+    project_id: str,
+    project: models.Project,
+    release_store: ReleaseStore,
+    from_label: str,
+    description: str
+):
+    release_images = get_images(
+        ecr=ecr,
+        project=project,
+        from_label=from_label
+    )
+
+    if not release_images:
+        raise RuntimeError(f"No images found for {self.id}/{from_label}")
+
+    return release_store.prepare_release(
+        project_id=project_id,
+        project=project,
+        description=description,
+        release_images=release_images
+    )
 
 
 def get_ecs_services(

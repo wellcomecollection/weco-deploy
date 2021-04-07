@@ -11,7 +11,7 @@ from tabulate import tabulate
 
 from . import ecs, git, iam
 from .pretty_printing import pprint_date
-from .project import Projects, get_images
+from .project import Projects, get_images, prepare_release
 from .version_check import warn_if_not_latest_version, current_version
 
 DEFAULT_PROJECT_FILEPATH = ".wellcome_project"
@@ -346,7 +346,11 @@ def _display_release(release, from_label):
 
 
 def _prepare(project, from_label, description):
-    release = project.prepare(
+    release = prepare_release(
+        ecr=project.ecr,
+        project_id=project.id,
+        project=project._underlying,
+        release_store=project.release_store,
         from_label=from_label,
         description=description
     )
