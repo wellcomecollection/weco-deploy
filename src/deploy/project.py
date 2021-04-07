@@ -33,11 +33,14 @@ class Projects:
         except KeyError:
             raise ConfigError(f"No matching project {project_id} in {self.projects}")
 
-        prepare_config(config, **kwargs)
+        try:
+            region_name = config["region_name"]
+        except KeyError:
+            region_name = DEFAULT_REGION_NAME
 
         release_store = DynamoReleaseStore(
             project_id=project_id,
-            region_name=config["region_name"],
+            region_name=region_name,
             role_arn=config["role_arn"]
         )
 
@@ -46,46 +49,6 @@ class Projects:
             config=config,
             release_store=release_store
         )
-
-
-def prepare_config(
-        config,
-        *,
-        role_arn=None,
-        region_name=None
-):
-    """
-    Prepare the config.  Fill in overrides or defaults as necessary.
-    """
-    # We always want a role_arn to be set.  Read it from the initial config,
-    # or raise an error if not -- there's no way to pick a sensible default.
-    if role_arn:
-        if ("role_arn" in config) and (config["role_arn"] != role_arn):
-            warnings.warn(
-                f"Preferring override role_arn {role_arn} "
-                f"to role_arn in config {config['role_arn']}"
-            )
-            config["role_arn"] = role_arn
-        elif "role_arn" not in config:
-            config["role_arn"] = role_arn
-
-    if "role_arn" not in config:
-        raise ConfigError("role_arn is not set!")
-
-    assert "role_arn" in config
-
-    # We always want a region_name to be set.  Read it from the initial config
-    # if possible, or use the override or default if not.
-    if region_name and ("region_name" in config) and (config["region_name"] != region_name):
-        warnings.warn(
-            f"Preferring override region_name {region_name} "
-            f"to region_name in config {config['region_name']}"
-        )
-        config["region_name"] = region_name
-    elif "region_name" not in config:
-        config["region_name"] = region_name or DEFAULT_REGION_NAME
-
-    assert "region_name" in config
 
 
 class Project:
