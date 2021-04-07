@@ -1,8 +1,10 @@
 import abc
+import datetime
+import uuid
 
 from boto3.dynamodb.conditions import Key
 
-from . import iam
+from . import iam, models
 from .exceptions import WecoDeployError
 
 
@@ -41,11 +43,17 @@ class ReleaseStore(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_release(self, release_id):
+    def _get_release_by_id(self, release_id):
         """
         Retrieve a previously stored release.
         """
         pass
+
+    def get_release(self, release_id):
+        if release_id == "latest":
+            return self.get_most_recent_release()
+        else:
+            return self._get_release_by_id(release_id)
 
     @abc.abstractmethod
     def get_recent_releases(self, *, limit):
@@ -77,6 +85,60 @@ class ReleaseStore(abc.ABC):
         """
         pass
 
+    def get_deployments(self, *, release_id, environment_id, limit):
+        if release_id is not None:
+            release = self.get_release(release_id)
+
+            # TODO: I think the release ID is already stored on the deployments.
+            # Can we remove this loop?
+            for d in release["deployments"]:
+                assert d["release_id"] == release_id
+
+            deployments = release["deployments"]
+        else:
+            deployments = self.get_recent_deployments(
+                environment=environment_id,
+                limit=limit
+            )
+
+        deployments = sorted(
+            deployments, key=lambda d: d["date_created"], reverse=True
+        )
+        return deployments[:limit]
+
+    def prepare_release(
+        self,
+        *,
+        project_id: str,
+        project: models.Project,
+        description,
+        release_images
+    ):
+        try:
+            previous_release = self.get_most_recent_release()
+        except ReleaseNotFoundError:
+            previous_release = None
+
+        release_id = str(uuid.uuid4())
+
+        new_release = {
+            "release_id": release_id,
+            "project_id": project_id,
+            "project_name": project.name,
+            "date_created": datetime.datetime.utcnow().isoformat(),
+            "requested_by": iam.get_underlying_role_arn(),
+            "description": description,
+            "images": release_images,
+            "deployments": []
+        }
+
+        self.put_release(new_release)
+
+        return {
+            "previous_release": previous_release,
+            "new_release": new_release
+        }
+
 
 class MemoryReleaseStore(ReleaseStore):
     def __init__(self):
@@ -91,7 +153,7 @@ class MemoryReleaseStore(ReleaseStore):
     def put_release(self, release):
         self.cache[release["release_id"]] = release
 
-    def get_release(self, release_id):
+    def _get_release_by_id(self, release_id):
         try:
             return self.cache[release_id]
         except KeyError:
@@ -155,7 +217,7 @@ class DynamoReleaseStore(ReleaseStore):
     def put_release(self, release):
         self.table.put_item(Item=release)
 
-    def get_release(self, release_id):
+    def _get_release_by_id(self, release_id):
         resp = self.table.get_item(Key={"release_id": release_id})
         try:
             return resp["Item"]

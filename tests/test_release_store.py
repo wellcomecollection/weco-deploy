@@ -204,6 +204,28 @@ class ReleaseStoreTestsMixin:
             assert len(stored_release["deployments"]) == 4
             assert stored_release["last_date_deployed"] == deployment["date_created"]
 
+    def test_get_release(self, project_id):
+        releases = [
+            {
+                "release_id": f"release-{i}",
+                "project_id": project_id,
+                "date_created": datetime.datetime(2001, 1, i).isoformat(),
+                "last_date_deployed": datetime.datetime.now().isoformat()
+            }
+            for i in range(1, 10)
+        ]
+
+        with self.create_release_store(project_id) as release_store:
+            release_store.initialise()
+
+            for r in releases:
+                release_store.put_release(r)
+
+            assert release_store.get_release("latest") == releases[-1]
+
+            for r in releases:
+                assert release_store.get_release(release_id=r["release_id"]) == r
+
 
 class TestMemoryReleaseStore(ReleaseStoreTestsMixin):
     @contextlib.contextmanager

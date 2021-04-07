@@ -1,15 +1,13 @@
 import datetime
 import functools
-import uuid
-import warnings
 
 import cattr
 import yaml
 
-from . import ecs, ecr, iam, models
-from .ecr import Ecr
+from . import ecs, iam, models
+from .ecr import EcrPrivate
 from .exceptions import ConfigError
-from .release_store import DynamoReleaseStore, ReleaseNotFoundError
+from .release_store import DynamoReleaseStore
 from .tags import parse_aws_tags
 
 DEFAULT_REGION_NAME = "eu-west-1"
@@ -33,11 +31,14 @@ class Projects:
         except KeyError:
             raise ConfigError(f"No matching project {project_id} in {self.projects}")
 
-        prepare_config(config, **kwargs)
+        try:
+            region_name = config["region_name"]
+        except KeyError:
+            region_name = DEFAULT_REGION_NAME
 
         release_store = DynamoReleaseStore(
             project_id=project_id,
-            region_name=config["region_name"],
+            region_name=region_name,
             role_arn=config["role_arn"]
         )
 
@@ -46,46 +47,6 @@ class Projects:
             config=config,
             release_store=release_store
         )
-
-
-def prepare_config(
-        config,
-        *,
-        role_arn=None,
-        region_name=None
-):
-    """
-    Prepare the config.  Fill in overrides or defaults as necessary.
-    """
-    # We always want a role_arn to be set.  Read it from the initial config,
-    # or raise an error if not -- there's no way to pick a sensible default.
-    if role_arn:
-        if ("role_arn" in config) and (config["role_arn"] != role_arn):
-            warnings.warn(
-                f"Preferring override role_arn {role_arn} "
-                f"to role_arn in config {config['role_arn']}"
-            )
-            config["role_arn"] = role_arn
-        elif "role_arn" not in config:
-            config["role_arn"] = role_arn
-
-    if "role_arn" not in config:
-        raise ConfigError("role_arn is not set!")
-
-    assert "role_arn" in config
-
-    # We always want a region_name to be set.  Read it from the initial config
-    # if possible, or use the override or default if not.
-    if region_name and ("region_name" in config) and (config["region_name"] != region_name):
-        warnings.warn(
-            f"Preferring override region_name {region_name} "
-            f"to region_name in config {config['region_name']}"
-        )
-        config["region_name"] = region_name
-    elif "region_name" not in config:
-        config["region_name"] = region_name or DEFAULT_REGION_NAME
-
-    assert "region_name" in config
 
 
 class Project:
@@ -108,7 +69,7 @@ class Project:
     @property
     @functools.lru_cache()
     def ecr(self):
-        return Ecr(region_name=self.region_name, role_arn=self.role_arn)
+        return EcrPrivate(region_name=self.region_name, role_arn=self.role_arn)
 
     @property
     def role_arn(self):
@@ -134,45 +95,6 @@ class Project:
             "description": description,
             "details": details
         }
-
-    def _create_release(self, description, images):
-        release_id = str(uuid.uuid4())
-
-        return {
-            "release_id": release_id,
-            "project_id": self.id,
-            "project_name": self._underlying.name,
-            "date_created": datetime.datetime.utcnow().isoformat(),
-            "requested_by": iam.get_underlying_role_arn(),
-            "description": description,
-            "images": images,
-            "deployments": []
-        }
-
-    def get_deployments(self, release_id, limit, environment_id):
-        if release_id is not None:
-            release = self.release_store.get_release(release_id)
-
-            # TODO: I think the release ID is already stored on the deployments.
-            # Can we remove this loop?
-            for d in release["deployments"]:
-                assert d["release_id"] == release_id
-
-            deployments = release["deployments"]
-        else:
-            deployments = self.release_store.get_recent_deployments(
-                environment=environment_id,
-                limit=limit
-            )
-
-        deployments = sorted(deployments, key=lambda d: d["date_created"], reverse=True)
-        return deployments[:limit]
-
-    def get_release(self, release_id):
-        if release_id == "latest":
-            return self.release_store.get_most_recent_release()
-        else:
-            return self.release_store.get_release(release_id)
 
     def get_ecs_services(self, release, environment_id):
         # We always get a fresh set of ECS service descriptions.
@@ -267,29 +189,6 @@ class Project:
 
         return is_deployed
 
-    def publish(self, image_id, label):
-        # Create an ECR client for the correct account
-        self.ecr.login()
-
-        remote_uri, remote_tag, local_tag = self.ecr.publish_image(
-            image_id=image_id,
-        )
-
-        tag_result = self.ecr.tag_image(
-            image_id=image_id,
-            tag=remote_tag,
-            new_tag=label
-        )
-
-        return {
-            'ecr_push': {
-                'local_tag': local_tag,
-                'remote_tag': remote_tag,
-                'remote_uri': remote_uri,
-            },
-            'ecr_tag': tag_result
-        }
-
     def get_images(self, from_label):
         """
         Returns a dict (image id) -> (Git ref tag).
@@ -297,8 +196,7 @@ class Project:
         Note: a single Docker image may have multiple ref tags, so the ref tag
         is chosen arbitrarily.
         """
-        ref_tags_resp = ecr.get_ref_tags_for_repositories(
-            self.ecr._underlying.client,
+        ref_tags_resp = self.ecr.get_ref_tags_for_repositories(
             image_repositories=self.image_repositories.keys(),
             tag=from_label
         )
@@ -315,34 +213,21 @@ class Project:
 
         return result
 
-    def _prepare_release(self, description, release_images):
-        try:
-            previous_release = self.release_store.get_most_recent_release()
-        except ReleaseNotFoundError:
-            previous_release = None
-
-        new_release = self._create_release(
-            description=description,
-            images=release_images
-        )
-
-        self.release_store.put_release(new_release)
-
-        return {"previous_release": previous_release, "new_release": new_release}
-
     def prepare(self, from_label, description):
         release_images = self.get_images(from_label)
 
         if not release_images:
             raise RuntimeError(f"No images found for {self.id}/{from_label}")
 
-        return self._prepare_release(
+        return self.release_store.prepare_release(
+            project_id=self.id,
+            project=self._underlying,
             description=description,
             release_images=release_images
         )
 
     def update(self, release_id, service_ids, from_label):
-        release = self.get_release(release_id)
+        release = self.release_store.get_release(release_id)
         images = self.get_images(from_label)
 
         # Ensure all specified services are available as images
@@ -358,7 +243,9 @@ class Project:
 
         description = f"Release based on {release_id}, updating {service_ids} to {from_label}"
 
-        return self._prepare_release(
+        return self.release_store.prepare_release(
+            project_id=self.id,
+            project=self._underlying,
             description=description,
             release_images=release_images
         )
@@ -374,15 +261,10 @@ class Project:
         )
 
     def deploy(self, release_id, environment_id, description):
-        release = self.get_release(release_id)
+        release = self.release_store.get_release(release_id)
 
         if release is None:
             raise ValueError(f"No releases found {release_id}, cannot continue!")
-
-        matched_services = self.get_ecs_services(
-            release=release,
-            environment_id=environment_id
-        )
 
         # Force check for valid environment
         if environment_id not in self.environment_names:
@@ -409,6 +291,11 @@ class Project:
                 )
 
             return ecs_services_deployed[service_arn]
+
+        matched_services = self.get_ecs_services(
+            release=release,
+            environment_id=environment_id
+        )
 
         for image_id, image_name in sorted(release['images'].items()):
             tag_result = self._tag_ecr_image(

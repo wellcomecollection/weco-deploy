@@ -96,7 +96,7 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_name, role_arn, 
 def _publish(project, image_id, label):
     click.echo(click.style(f"Attempting to publish {project.id}/{image_id}", fg="green"))
 
-    publish_result = project.publish(
+    publish_result = project.ecr.publish(
         image_id=image_id,
         label=label
     )
@@ -240,7 +240,7 @@ def deploy(ctx, release_id, environment_id, description, confirmation_wait_for, 
     project = ctx.obj['project']
     verbose = ctx.obj['verbose']
 
-    release = project.get_release(release_id)
+    release = project.release_store.get_release(release_id)
 
     _deploy(
         project=project,
@@ -464,7 +464,7 @@ def show_release(ctx, release_id):
     if not release_id:
         release_id = 'latest'
 
-    release = project.get_release(release_id)
+    release = project.release_store.get_release(release_id)
 
     click.echo(json.dumps(release, sort_keys=True, indent=2))
 
@@ -487,7 +487,7 @@ def show_deployments(ctx, release_id, environment_id, limit):
         "description"
     ]
 
-    for deployment in project.get_deployments(
+    for deployment in project.release_store.get_deployments(
         release_id=release_id,
         environment_id=environment_id,
         limit=limit
