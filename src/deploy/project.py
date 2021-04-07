@@ -5,7 +5,7 @@ import cattr
 import yaml
 
 from . import ecs, iam, models
-from .ecr import EcrPrivate
+from .ecr import AbstractEcr, EcrPrivate
 from .exceptions import ConfigError
 from .release_store import DynamoReleaseStore
 from .tags import parse_aws_tags
@@ -189,32 +189,12 @@ class Project:
 
         return is_deployed
 
-    def get_images(self, from_label):
-        """
-        Returns a dict (image id) -> (Git ref tag).
-
-        Note: a single Docker image may have multiple ref tags, so the ref tag
-        is chosen arbitrarily.
-        """
-        ref_tags_resp = self.ecr.get_ref_tags_for_repositories(
-            image_repositories=self.image_repositories.keys(),
-            tag=from_label
-        )
-
-        # An image might have multiple ref tags if it was pushed at multiple
-        # Git commits with the same code.  In this case, choose a ref arbitrarily.
-        result = {}
-
-        for image_id, ref_tags in ref_tags_resp.items():
-            try:
-                result[image_id] = ref_tags.pop()
-            except KeyError:  # No images
-                result[image_id] = None
-
-        return result
-
     def prepare(self, from_label, description):
-        release_images = self.get_images(from_label)
+        release_images = get_images(
+            ecr=self.ecr,
+            project=self._underlying,
+            from_label=from_label
+        )
 
         if not release_images:
             raise RuntimeError(f"No images found for {self.id}/{from_label}")
@@ -228,7 +208,11 @@ class Project:
 
     def update(self, release_id, service_ids, from_label):
         release = self.release_store.get_release(release_id)
-        images = self.get_images(from_label)
+        images = get_images(
+            ecr=self.ecr,
+            project=self._underlying,
+            from_label=from_label
+        )
 
         # Ensure all specified services are available as images
         for service_id in service_ids:
@@ -328,3 +312,29 @@ class Project:
         )
 
         return deployment
+
+
+def get_images(*, ecr: AbstractEcr, project: models.Project, from_label: str):
+    """
+    Returns a dict (image id) -> (Git ref tag).
+
+    Note: a single Docker image may have multiple ref tags, so the ref tag
+    is chosen arbitrarily.
+    """
+    ref_tags_resp = ecr.get_ref_tags_for_repositories(
+        image_repositories=project.image_repositories.keys(),
+        tag=from_label
+    )
+
+    # An image might have multiple ref tags if it was pushed at multiple
+    # Git commits with the same code.  In this case, choose a ref arbitrarily.
+    result = {}
+
+    for image_id, ref_tags in ref_tags_resp.items():
+        try:
+            result[image_id] = ref_tags.pop()
+        except KeyError:  # No images
+            result[image_id] = None
+
+    return result
+

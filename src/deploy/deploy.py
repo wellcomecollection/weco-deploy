@@ -11,7 +11,7 @@ from tabulate import tabulate
 
 from . import ecs, git, iam
 from .pretty_printing import pprint_date
-from .project import Projects
+from .project import Projects, get_images
 from .version_check import warn_if_not_latest_version, current_version
 
 DEFAULT_PROJECT_FILEPATH = ".wellcome_project"
@@ -513,7 +513,11 @@ def show_deployments(ctx, release_id, environment_id, limit):
 def show_images(ctx, label):
     project = ctx.obj['project']
 
-    images = project.get_images(label)
+    images = get_images(
+        ecr=project.ecr,
+        project=project._underlying,
+        from_label=label
+    )
 
     rows = []
 

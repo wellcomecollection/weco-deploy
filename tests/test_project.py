@@ -1,5 +1,6 @@
 import pytest
 
+from deploy import project
 from deploy.exceptions import ConfigError
 from deploy.models import Environment, ImageRepository, Service
 from deploy.project import Projects, Project
@@ -119,7 +120,7 @@ class TestProject:
             "name": "Example Project",
         }
 
-        project = Project(
+        p = Project(
             project_id=project_id,
             config=config,
             release_store=release_store
@@ -129,14 +130,14 @@ class TestProject:
             "foo": "abc"
         }
 
-        def patch_get_images(label):
+        def patch_get_images(**kwargs):
             return get_images_return
 
         # This is a poor way to test prepare as it relies on knowing the impl of get_images
         # The correct way to do this is to have a mocked `Ecr` and hand that in
         # TODO: Handle tests that interact with ECR by mocking it
         project.get_images = patch_get_images
-        prepared_release = project.prepare("stage", "Some description")
+        prepared_release = p.prepare("stage", "Some description")
 
         assert prepared_release["previous_release"] is None
         assert prepared_release["new_release"]["images"] == get_images_return
