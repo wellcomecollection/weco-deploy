@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.6.28 - 2021-04-07
+-------------------
+
+More internal refactoring that should have no user-visible effect.
+
+-------------------
 5.6.27 - 2021-04-07
 -------------------
 
