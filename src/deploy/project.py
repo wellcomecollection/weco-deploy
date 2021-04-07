@@ -6,9 +6,8 @@ import warnings
 import cattr
 import yaml
 
-from . import ecr, iam, models
+from . import ecs, ecr, iam, models
 from .ecr import Ecr
-from .ecs import Ecs, find_matching_service
 from .exceptions import ConfigError
 from .release_store import DynamoReleaseStore, ReleaseNotFoundError
 from .tags import parse_aws_tags
@@ -100,16 +99,10 @@ class Project:
         self.release_store = release_store
         self.release_store.initialise()
 
-    @property
-    @functools.lru_cache()
-    def ecs(self):
-        return self.ecs_no_cache
-
-    @property
-    def ecs_no_cache(self):
-        return Ecs(
-            region_name=self.region_name,
-            role_arn=self.role_arn
+        self.session = iam.get_session(
+            "weco-deploy-project",
+            role_arn=self.role_arn,
+            region_name=self.region_name
         )
 
     @property
@@ -181,18 +174,13 @@ class Project:
         else:
             return self.release_store.get_release(release_id)
 
-    def get_ecs_services(self, release, environment_id, cached=True):
-        def _get_service(service_id):
-            # Sometimes we want not to use the service cache - eg when checking
-            # whether deployments succeeded, we want a fresh copy of the services
-            # information.
-            if not cached:
-                ecs = self.ecs_no_cache
-            else:
-                ecs = self.ecs
+    def get_ecs_services(self, release, environment_id):
+        # We always get a fresh set of ECS service descriptions.
+        service_descriptions = ecs.describe_services(self.session)
 
-            ecs_service = find_matching_service(
-                service_descriptions=ecs._described_services,
+        def _get_service(service_id):
+            ecs_service = ecs.find_matching_service(
+                service_descriptions=service_descriptions,
                 service_id=service_id,
                 environment_id=environment_id
             )
@@ -226,7 +214,7 @@ class Project:
         on the tasks within those services. We check that the desiredCount
         of tasks matches the running count of tasks.
         """
-        ecs_services = self.get_ecs_services(release, environment_id, cached=False)
+        ecs_services = self.get_ecs_services(release, environment_id)
 
         def printv(str):
             if verbose:
@@ -240,7 +228,12 @@ class Project:
                 service_arn = service["response"]["serviceArn"]
                 service_deployment_label = service_tags["deployment:label"]
                 desired_task_count = service["response"]["desiredCount"]
-                tasks = self.ecs.list_service_tasks(service)
+
+                tasks = ecs.list_tasks_in_service(
+                    self.session,
+                    cluster_arn=service["response"]["clusterArn"],
+                    service_name=service["response"]["serviceName"],
+                )
 
                 for task in tasks:
                     task_tags = parse_aws_tags(task["tags"])
@@ -370,13 +363,6 @@ class Project:
             release_images=release_images
         )
 
-    def _deploy_ecs_service(self, service, deployment_label):
-        return self.ecs.redeploy_service(
-            cluster_arn=service['response']['clusterArn'],
-            service_arn=service['response']['serviceArn'],
-            deployment_label=deployment_label
-        )
-
     def _tag_ecr_image(self, environment_id, image_id, image_name):
         old_tag = image_name.split(":")[-1]
         new_tag = f"env.{environment_id}"
@@ -411,13 +397,18 @@ class Project:
 
         # Memoize service deployments to prevent multiple deployments
         def _ecs_deploy(service, deployment_label):
-            if service['response']['serviceArn'] not in ecs_services_deployed:
-                ecs_services_deployed[service['response']['serviceArn']] = self._deploy_ecs_service(
-                    service=service,
+            cluster_arn = service["response"]["clusterArn"]
+            service_arn = service["response"]["serviceArn"]
+
+            if service_arn not in ecs_services_deployed:
+                ecs_services_deployed[service_arn] = ecs.deploy_service(
+                    self.session,
+                    cluster_arn=cluster_arn,
+                    service_arn=service_arn,
                     deployment_label=deployment_label
                 )
 
-            return ecs_services_deployed[service['response']['serviceArn']]
+            return ecs_services_deployed[service_arn]
 
         for image_id, image_name in sorted(release['images'].items()):
             tag_result = self._tag_ecr_image(

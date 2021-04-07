@@ -1,4 +1,4 @@
-from . import iam, tags
+from . import tags
 from .iterators import chunked_iterable
 from .models import Project
 
@@ -23,10 +23,13 @@ def list_service_arns_in_cluster(ecs_client, *, cluster):
         yield from page["serviceArns"]
 
 
-def describe_services(ecs_client):
+def describe_services(session):
     """
     Describe all the ECS services in an account.
     """
+    ecs_client = session.client("ecs")
+    result = []
+
     for cluster in list_cluster_arns_in_account(ecs_client):
         service_arns = list_service_arns_in_cluster(ecs_client, cluster=cluster)
 
@@ -38,7 +41,9 @@ def describe_services(ecs_client):
                 include=["TAGS"]
             )
 
-            yield from resp["services"]
+            result.extend(resp["services"])
+
+    return result
 
 
 class NoMatchingServiceError(Exception):
@@ -104,59 +109,55 @@ def find_service_arns_for_release(
     return result
 
 
-class Ecs:
-    def __init__(self, region_name, role_arn):
-        session = iam.get_session(
-            session_name="ReleaseToolEcs",
-            role_arn=role_arn,
-            region_name=region_name
-        )
-        self.ecs = session.client('ecs')
-        self._described_services = list(describe_services(self.ecs))
+def deploy_service(session, *, cluster_arn, service_arn, deployment_label):
+    """
+    Triggers a deployment of a given service.
+    """
+    ecs_client = session.client("ecs")
 
-    def redeploy_service(self, cluster_arn, service_arn, deployment_label):
-        response = self.ecs.update_service(
+    resp = ecs_client.update_service(
+        cluster=cluster_arn,
+        service=service_arn,
+        forceNewDeployment=True
+    )
+
+    ecs_client.tag_resource(
+        resourceArn=service_arn,
+        tags=tags.to_aws_tags({"deployment:label": deployment_label})
+    )
+
+    return {
+        "cluster_arn": resp["service"]["clusterArn"],
+        "service_arn": resp["service"]["serviceArn"],
+        "deployment_id": resp["service"]["deployments"][0]["id"]
+    }
+
+
+def list_tasks_in_service(session, *, cluster_arn, service_name):
+    """
+    Given the name of a service, return a list of tasks running within
+    the service.
+    """
+    ecs_client = session.client("ecs")
+
+    task_arns = []
+
+    paginator = ecs_client.get_paginator("list_tasks")
+    for page in paginator.paginate(
+        cluster=cluster_arn, serviceName=service_name
+    ):
+        task_arns.extend(page["taskArns"])
+
+    # If task_arns is empty we can't ask to describe them.
+    # TODO: This method can handle up to 100 task ARNs.  It seems unlikely
+    # we'd ever have more than that, hence not handling it properly.
+    if task_arns:
+        resp = ecs_client.describe_tasks(
             cluster=cluster_arn,
-            service=service_arn,
-            forceNewDeployment=True
+            tasks=task_arns,
+            include=["TAGS"]
         )
 
-        self.ecs.tag_resource(
-            resourceArn=service_arn,
-            tags=[{
-                'key': 'deployment:label',
-                'value': deployment_label
-            }]
-        )
-
-        return {
-            'cluster_arn': response['service']['clusterArn'],
-            'service_arn': response['service']['serviceArn'],
-            'deployment_id': response['service']['deployments'][0]['id']
-        }
-
-    def list_service_tasks(self, service):
-        """
-        Given a service (e.g. bag-unpacker),
-        return a list of tasks running within that service
-        """
-        service_name = service["response"]["serviceName"]
-        cluster_arn = service["response"]["clusterArn"]
-
-        paginator = self.ecs.get_paginator("list_tasks")
-        paginator_iter = paginator.paginate(cluster=cluster_arn, serviceName=service_name)
-        task_arns = []
-        for page in paginator_iter:
-            task_arns += page["taskArns"]
-
-        # If task_arns is empty we can't ask to describe them
-        if task_arns:
-            resp = self.ecs.describe_tasks(
-                cluster=cluster_arn,
-                tasks=task_arns,
-                include=["TAGS"]
-            )
-
-            return resp["tasks"]
-        else:
-            return []
+        return resp["tasks"]
+    else:
+        return []
