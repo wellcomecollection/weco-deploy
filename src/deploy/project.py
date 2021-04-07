@@ -96,47 +96,18 @@ class Project:
             "details": details
         }
 
-    def get_ecs_services(self, release, environment_id):
-        # We always get a fresh set of ECS service descriptions.
-        service_descriptions = ecs.describe_services(self.session)
-
-        def _get_service(service_id):
-            ecs_service = ecs.find_matching_service(
-                service_descriptions=service_descriptions,
-                service_id=service_id,
-                environment_id=environment_id
-            )
-
-            return {
-                'config': {"id": service_id},
-                'response': ecs_service
-            }
-
-        matched_services = {}
-        for image_id, _ in release['images'].items():
-            # Attempt to match deployment image id to config and override service_ids
-            try:
-                matched_image = self.image_repositories[image_id]
-            except KeyError:
-                continue
-
-            services = matched_image.get('services', [])
-
-            available_services = [_get_service(service_id) for service_id in services]
-            available_services = [service for service in available_services if service["response"]]
-
-            if available_services:
-                matched_services[image_id] = available_services
-
-        return matched_services
-
     def is_release_deployed(self, release, environment_id, verbose=False):
         """
         Checks the `deployment:label` tag on a service matches the tags
         on the tasks within those services. We check that the desiredCount
         of tasks matches the running count of tasks.
         """
-        ecs_services = self.get_ecs_services(release, environment_id)
+        ecs_services = get_ecs_services(
+            self.session,
+            project=self._underlying,
+            release=release,
+            environment_id=environment_id
+        )
 
         def printv(str):
             if verbose:
@@ -276,7 +247,9 @@ class Project:
 
             return ecs_services_deployed[service_arn]
 
-        matched_services = self.get_ecs_services(
+        matched_services = get_ecs_services(
+            self.session,
+            project=self._underlying,
             release=release,
             environment_id=environment_id
         )
@@ -312,6 +285,42 @@ class Project:
         )
 
         return deployment
+
+
+def get_ecs_services(
+    session, *, project: models.Project, release, environment_id
+):
+    service_descriptions = ecs.describe_services(session)
+
+    def _get_service(service_id):
+        ecs_service = ecs.find_matching_service(
+            service_descriptions=service_descriptions,
+            service_id=service_id,
+            environment_id=environment_id
+        )
+
+        return {
+            'config': {"id": service_id},
+            'response': ecs_service
+        }
+
+    matched_services = {}
+    for image_id, _ in release['images'].items():
+        # Attempt to match deployment image id to config and override service_ids
+        try:
+            matched_image = project.image_repositories[image_id]
+        except KeyError:
+            continue
+
+        services = matched_image.get('services', [])
+
+        available_services = [_get_service(service_id) for service_id in services]
+        available_services = [service for service in available_services if service["response"]]
+
+        if available_services:
+            matched_services[image_id] = available_services
+
+    return matched_services
 
 
 def get_images(*, ecr: AbstractEcr, project: models.Project, from_label: str):
