@@ -257,14 +257,6 @@ class EcrPublic(AbstractEcr):
         return [output]
 
 
-class Ecr:
-    def __init__(self, *, region_name, role_arn):
-        self._underlying = EcrPrivate(
-            region_name=region_name,
-            role_arn=role_arn
-        )
-
-
 class NoSuchImageError(EcrError):
     """
     Raised when an image cannot be found.

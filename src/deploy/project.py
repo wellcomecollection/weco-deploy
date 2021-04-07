@@ -7,7 +7,7 @@ import cattr
 import yaml
 
 from . import ecs, ecr, iam, models
-from .ecr import Ecr
+from .ecr import EcrPrivate
 from .exceptions import ConfigError
 from .release_store import DynamoReleaseStore, ReleaseNotFoundError
 from .tags import parse_aws_tags
@@ -108,7 +108,7 @@ class Project:
     @property
     @functools.lru_cache()
     def ecr(self):
-        return Ecr(region_name=self.region_name, role_arn=self.role_arn)
+        return EcrPrivate(region_name=self.region_name, role_arn=self.role_arn)
 
     @property
     def role_arn(self):
@@ -249,7 +249,7 @@ class Project:
         Note: a single Docker image may have multiple ref tags, so the ref tag
         is chosen arbitrarily.
         """
-        ref_tags_resp = self.ecr._underlying.get_ref_tags_for_repositories(
+        ref_tags_resp = self.ecr.get_ref_tags_for_repositories(
             image_repositories=self.image_repositories.keys(),
             tag=from_label
         )
