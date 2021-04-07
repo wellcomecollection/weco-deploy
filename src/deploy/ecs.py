@@ -1,5 +1,6 @@
 from . import iam, tags
 from .iterators import chunked_iterable
+from .models import Project
 
 
 def list_cluster_arns_in_account(ecs_client):
@@ -40,6 +41,69 @@ def describe_services(ecs_client):
             yield from resp["services"]
 
 
+class NoMatchingServiceError(Exception):
+    pass
+
+
+class MultipleMatchingServicesError(Exception):
+    pass
+
+
+def find_matching_service(
+    service_descriptions, *, service_id, environment_id
+):
+    """
+    Given a service (e.g. bag-unpacker) and an environment (e.g. prod),
+    return the unique matching service.
+    """
+    try:
+        return tags.find_unique_resource_matching_tags(
+            service_descriptions,
+            expected_tags={
+                "deployment:service": service_id,
+                "deployment:env": environment_id,
+            }
+        )
+    except tags.NoMatchingResourceError:
+        raise NoMatchingServiceError(
+            f"No matching service found for {service_id}/{environment_id}!"
+        )
+    except tags.MultipleMatchingResourcesError:
+        raise MultipleMatchingServicesError(
+            f"Multiple matching services found for {service_id}/{environment_id}!"
+        )
+
+
+def find_service_arns_for_release(
+    *, project: Project, release, service_descriptions, environment_id
+):
+    """
+    Build a dictionary (image ID) -> list(service ARNs) for all the images
+    in a particular release.
+    """
+    result = {image_id: [] for image_id in release["images"]}
+
+    for image_id in release["images"]:
+        try:
+            services = project.image_repositories[image_id].services
+        except KeyError:
+            continue
+
+        for service_id in services:
+            try:
+                matching_service = find_matching_service(
+                    service_descriptions,
+                    service_id=service_id,
+                    environment_id=environment_id
+                )
+            except NoMatchingServiceError:
+                continue
+
+            result[image_id].append(matching_service["serviceArn"])
+
+    return result
+
+
 class Ecs:
     def __init__(self, region_name, role_arn):
         session = iam.get_session(
@@ -70,26 +134,6 @@ class Ecs:
             'service_arn': response['service']['serviceArn'],
             'deployment_id': response['service']['deployments'][0]['id']
         }
-
-    def find_matching_service(self, *, service_id, environment_id):
-        """
-        Given a service (e.g. bag-unpacker) and an environment (e.g. prod),
-        return the unique matching service.
-        """
-        try:
-            return tags.find_unique_resource_matching_tags(
-                self._described_services,
-                expected_tags={
-                    "deployment:service": service_id,
-                    "deployment:env": environment_id,
-                }
-            )
-        except tags.NoMatchingResourceError:
-            return None
-        except tags.MultipleMatchingResourcesError:
-            raise RuntimeError(
-                f"Multiple matching services found for {service_id}/{environment_id}!"
-            )
 
     def list_service_tasks(self, service):
         """

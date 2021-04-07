@@ -1,4 +1,3 @@
-import collections
 import datetime
 import functools
 import uuid
@@ -9,7 +8,7 @@ import yaml
 
 from . import ecr, iam, models
 from .ecr import Ecr
-from .ecs import Ecs
+from .ecs import Ecs, find_matching_service
 from .exceptions import ConfigError
 from .release_store import DynamoReleaseStore, ReleaseNotFoundError
 from .tags import parse_aws_tags
@@ -182,38 +181,6 @@ class Project:
         else:
             return self.release_store.get_release(release_id)
 
-    def _get_services_by_image_id(self, release):
-        """
-        Generates a set of tuples (image_id, List[services])
-        """
-        for image_id in release["images"]:
-            try:
-                matched_image = self.image_repositories[image_id]
-            except KeyError:
-                continue
-
-            yield (image_id, matched_image["services"])
-
-    def get_ecs_service_arns(self, release, environment_id):
-        """
-        Returns a dict (image ID) -> List[service ARNs].
-        """
-        result = collections.defaultdict(list)
-
-        for image_id, services in self._get_services_by_image_id(release):
-            for service_id in services:
-                matching_service = self.ecs.find_matching_service(
-                    service_id=service_id,
-                    environment_id=environment_id
-                )
-
-                try:
-                    result[image_id].append(matching_service["serviceArn"])
-                except TypeError:
-                    assert matching_service is None, matching_service
-
-        return dict(result)
-
     def get_ecs_services(self, release, environment_id, cached=True):
         def _get_service(service_id):
             # Sometimes we want not to use the service cache - eg when checking
@@ -224,7 +191,8 @@ class Project:
             else:
                 ecs = self.ecs
 
-            ecs_service = ecs.find_matching_service(
+            ecs_service = find_matching_service(
+                service_descriptions=ecs._described_services,
                 service_id=service_id,
                 environment_id=environment_id
             )
