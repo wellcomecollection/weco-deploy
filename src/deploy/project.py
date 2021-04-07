@@ -1,7 +1,5 @@
 import datetime
 import functools
-import uuid
-import warnings
 
 import cattr
 import yaml
@@ -9,7 +7,7 @@ import yaml
 from . import ecs, iam, models
 from .ecr import EcrPrivate
 from .exceptions import ConfigError
-from .release_store import DynamoReleaseStore, ReleaseNotFoundError
+from .release_store import DynamoReleaseStore
 from .tags import parse_aws_tags
 
 DEFAULT_REGION_NAME = "eu-west-1"
@@ -97,7 +95,6 @@ class Project:
             "description": description,
             "details": details
         }
-
 
     def get_ecs_services(self, release, environment_id):
         # We always get a fresh set of ECS service descriptions.
