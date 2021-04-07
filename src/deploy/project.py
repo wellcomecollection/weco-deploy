@@ -98,19 +98,6 @@ class Project:
             "details": details
         }
 
-    def _create_release(self, description, images):
-        release_id = str(uuid.uuid4())
-
-        return {
-            "release_id": release_id,
-            "project_id": self.id,
-            "project_name": self._underlying.name,
-            "date_created": datetime.datetime.utcnow().isoformat(),
-            "requested_by": iam.get_underlying_role_arn(),
-            "description": description,
-            "images": images,
-            "deployments": []
-        }
 
     def get_ecs_services(self, release, environment_id):
         # We always get a fresh set of ECS service descriptions.
@@ -229,28 +216,15 @@ class Project:
 
         return result
 
-    def _prepare_release(self, description, release_images):
-        try:
-            previous_release = self.release_store.get_most_recent_release()
-        except ReleaseNotFoundError:
-            previous_release = None
-
-        new_release = self._create_release(
-            description=description,
-            images=release_images
-        )
-
-        self.release_store.put_release(new_release)
-
-        return {"previous_release": previous_release, "new_release": new_release}
-
     def prepare(self, from_label, description):
         release_images = self.get_images(from_label)
 
         if not release_images:
             raise RuntimeError(f"No images found for {self.id}/{from_label}")
 
-        return self._prepare_release(
+        return self.release_store.prepare_release(
+            project_id=self.id,
+            project=self._underlying,
             description=description,
             release_images=release_images
         )
@@ -272,7 +246,9 @@ class Project:
 
         description = f"Release based on {release_id}, updating {service_ids} to {from_label}"
 
-        return self._prepare_release(
+        return self.release_store.prepare_release(
+            project_id=self.id,
+            project=self._underlying,
             description=description,
             release_images=release_images
         )

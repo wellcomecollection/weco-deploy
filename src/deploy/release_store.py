@@ -1,8 +1,10 @@
 import abc
+import datetime
+import uuid
 
 from boto3.dynamodb.conditions import Key
 
-from . import iam
+from . import iam, models
 from .exceptions import WecoDeployError
 
 
@@ -103,6 +105,39 @@ class ReleaseStore(abc.ABC):
             deployments, key=lambda d: d["date_created"], reverse=True
         )
         return deployments[:limit]
+
+    def prepare_release(
+        self,
+        *,
+        project_id: str,
+        project: models.Project,
+        description,
+        release_images
+    ):
+        try:
+            previous_release = self.get_most_recent_release()
+        except ReleaseNotFoundError:
+            previous_release = None
+
+        release_id = str(uuid.uuid4())
+
+        new_release = {
+            "release_id": release_id,
+            "project_id": project_id,
+            "project_name": project.name,
+            "date_created": datetime.datetime.utcnow().isoformat(),
+            "requested_by": iam.get_underlying_role_arn(),
+            "description": description,
+            "images": release_images,
+            "deployments": []
+        }
+
+        self.put_release(new_release)
+
+        return {
+            "previous_release": previous_release,
+            "new_release": new_release
+        }
 
 
 class MemoryReleaseStore(ReleaseStore):
