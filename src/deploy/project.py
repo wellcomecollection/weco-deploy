@@ -354,11 +354,6 @@ class Project:
         if release is None:
             raise ValueError(f"No releases found {release_id}, cannot continue!")
 
-        matched_services = self.get_ecs_services(
-            release=release,
-            environment_id=environment_id
-        )
-
         # Force check for valid environment
         if environment_id not in self.environment_names:
             raise ValueError(
@@ -384,6 +379,11 @@ class Project:
                 )
 
             return ecs_services_deployed[service_arn]
+
+        matched_services = self.get_ecs_services(
+            release=release,
+            environment_id=environment_id
+        )
 
         for image_id, image_name in sorted(release['images'].items()):
             tag_result = self._tag_ecr_image(
