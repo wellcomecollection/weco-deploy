@@ -1,5 +1,3 @@
-import datetime
-
 import pytest
 
 from deploy.exceptions import ConfigError

@@ -6,7 +6,7 @@ import warnings
 import cattr
 import yaml
 
-from . import ecs, ecr, iam, models
+from . import ecs, iam, models
 from .ecr import EcrPrivate
 from .exceptions import ConfigError
 from .release_store import DynamoReleaseStore, ReleaseNotFoundError
