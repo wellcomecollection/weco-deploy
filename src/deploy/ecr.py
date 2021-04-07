@@ -264,19 +264,6 @@ class Ecr:
             role_arn=role_arn
         )
 
-    def publish_image(self, image_id):
-        return self._underlying.publish_image(image_id=image_id)
-
-    def tag_image(self, image_id, tag, new_tag):
-        return self._underlying.tag_image(
-            image_id=image_id,
-            tag=tag,
-            new_tag=new_tag
-        )
-
-    def login(self):
-        self._underlying.login()
-
 
 class NoSuchImageError(EcrError):
     """
