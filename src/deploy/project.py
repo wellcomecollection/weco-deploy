@@ -242,29 +242,6 @@ class Project:
 
         return is_deployed
 
-    def publish(self, image_id, label):
-        # Create an ECR client for the correct account
-        self.ecr.login()
-
-        remote_uri, remote_tag, local_tag = self.ecr.publish_image(
-            image_id=image_id,
-        )
-
-        tag_result = self.ecr.tag_image(
-            image_id=image_id,
-            tag=remote_tag,
-            new_tag=label
-        )
-
-        return {
-            'ecr_push': {
-                'local_tag': local_tag,
-                'remote_tag': remote_tag,
-                'remote_uri': remote_uri,
-            },
-            'ecr_tag': tag_result
-        }
-
     def get_images(self, from_label):
         """
         Returns a dict (image id) -> (Git ref tag).

@@ -96,7 +96,7 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_name, role_arn, 
 def _publish(project, image_id, label):
     click.echo(click.style(f"Attempting to publish {project.id}/{image_id}", fg="green"))
 
-    publish_result = project.publish(
+    publish_result = project.ecr._underlying.publish(
         image_id=image_id,
         label=label
     )

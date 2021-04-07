@@ -168,6 +168,31 @@ class AbstractEcr(ABC):
 
         return result
 
+    def publish(self, *, image_id, label):
+        """
+        Publishes an image to ECR.
+        """
+        self.login()
+
+        remote_uri, remote_tag, local_tag = self.publish_image(
+            image_id=image_id
+        )
+
+        tag_result = self.tag_image(
+            image_id=image_id,
+            tag=remote_tag,
+            new_tag=label
+        )
+
+        return {
+            "ecr_push": {
+                "local_tag": local_tag,
+                "remote_tag": remote_tag,
+                "remote_uri": remote_uri,
+            },
+            "ecr_tag": tag_result
+        }
+
 
 class EcrPrivate(AbstractEcr):
     def __init__(self, *, region_name, role_arn):
