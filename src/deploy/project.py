@@ -149,25 +149,6 @@ class Project:
             "deployments": []
         }
 
-    def get_deployments(self, release_id, limit, environment_id):
-        if release_id is not None:
-            release = self.release_store.get_release(release_id)
-
-            # TODO: I think the release ID is already stored on the deployments.
-            # Can we remove this loop?
-            for d in release["deployments"]:
-                assert d["release_id"] == release_id
-
-            deployments = release["deployments"]
-        else:
-            deployments = self.release_store.get_recent_deployments(
-                environment=environment_id,
-                limit=limit
-            )
-
-        deployments = sorted(deployments, key=lambda d: d["date_created"], reverse=True)
-        return deployments[:limit]
-
     def get_release(self, release_id):
         if release_id == "latest":
             return self.release_store.get_most_recent_release()

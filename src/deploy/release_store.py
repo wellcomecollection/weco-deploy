@@ -77,6 +77,27 @@ class ReleaseStore(abc.ABC):
         """
         pass
 
+    def get_deployments(self, *, release_id, environment_id, limit):
+        if release_id is not None:
+            release = self.get_release(release_id)
+
+            # TODO: I think the release ID is already stored on the deployments.
+            # Can we remove this loop?
+            for d in release["deployments"]:
+                assert d["release_id"] == release_id
+
+            deployments = release["deployments"]
+        else:
+            deployments = self.get_recent_deployments(
+                environment=environment_id,
+                limit=limit
+            )
+
+        deployments = sorted(
+            deployments, key=lambda d: d["date_created"], reverse=True
+        )
+        return deployments[:limit]
+
 
 class MemoryReleaseStore(ReleaseStore):
     def __init__(self):
