@@ -149,12 +149,6 @@ class Project:
             "deployments": []
         }
 
-    def get_release(self, release_id):
-        if release_id == "latest":
-            return self.release_store.get_most_recent_release()
-        else:
-            return self.release_store.get_release(release_id)
-
     def get_ecs_services(self, release, environment_id):
         # We always get a fresh set of ECS service descriptions.
         service_descriptions = ecs.describe_services(self.session)
@@ -323,7 +317,7 @@ class Project:
         )
 
     def update(self, release_id, service_ids, from_label):
-        release = self.get_release(release_id)
+        release = self.release_store.get_release(release_id)
         images = self.get_images(from_label)
 
         # Ensure all specified services are available as images
@@ -355,7 +349,7 @@ class Project:
         )
 
     def deploy(self, release_id, environment_id, description):
-        release = self.get_release(release_id)
+        release = self.release_store.get_release(release_id)
 
         if release is None:
             raise ValueError(f"No releases found {release_id}, cannot continue!")

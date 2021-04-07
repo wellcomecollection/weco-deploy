@@ -41,11 +41,17 @@ class ReleaseStore(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_release(self, release_id):
+    def _get_release_by_id(self, release_id):
         """
         Retrieve a previously stored release.
         """
         pass
+
+    def get_release(self, release_id):
+        if release_id == "latest":
+            return self.get_most_recent_release()
+        else:
+            return self._get_release_by_id(release_id)
 
     @abc.abstractmethod
     def get_recent_releases(self, *, limit):
@@ -112,7 +118,7 @@ class MemoryReleaseStore(ReleaseStore):
     def put_release(self, release):
         self.cache[release["release_id"]] = release
 
-    def get_release(self, release_id):
+    def _get_release_by_id(self, release_id):
         try:
             return self.cache[release_id]
         except KeyError:
@@ -176,7 +182,7 @@ class DynamoReleaseStore(ReleaseStore):
     def put_release(self, release):
         self.table.put_item(Item=release)
 
-    def get_release(self, release_id):
+    def _get_release_by_id(self, release_id):
         resp = self.table.get_item(Key={"release_id": release_id})
         try:
             return resp["Item"]
