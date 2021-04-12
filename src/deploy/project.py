@@ -96,47 +96,20 @@ class Project:
             "details": details
         }
 
-    def get_ecs_services(self, release, environment_id):
-        # We always get a fresh set of ECS service descriptions.
-        service_descriptions = ecs.describe_services(self.session)
-
-        def _get_service(service_id):
-            ecs_service = ecs.find_matching_service(
-                service_descriptions=service_descriptions,
-                service_id=service_id,
-                environment_id=environment_id
-            )
-
-            return {
-                'config': {"id": service_id},
-                'response': ecs_service
-            }
-
-        matched_services = {}
-        for image_id, _ in release['images'].items():
-            # Attempt to match deployment image id to config and override service_ids
-            try:
-                matched_image = self.image_repositories[image_id]
-            except KeyError:
-                continue
-
-            services = matched_image.get('services', [])
-
-            available_services = [_get_service(service_id) for service_id in services]
-            available_services = [service for service in available_services if service["response"]]
-
-            if available_services:
-                matched_services[image_id] = available_services
-
-        return matched_services
-
     def is_release_deployed(self, release, environment_id, verbose=False):
         """
         Checks the `deployment:label` tag on a service matches the tags
         on the tasks within those services. We check that the desiredCount
         of tasks matches the running count of tasks.
         """
-        ecs_services = self.get_ecs_services(release, environment_id)
+        service_descriptions = ecs.describe_services(self.session)
+
+        ecs_services = ecs.get_ecs_services_from_service_descriptions(
+            project=self._underlying,
+            service_descriptions=service_descriptions,
+            release=release,
+            environment_id=environment_id
+        )
 
         def printv(str):
             if verbose:
@@ -145,16 +118,16 @@ class Project:
         is_deployed = True
 
         for _, services in sorted(ecs_services.items()):
-            for service in services:
-                service_tags = parse_aws_tags(service["response"]["tags"])
-                service_arn = service["response"]["serviceArn"]
+            for service_resp in services.values():
+                service_tags = parse_aws_tags(service_resp["tags"])
+                service_arn = service_resp["serviceArn"]
                 service_deployment_label = service_tags["deployment:label"]
-                desired_task_count = service["response"]["desiredCount"]
+                desired_task_count = service_resp["desiredCount"]
 
                 tasks = ecs.list_tasks_in_service(
                     self.session,
-                    cluster_arn=service["response"]["clusterArn"],
-                    service_name=service["response"]["serviceName"],
+                    cluster_arn=service_resp["clusterArn"],
+                    service_name=service_resp["serviceName"],
                 )
 
                 for task in tasks:
@@ -279,8 +252,8 @@ class Project:
 
         # Memoize service deployments to prevent multiple deployments
         def _ecs_deploy(service, deployment_label):
-            cluster_arn = service["response"]["clusterArn"]
-            service_arn = service["response"]["serviceArn"]
+            cluster_arn = service["clusterArn"]
+            service_arn = service["serviceArn"]
 
             if service_arn not in ecs_services_deployed:
                 ecs_services_deployed[service_arn] = ecs.deploy_service(
@@ -292,7 +265,11 @@ class Project:
 
             return ecs_services_deployed[service_arn]
 
-        matched_services = self.get_ecs_services(
+        service_descriptions = ecs.describe_services(self.session)
+
+        matched_services = ecs.get_ecs_services_from_service_descriptions(
+            project=self._underlying,
+            service_descriptions=service_descriptions,
             release=release,
             environment_id=environment_id
         )
@@ -312,7 +289,7 @@ class Project:
                         service=service,
                         deployment_label=release['release_id']
                     )
-                    for service in matched_services.get(image_id, [])
+                    for service in matched_services.get(image_id, {}).values()
                 ]
 
             deployment_details[image_id] = {

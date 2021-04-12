@@ -1,3 +1,5 @@
+import typing
+
 from . import tags
 from .iterators import chunked_iterable
 from .models import Project
@@ -161,3 +163,36 @@ def list_tasks_in_service(session, *, cluster_arn, service_name):
         return resp["tasks"]
     else:
         return []
+
+
+def find_ecs_services_for_release(
+    *,
+    project: Project,
+    service_descriptions: typing.List[typing.Dict],
+    release: str,
+    environment_id: str
+):
+    """
+    Returns a map (image ID) -> Dict(service ID -> ECS service description)
+    """
+    def _find_service(service_id):
+        return find_matching_service(
+            service_descriptions=service_descriptions,
+            service_id=service_id,
+            environment_id=environment_id
+        )
+
+    matched_services = {}
+    for image_id, _ in release['images'].items():
+        # Attempt to match deployment image id to config and override service_ids
+        try:
+            matched_image = project.image_repositories[image_id]
+        except KeyError:
+            continue
+
+        matched_services[image_id] = {
+            service_id: _find_service(service_id)
+            for service_id in matched_image.services
+        }
+
+    return matched_services
