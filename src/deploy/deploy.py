@@ -154,10 +154,12 @@ def _deploy(project, release, environment_id, description, confirm=True):
     click.echo(click.style(f"Requested by: {release['requested_by']}", fg="yellow"))
     click.echo(click.style(f"Date created: {release['date_created']}", fg="yellow"))
 
+    service_descriptions = ecs.describe_services(project.session)
+
     ecs_service_arns = ecs.find_service_arns_for_release(
         project=project._underlying,
         release=release,
-        service_descriptions=project.ecs._described_services,
+        service_descriptions=service_descriptions,
         environment_id=environment_id
     )
 
