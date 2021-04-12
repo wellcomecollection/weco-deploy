@@ -8,3 +8,4 @@ include =
 show_missing = True
 exclude_lines =
     @abc.abstractmethod
+    @abstractmethod

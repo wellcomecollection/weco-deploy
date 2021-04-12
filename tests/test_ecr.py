@@ -1,4 +1,5 @@
 import json
+import secrets
 
 from botocore.exceptions import ClientError
 import moto
@@ -77,6 +78,29 @@ class TestGetRefTagsForImage:
             ecr.get_ref_tags_for_image(
                 ecr_client, repository_name="example_worker", tag="latest"
             )
+
+
+@moto.mock_sts()
+def test_get_public_image_uri(role_arn):
+    ecr_public = ecr.EcrPublic(gallery_id="abcdef", role_arn=role_arn)
+
+    assert (
+        ecr_public.get_image_uri(image_id="example_worker", tag="latest") ==
+        "public.ecr.aws/abcdef/uk.ac.wellcome/example_worker:latest"
+    )
+
+
+@moto.mock_sts()
+def test_get_private_image_uri(region_name, role_arn):
+    ecr_private = ecr.EcrPrivate(
+        region_name=region_name,
+        role_arn=f"arn:aws:iam::1234567890:role/role-{secrets.token_hex()}"
+    )
+
+    assert (
+        ecr_private.get_image_uri(image_id="example_worker", tag="latest") ==
+        f"1234567890.dkr.ecr.{region_name}.amazonaws.com/uk.ac.wellcome/example_worker:latest"
+    )
 
 
 @moto.mock_sts()
