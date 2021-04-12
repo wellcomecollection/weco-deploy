@@ -3,6 +3,7 @@ import pytest
 from deploy.ecs import (
     deploy_service,
     describe_services,
+    find_ecs_services_for_release,
     find_matching_service,
     find_service_arns_for_release,
     list_cluster_arns_in_account,
@@ -279,3 +280,76 @@ def test_list_tasks_in_service(session, ecs_stack):
         service_name="service1a"
     )
     assert resp == []
+
+
+def test_find_ecs_services_for_release(session, ecs_stack):
+    project = Project(
+        name="Example Project",
+        role_arn="arn:aws:iam::123456789012:role/example-ci",
+        image_repositories=[
+            ImageRepository(id="repo1", services=[Service(id="service1")]),
+            ImageRepository(id="repo2", services=[Service(id="service2")])
+        ]
+    )
+
+    service_1_prod = {
+        "serviceArn": "arn:aws:ecs:eu-west-1:012345678910:service/service1a",
+        "tags": [
+            {
+                "key": "deployment:service",
+                "value": "service1",
+            },
+            {
+                "key": "deployment:env",
+                "value": "prod",
+            },
+        ]
+    }
+
+    service_1_staging = {
+        "serviceArn": "arn:aws:ecs:eu-west-1:012345678910:service/service1b",
+        "tags": [
+            {
+                "key": "deployment:service",
+                "value": "service1",
+            },
+            {
+                "key": "deployment:env",
+                "value": "staging",
+            },
+        ]
+    }
+
+    service_2_prod = {
+        "serviceArn": "arn:aws:ecs:eu-west-1:012345678910:service/service2",
+        "tags": [
+            {
+                "key": "deployment:service",
+                "value": "service2",
+            },
+            {
+                "key": "deployment:env",
+                "value": "prod",
+            },
+        ]
+    }
+
+    service_descriptions = [service_1_prod, service_1_staging, service_2_prod]
+
+    resp = find_ecs_services_for_release(
+        project=project,
+        service_descriptions=service_descriptions,
+        release={
+            "images": {
+                "repo1": "edu.self/service1:ref.123456",
+                "repo2": "edu.self/service2:ref.123456",
+                "repo3": "edu.self/service3:ref.123456",
+            }
+        },
+        environment_id="prod"
+    )
+
+    assert resp == {
+        "repo1": {"service1": service_1_prod},
+        "repo2": {"service2": service_2_prod},
+    }
