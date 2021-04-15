@@ -104,7 +104,7 @@ class Project:
         """
         service_descriptions = ecs.describe_services(self.session)
 
-        ecs_services = ecs.get_ecs_services_from_service_descriptions(
+        ecs_services = ecs.find_ecs_services_for_release(
             project=self._underlying,
             service_descriptions=service_descriptions,
             release=release,
@@ -267,7 +267,7 @@ class Project:
 
         service_descriptions = ecs.describe_services(self.session)
 
-        matched_services = ecs.get_ecs_services_from_service_descriptions(
+        matched_services = ecs.find_ecs_services_for_release(
             project=self._underlying,
             service_descriptions=service_descriptions,
             release=release,
