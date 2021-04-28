@@ -541,4 +541,3 @@ def main():
     except (WecoDeployError, ConfigError) as err:
         click.echo(click.style(f"Failed: {err}", fg="bright_red"))
         sys.exit(1)
-
