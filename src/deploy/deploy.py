@@ -10,6 +10,7 @@ from pprint import pprint
 from tabulate import tabulate
 
 from . import ecs, git, iam
+from .exceptions import ConfigError, WecoDeployError
 from .pretty_printing import pprint_date
 from .project import Projects
 from .version_check import warn_if_not_latest_version, current_version
@@ -535,4 +536,8 @@ def show_images(ctx, label):
 
 
 def main():
-    cli()
+    try:
+        cli()
+    except (WecoDeployError, ConfigError) as err:
+        click.echo(click.style(f"Failed: {err}", fg="bright_red"))
+        sys.exit(1)

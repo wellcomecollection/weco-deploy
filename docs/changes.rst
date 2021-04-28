@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.6.32 - 2021-04-21
+-------------------
+
+Add a few more tests around the ECR-related code, and fix a deploy-related bug.
+
+-------------------
 5.6.31 - 2021-04-15
 -------------------
 

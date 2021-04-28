@@ -6,7 +6,7 @@ import yaml
 
 from . import ecs, iam, models
 from .ecr import EcrPrivate
-from .exceptions import ConfigError
+from .exceptions import ConfigError, WecoDeployError
 from .release_store import DynamoReleaseStore
 from .tags import parse_aws_tags
 
@@ -190,7 +190,11 @@ class Project:
         release_images = self.get_images(from_label)
 
         if not release_images:
-            raise RuntimeError(f"No images found for {self.id}/{from_label}")
+            raise WecoDeployError(f"No images found for {self.id}/{from_label}")
+
+        for service_id, release_ref in release_images.items():
+            if release_ref is None:
+                raise WecoDeployError(f"No image found for {self.id}/{from_label}/{service_id}")
 
         return self.release_store.prepare_release(
             project_id=self.id,
@@ -206,7 +210,7 @@ class Project:
         # Ensure all specified services are available as images
         for service_id in service_ids:
             if service_id not in images.keys():
-                raise RuntimeError(f"No images found for {service_id}")
+                raise WecoDeployError(f"No images found for {service_id}")
 
         # Filter to only specified images
         filtered_images = {k: v for k, v in images.items() if k in service_ids}
@@ -237,11 +241,11 @@ class Project:
         release = self.release_store.get_release(release_id)
 
         if release is None:
-            raise ValueError(f"No releases found {release_id}, cannot continue!")
+            raise WecoDeployError(f"No releases found {release_id}, cannot continue!")
 
         # Force check for valid environment
         if environment_id not in self.environment_names:
-            raise ValueError(
+            raise WecoDeployError(
                 f"Unknown environment. "
                 f"Got {environment_id!r}, expected {self.environment_names.keys()!r}"
             )
