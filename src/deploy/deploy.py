@@ -75,8 +75,8 @@ def cli(ctx, project_file, verbose, confirm, project_id, region_name, role_arn, 
         click.echo("")
 
         lines = [
-            f"Using role ARN:   {config['role_arn']}",
-            f"IN region:        {config['region_name']}",
+            f"Using role ARN:   {config.get('role_arn','')}",
+            f"IN region:        {config.get('region_name','')}",
             f"Running as role:  {user_arn}",
             f"Underlying role:  {underlying_user_arn}" if user_arn != underlying_user_arn else "",
         ]

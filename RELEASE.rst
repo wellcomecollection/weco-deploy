@@ -1,3 +1,3 @@
 RELEASE_TYPE: patch
 
-Fix a bug where an unavailable service for an env causes a deployment to fail. 
+Fix for where role_arn is unset and verbose is set on causing boom

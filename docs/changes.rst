@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.6.34 - 2021-04-28
+-------------------
+
+Fix a bug where an unavailable service for an env causes a deployment to fail.
+
+-------------------
 5.6.33 - 2021-04-28
 -------------------
 
