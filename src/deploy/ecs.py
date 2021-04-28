@@ -187,11 +187,15 @@ def find_ecs_services_for_release(
 
         for service_id in matched_image.services:
             try:
-                matched_services[image_id] = find_matching_service(
+                service_description = find_matching_service(
                     service_descriptions=service_descriptions,
                     service_id=service_id,
                     environment_id=environment_id
                 )
+
+                matched_services[image_id] = {
+                    service_id: service_description
+                }
             except NoMatchingServiceError:
                 pass
 
