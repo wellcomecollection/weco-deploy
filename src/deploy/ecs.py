@@ -1,3 +1,4 @@
+import collections
 import typing
 
 from . import tags
@@ -175,14 +176,8 @@ def find_ecs_services_for_release(
     """
     Returns a map (image ID) -> Dict(service ID -> ECS service description)
     """
-    def _find_service(service_id):
-        return find_matching_service(
-            service_descriptions=service_descriptions,
-            service_id=service_id,
-            environment_id=environment_id
-        )
+    matched_services = collections.defaultdict(dict)
 
-    matched_services = {}
     for image_id, _ in release['images'].items():
         # Attempt to match deployment image id to config and override service_ids
         try:
@@ -190,9 +185,18 @@ def find_ecs_services_for_release(
         except KeyError:
             continue
 
-        matched_services[image_id] = {
-            service_id: _find_service(service_id)
-            for service_id in matched_image.services
-        }
+        for service_id in matched_image.services:
+            try:
+                service_description = find_matching_service(
+                    service_descriptions=service_descriptions,
+                    service_id=service_id,
+                    environment_id=environment_id
+                )
+
+                matched_services[image_id] = {
+                    service_id: service_description
+                }
+            except NoMatchingServiceError:
+                pass
 
     return matched_services
