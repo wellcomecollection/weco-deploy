@@ -350,6 +350,5 @@ def test_find_ecs_services_for_release(session, ecs_stack):
     )
 
     assert resp == {
-        "repo1": {"service1": service_1_prod},
         "repo2": {"service2": service_2_prod},
     }
