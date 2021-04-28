@@ -193,7 +193,8 @@ class Project:
             raise WecoDeployError(f"No images found for {self.id}/{from_label}")
 
         for service_id, release_ref in release_images.items():
-            raise WecoDeployError(f"No image found for {self.id}/{from_label}/{service_id}")
+            if release_ref is None:
+                raise WecoDeployError(f"No image found for {self.id}/{from_label}/{service_id}")
 
         return self.release_store.prepare_release(
             project_id=self.id,
