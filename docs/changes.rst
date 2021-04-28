@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.6.33 - 2021-04-28
+-------------------
+
+Add a check on missing images when preparing releases and improve known error display.
+
+-------------------
 5.6.32 - 2021-04-21
 -------------------
 
