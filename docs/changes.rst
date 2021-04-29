@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.6.35 - 2021-04-29
+-------------------
+
+Fix for where role_arn is unset and verbose is set on causing boom
+
+-------------------
 5.6.34 - 2021-04-28
 -------------------
 
