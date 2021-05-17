@@ -324,7 +324,8 @@ def _display_release(release, from_label):
         #
 
         prev_git_commit = "-------"
-        new_git_commit = "-------"
+        new_git_commit = click.style(f"No image found!", fg="bright_magenta")
+
         prev_release_images = None
 
         if prev_release is not None:
