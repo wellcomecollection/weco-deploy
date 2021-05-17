@@ -192,10 +192,6 @@ class Project:
         if not release_images:
             raise WecoDeployError(f"No images found for {self.id}/{from_label}")
 
-        for service_id, release_ref in release_images.items():
-            if release_ref is None:
-                raise WecoDeployError(f"No image found for {self.id}/{from_label}/{service_id}")
-
         return self.release_store.prepare_release(
             project_id=self.id,
             project=self._underlying,
@@ -279,6 +275,9 @@ class Project:
         )
 
         for image_id, image_name in sorted(release['images'].items()):
+            if image_name is None:
+                continue
+
             tag_result = self._tag_ecr_image(
                 environment_id=environment_id,
                 image_id=image_id,

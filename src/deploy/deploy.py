@@ -322,7 +322,9 @@ def _display_release(release, from_label):
         #
         #     {ecr_repo_uri}/{namespace}/{service}:ref.{git_commit}
         #
+
         prev_git_commit = "-------"
+        new_git_commit = "-------"
         prev_release_images = None
 
         if prev_release is not None:
@@ -331,7 +333,8 @@ def _display_release(release, from_label):
         if prev_release_images is not None:
             prev_git_commit = prev_release_images.split(".")[-1][:7]
 
-        new_git_commit = image.split(".")[-1][:7]
+        if image is not None:
+            new_git_commit = image.split(".")[-1][:7]
 
         rows.append([
             service,
