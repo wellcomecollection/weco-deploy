@@ -6,7 +6,7 @@ import yaml
 
 from . import ecs, iam, models
 from .ecr import EcrPrivate
-from .exceptions import ConfigError, WecoDeployError
+from .exceptions import ConfigError, WecoDeployError, NothingToReleaseError
 from .release_store import DynamoReleaseStore
 from .tags import parse_aws_tags
 
@@ -189,8 +189,11 @@ class Project:
     def prepare(self, from_label, description):
         release_images = self.get_images(from_label)
 
-        if not release_images:
-            raise WecoDeployError(f"No images found for {self.id}/{from_label}")
+        services_to_release = [service_id for service_id, release_ref in release_images.items() if
+                               release_ref is not None]
+
+        if not services_to_release:
+            raise NothingToReleaseError("No images to release!")
 
         return self.release_store.prepare_release(
             project_id=self.id,

@@ -8,3 +8,6 @@ class ConfigError(WecoDeployError):
 
 class EcrError(WecoDeployError):
     pass
+
+class NothingToReleaseError(Exception):
+    pass
