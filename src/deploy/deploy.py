@@ -10,7 +10,7 @@ from pprint import pprint
 from tabulate import tabulate
 
 from . import ecs, git, iam
-from .exceptions import ConfigError, WecoDeployError
+from .exceptions import ConfigError, WecoDeployError, NothingToReleaseError
 from .pretty_printing import pprint_date
 from .project import Projects
 from .version_check import warn_if_not_latest_version, current_version
@@ -353,10 +353,14 @@ def _display_release(release, from_label):
 
 
 def _prepare(project, from_label, description):
-    release = project.prepare(
-        from_label=from_label,
-        description=description
-    )
+    try:
+        release = project.prepare(
+            from_label=from_label,
+            description=description
+        )
+    except NothingToReleaseError:
+        click.echo(click.style("No images to deploy, cannot create release.", fg="bright_magenta"))
+        return None
 
     _display_release(
         release=release,
@@ -443,6 +447,9 @@ def release_deploy(ctx, from_label, environment_id, description, confirmation_wa
         from_label=from_label,
         description=description
     )
+
+    if not release:
+        return
 
     _deploy(
         project=project,
