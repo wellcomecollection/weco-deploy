@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.6.37 - 2021-05-18
+-------------------
+
+If there is nothing to release, don't cut a release!
+
+-------------------
 5.6.36 - 2021-05-17
 -------------------
 
