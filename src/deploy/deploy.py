@@ -359,7 +359,7 @@ def _prepare(project, from_label, description):
             description=description
         )
     except NothingToReleaseError:
-        click.echo(click.style("No images to deploy, cannot create release.",  fg="bright_magenta"))
+        click.echo(click.style("No images to deploy, cannot create release.", fg="bright_magenta"))
         return None
 
     _display_release(
