@@ -6,7 +6,7 @@ This script runs in Travis to build/publish our Docker images.
 If this script runs in a pull request, it just checks the images can
 build successfully.
 
-If this script runs in a push to master, it builds the images and then
+If this script runs in a push to main, it builds the images and then
 publishes them to Docker Hub.
 
 It exits with code 0 (success) if the build/publish was successful,
@@ -39,9 +39,9 @@ if __name__ == '__main__':
     tools.git('fetch')
 
     HEAD = tools.hash_for_name('HEAD')
-    MASTER = tools.hash_for_name('origin/master')
+    MAIN = tools.hash_for_name('origin/main')
 
-    on_master = tools.is_ancestor(HEAD, MASTER)
+    on_main = tools.is_ancestor(HEAD, MAIN)
     has_release = tools.has_release()
 
     major, minor, patch = tuple(map(int, tools.latest_version().split(".")))
@@ -54,11 +54,11 @@ if __name__ == '__main__':
     local_image_name = image_names[0]
 
     # Get latest code before we build
-    tools.git('pull', 'origin', 'master')
+    tools.git('pull', 'origin', 'main')
 
     docker("build", "--tag", local_image_name, ROOT)
 
-    if has_release and on_master:
+    if has_release and on_main:
         # Log in to Docker Hub & push.  Be careful about this subprocess call -- if it
         # errors, the default exception would print our password to stderr.
         # See https://alexwlchan.net/2018/05/beware-logged-errors/

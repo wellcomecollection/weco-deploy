@@ -150,7 +150,7 @@ def create_tag_and_push():
 
     git('tag', __version__)
 
-    subprocess.check_call(['git', 'push', 'ssh-origin', 'HEAD:master'])
+    subprocess.check_call(['git', 'push', 'ssh-origin', 'HEAD:main'])
     subprocess.check_call(['git', 'push', 'ssh-origin', '--tags'])
 
 

@@ -46,11 +46,11 @@ if __name__ == '__main__':
     tools.git("fetch", "ssh-origin")
 
     HEAD = tools.hash_for_name('HEAD')
-    MASTER = tools.hash_for_name('ssh-origin/master')
+    MAIN = tools.hash_for_name('ssh-origin/main')
     print('Current head:  ', HEAD)
-    print('Current master:', MASTER)
+    print('Current main:', MAIN)
 
-    on_master = tools.is_ancestor(HEAD, MASTER)
+    on_main = tools.is_ancestor(HEAD, MAIN)
     has_release = tools.has_release()
 
     if has_release:
@@ -66,8 +66,8 @@ if __name__ == '__main__':
         sys.executable, 'setup.py', 'sdist', '--dist-dir', DIST,
     ])
 
-    if not on_master:
-        print('Not deploying due to not being on master')
+    if not on_main:
+        print('Not deploying due to not being on main')
         sys.exit(0)
 
     if not has_release:
