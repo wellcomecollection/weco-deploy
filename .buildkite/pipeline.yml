@@ -5,18 +5,24 @@ steps:
           run: tox
           env:
             - TOXENV=lint
+    agents:
+      queue: nano
   - label: "check_release_file"
     plugins:
       - docker-compose#v3.5.0:
           run: tox
           env:
             - TOXENV=check_release_file
+    agents:
+      queue: nano
   - label: "test"
     plugins:
       - docker-compose#v3.5.0:
           run: tox
           env:
             - TOXENV=py37
+    agents:
+      queue: nano
   - wait
   - label: "pypi publish"
     if: build.branch == "main"
@@ -30,6 +36,8 @@ steps:
             - TOXENV=deploy
             - PYPI_USERNAME=wellcomedigitalplatform
             - PYPI_PASSWORD
+    agents:
+      queue: nano
   - wait
   - label: "docker hub and ECR publish"
     if: build.branch == "main"
@@ -42,3 +50,5 @@ steps:
           env:
             - TOXENV=docker_build
             - DOCKER_HUB_PASSWORD
+    agents:
+      queue: nano
