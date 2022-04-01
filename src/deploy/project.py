@@ -102,6 +102,13 @@ class Project:
         on the tasks within those services. We check that the desiredCount
         of tasks matches the running count of tasks.
         """
+        expected_ecs_services = set()
+        for deployment in release['deployments']:
+            for details in deployment['details'].values():
+                for ecs_deployment in details['ecs_deployments']:
+                    expected_ecs_services.add(ecs_deployment['service_arn'])
+
+
         service_descriptions = ecs.describe_services(self.session)
 
         ecs_services = ecs.find_ecs_services_for_release(
@@ -117,10 +124,13 @@ class Project:
 
         is_deployed = True
 
-        for _, services in sorted(ecs_services.items()):
+        for service_id, services in sorted(ecs_services.items()):
             for service_resp in services.values():
-                service_tags = parse_aws_tags(service_resp["tags"])
                 service_arn = service_resp["serviceArn"]
+                if service_arn not in expected_ecs_services:
+                    printv(f"{service_id} was not deployed to {environment_id} as part of this release")
+                    continue
+                service_tags = parse_aws_tags(service_resp["tags"])
                 service_deployment_label = service_tags["deployment:label"]
                 desired_task_count = service_resp["desiredCount"]
 
