@@ -266,12 +266,12 @@ def deploy(ctx, release_id, environment_id, description, confirmation_wait_for, 
     short_help="Checks for a releaase on a project",
     help="""
     Checks whether a release has been successfully deployed to its expected target(s).
-    
+
     This allows you to run the confrmation phase separately from actually deploying anything.
-    
+
     The main reason you may wish to use this is if a previous call to deploy or release-deploy
     failed due to timing out in its own confirmation phase.
-    
+
     You may also wish to use this if you suspect a disconnect between what you expect on an environment
     and what is actually there.
     """

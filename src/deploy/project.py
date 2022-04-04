@@ -108,7 +108,6 @@ class Project:
                 for ecs_deployment in details['ecs_deployments']:
                     expected_ecs_services.add(ecs_deployment['service_arn'])
 
-
         service_descriptions = ecs.describe_services(self.session)
 
         ecs_services = ecs.find_ecs_services_for_release(
