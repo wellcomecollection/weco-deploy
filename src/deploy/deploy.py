@@ -263,7 +263,7 @@ def deploy(ctx, release_id, environment_id, description, confirmation_wait_for, 
 
 
 @cli.command(
-    short_help="Checks for a releaase on a project",
+    short_help="Checks for a release on a project",
     help="""
     Checks whether a release has been successfully deployed to its expected target(s).
 
