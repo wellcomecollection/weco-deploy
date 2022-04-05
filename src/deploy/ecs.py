@@ -124,6 +124,8 @@ def deploy_service(session, *, cluster_arn, service_arn, deployment_label):
         forceNewDeployment=True
     )
 
+    print(f"tagging {cluster_arn}  {service_arn} with label {deployment_label}")
+
     ecs_client.tag_resource(
         resourceArn=service_arn,
         tags=tags.to_aws_tags({"deployment:label": deployment_label})

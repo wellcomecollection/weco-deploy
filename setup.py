@@ -11,7 +11,7 @@ def local_file(name):
 
 
 SOURCE = local_file('src')
-README = local_file('README.rst')
+README = local_file('README.md')
 
 # Assignment to placate pyflakes. The actual version is from the exec that
 # follows.

@@ -244,7 +244,6 @@ def deploy(ctx, release_id, environment_id, description, confirmation_wait_for, 
     verbose = ctx.obj['verbose']
 
     release = project.release_store.get_release(release_id)
-
     _deploy(
         project=project,
         release=release,
@@ -252,6 +251,48 @@ def deploy(ctx, release_id, environment_id, description, confirmation_wait_for, 
         description=description,
         confirm=confirm
     )
+
+    _confirm_deploy(
+        project=project,
+        release=release,
+        environment_id=environment_id,
+        wait_for_seconds=confirmation_wait_for,
+        interval=confirmation_interval,
+        verbose=verbose
+    )
+
+
+@cli.command(
+    short_help="Checks for a release on a project",
+    help="""
+    Checks whether a release has been successfully deployed to its expected target(s).
+
+    This allows you to run the confrmation phase separately from actually deploying anything.
+
+    The main reason you may wish to use this is if a previous call to deploy or release-deploy
+    failed due to timing out in its own confirmation phase.
+
+    You may also wish to use this if you suspect a disconnect between what you expect on an environment
+    and what is actually there.
+    """
+)
+@click.option('--release-id', prompt="Release ID to check", default="latest", show_default=True,
+              help="The ID of the release to be checked, or the latest release if unspecified")
+@click.option('--environment-id', prompt="Environment ID to check",
+              default="stage", show_default=True,
+              help="The target environment of this deployment")
+@click.option('--confirmation-wait-for',
+              help="How many seconds to wait for a confirmation for", default=60,
+              show_default=True)
+@click.option('--confirmation-interval',
+              help="How many seconds in an interval before re-confirming a deploy", default=10,
+              show_default=True)
+@click.pass_context
+def confirm_deploy(ctx, release_id, environment_id, confirmation_wait_for, confirmation_interval):
+    project = ctx.obj['project']
+    verbose = ctx.obj['verbose']
+
+    release = project.release_store.get_release(release_id)
 
     _confirm_deploy(
         project=project,
@@ -293,7 +334,7 @@ def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval
 
     click.echo("")
     click.echo(click.style(f"Deployment of {release_id} to {environment_id} successful", fg="bright_green"))
-    click.echo(click.style(f"Deployment took {total_time_waited}s", fg="bright_green"))
+    click.echo(click.style(f"Check took {total_time_waited}s", fg="bright_green"))
     sys.exit(0)
 
 
