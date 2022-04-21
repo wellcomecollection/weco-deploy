@@ -5,6 +5,13 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.6.38 - 2022-04-21
+-------------------
+
+* Add "confirm-deploy" command
+* Ensure that deployment checks only look at things that changed
+
+-------------------
 5.6.37 - 2021-05-18
 -------------------
 
