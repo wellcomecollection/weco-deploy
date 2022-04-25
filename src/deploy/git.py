@@ -16,7 +16,7 @@ def log(commit_id, run_fetch=True):
         return subprocess.check_output(show_cmd).decode("utf8").strip()
 
     except subprocess.CalledProcessError:
-        # If we couldn't find the commit, run a 'git fetch' and see if it's
+        # If we couldn't find the commit, run 'git fetch' and see if it's
         # available in the remote state.  If we still can't find it after that,
         # give up and return an empty string.
         if run_fetch:
