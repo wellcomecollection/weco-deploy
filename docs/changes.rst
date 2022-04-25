@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.6.39 - 2022-04-25
+-------------------
+
+A no-op change to try to trigger a deployment.
+
+-------------------
 5.6.38 - 2022-04-21
 -------------------
 
