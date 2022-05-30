@@ -42,17 +42,25 @@ VERSION_TAGS="
   $MAJOR_TAG.$MINOR_TAG.$PATCH_TAG
   latest"
 
-docker login --username wellcometravis --password "$DOCKER_HUB_PASSWORD"
-
-aws ecr-public get-login-password --region us-east-1 | xargs -I '{}' docker login --username AWS --password '{}'
-
 docker build --tag "$LATEST_TAG" .
 
+docker login --username wellcometravis --password "$DOCKER_HUB_PASSWORD"
 for version in $VERSION_TAGS
 do
   docker tag "$LATEST_TAG" "wellcome/weco-deploy:$tag"
   docker push "wellcome/weco-deploy:$tag"
+done
 
+eval $(aws ecr get-login --no-include-email)
+for version in $VERSION_TAGS
+do
+  docker tag "$LATEST_TAG" "760097843905.dkr.ecr.eu-west-1.amazonaws.com/$LATEST_TAG"
+  docker push "760097843905.dkr.ecr.eu-west-1.amazonaws.com/$LATEST_TAG"
+done
+
+aws ecr-public get-login-password --region us-east-1 | xargs -I '{}' docker login --username AWS --password '{}'
+for version in $VERSION_TAGS
+do
   docker tag "$LATEST_TAG" "public.ecr.aws/l7a1d1z4/weco-deploy:$tag"
   docker push "public.ecr.aws/l7a1d1z4/weco-deploy:$tag"
 done
