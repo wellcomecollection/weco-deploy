@@ -5,7 +5,7 @@ set -o nounset
 
 git config user.name "Buildkite on behalf of Wellcome Collection"
 git config user.email "wellcomedigitalplatform@wellcome.ac.uk"
-# git remote add ssh-origin "git@github.com:wellcomecollection/weco-deploy.git"
+git remote add ssh-origin "git@github.com:wellcomecollection/weco-deploy.git"
 
 if [[ ! -f RELEASE.md ]]
 then
