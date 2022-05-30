@@ -32,13 +32,9 @@ steps:
             - PYPI_PASSWORD
   - wait
   - label: "docker hub and ECR publish"
+    command: ./scripts/publish_docker_images.sh
     if: build.branch == "main"
     plugins:
       - seek-oss/aws-sm#v2.1.0:
           env:
             DOCKER_HUB_PASSWORD: builds/docker_hub_password
-      - docker-compose#v3.5.0:
-          run: tox
-          env:
-            - TOXENV=docker_build
-            - DOCKER_HUB_PASSWORD

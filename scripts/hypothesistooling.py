@@ -24,12 +24,6 @@ import sys
 from datetime import datetime, timedelta
 
 
-def current_branch():
-    return subprocess.check_output([
-        'git', 'rev-parse', '--abbrev-ref', 'HEAD'
-    ]).decode('ascii').strip()
-
-
 def tags():
     result = [t.decode('ascii') for t in subprocess.check_output([
         'git', 'tag'
