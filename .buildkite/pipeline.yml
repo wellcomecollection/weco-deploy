@@ -6,11 +6,8 @@ steps:
           env:
             - TOXENV=lint
   - label: "check_release_file"
-    plugins:
-      - docker-compose#v3.5.0:
-          run: tox
-          env:
-            - TOXENV=check_release_file
+    command: scripts/check-release-file.py
+
   - label: "test"
     plugins:
       - docker-compose#v3.5.0:
