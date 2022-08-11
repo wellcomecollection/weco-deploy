@@ -49,7 +49,7 @@ class AbstractEcr(ABC):
     def get_authorization_data(self):
         """
         Returns an "authorization token data object" that can be used to
-        authenticate with the local Docker client.
+        authenticate with a local Docker client.
         """
         pass
 
