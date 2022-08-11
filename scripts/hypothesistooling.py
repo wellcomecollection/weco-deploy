@@ -170,7 +170,7 @@ def modified_files():
     return files
 
 
-RELEASE_FILE = os.path.join(ROOT, 'RELEASE.rst')
+RELEASE_FILE = os.path.join(ROOT, 'RELEASE.md')
 
 
 def has_release():
