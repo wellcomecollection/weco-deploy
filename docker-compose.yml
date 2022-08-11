@@ -18,5 +18,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HOME}/.docker:/root/.docker
     environment:
+      - CI=true
       - TOXENV
       - SSH_AUTH_SOCK=/ssh-agent.sock

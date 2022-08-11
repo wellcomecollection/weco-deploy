@@ -14,8 +14,9 @@ RUN pip install cryptography
 RUN rc-update add sshd
 
 RUN pip install --upgrade pip awscli setuptools tox
+COPY ./safe_git_tox_entrypoint.sh /
 
 VOLUME /workdir
 WORKDIR /workdir
 
-ENTRYPOINT ["tox"]
+ENTRYPOINT ["/safe_git_tox_entrypoint.sh"]
