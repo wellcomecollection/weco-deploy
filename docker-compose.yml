@@ -8,10 +8,15 @@ services:
       - .:/workdir
       - ${HOME}/.ssh/known_hosts:/root/.ssh/known_hosts
       - ${SSH_AUTH_SOCK}:/ssh-agent.sock
-      # Expose the host Docker socket inside the container. This
-      # is required for Docker to run correctly inside the container.
+      # Expose the host Docker socket and config inside the container.  Both of these
+      # are required for Docker to run correctly inside the container.
+      #
+      #   - The socket allows Docker-in-Docker to start new containers
+      #   - The config allows Docker-in-Docker to share credentials with Docker on
+      #     the host, e.g. to push images to ECR
+      #
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${HOME}/.aws:/root/.aws
+      - ${HOME}/.docker:/root/.docker
     environment:
       - CI=true
       - TOXENV
