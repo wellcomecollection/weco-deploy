@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 -------------------
+5.6.40 - 2022-08-11
+-------------------
+
+Fix the content-type in `setup.py` to fix publishing to PyPI.
+
+-------------------
 5.6.39 - 2022-04-25
 -------------------
 
