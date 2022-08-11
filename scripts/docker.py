@@ -13,7 +13,6 @@ It exits with code 0 (success) if the build/publish was successful,
 or code 1 (failure) if the build/publish fails for any image.
 """
 
-import os
 import subprocess
 import sys
 
