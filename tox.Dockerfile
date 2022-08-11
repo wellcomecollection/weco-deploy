@@ -19,6 +19,6 @@ VOLUME /workdir
 WORKDIR /workdir
 
 # Git in docker thinks that a volume is "unsafe" unless we do this
-RUN git config --global --add safe.directory *
+RUN git config --global --add safe.directory '*'
 
 ENTRYPOINT ["tox"]
