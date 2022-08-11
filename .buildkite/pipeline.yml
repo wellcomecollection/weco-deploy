@@ -9,6 +9,9 @@ steps:
           role: "arn:aws:iam::760097843905:role/platform-ci"
       - ecr#v2.1.1:
           login: true
+      - docker-login#v2.1.0:
+          username: wellcometravis
+          password-env: DOCKER_HUB_PASSWORD
       - docker-compose#v3.5.0:
           run: tox
           env:

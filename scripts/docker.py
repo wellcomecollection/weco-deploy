@@ -59,17 +59,7 @@ if __name__ == '__main__':
     docker("build", "--tag", local_image_name, ROOT)
 
     if on_main:
-        # Log in to Docker Hub & push.  Be careful about this subprocess call -- if it
-        # errors, the default exception would print our password to stderr.
-        # See https://alexwlchan.net/2018/05/beware-logged-errors/
         try:
-            subprocess.check_call("wc -l ~/.docker/config.json")
-            docker(
-                "login",
-                "--username", "wellcometravis",
-                "--password", os.environ["DOCKER_HUB_PASSWORD"]
-            )
-
             for image_name in image_names:
                 docker("tag", local_image_name, image_name)
                 docker("push", image_name)

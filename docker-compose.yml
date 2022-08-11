@@ -16,7 +16,7 @@ services:
       #     the host, e.g. to push images to ECR
       #
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${HOME}/.docker:/root/.docker
+      - ${DOCKER_CONFIG}:/root/.docker
     environment:
       - CI=true
       - TOXENV
