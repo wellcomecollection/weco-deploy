@@ -1,23 +1,4 @@
 steps:
-  - label: "docker hub and ECR publish"
-    if: build.branch == "main"
-    plugins:
-      - seek-oss/aws-sm#v2.1.0:
-          env:
-            DOCKER_HUB_PASSWORD: builds/docker_hub_password
-      - wellcomecollection/aws-assume-role#v0.2.2:
-          role: "arn:aws:iam::760097843905:role/platform-ci"
-      - ecr#v2.1.1:
-          login: true
-      - docker-login#v2.1.0:
-          username: wellcometravis
-          password-env: DOCKER_HUB_PASSWORD
-      - docker-compose#v3.5.0:
-          run: tox
-          env:
-            - TOXENV=docker_build
-            - DOCKER_HUB_PASSWORD
-  - wait
   - label: "lint"
     plugins:
       - docker-compose#v3.5.0:
@@ -47,3 +28,23 @@ steps:
             - PYPI_USERNAME=wellcomedigitalplatform
             - PYPI_PASSWORD
 
+  - wait
+
+  - label: "docker hub and ECR publish"
+    if: build.branch == "main"
+    plugins:
+      - seek-oss/aws-sm#v2.1.0:
+          env:
+            DOCKER_HUB_PASSWORD: builds/docker_hub_password
+      - wellcomecollection/aws-assume-role#v0.2.2:
+          role: "arn:aws:iam::760097843905:role/platform-ci"
+      - ecr#v2.1.1:
+          login: true
+      - docker-login#v2.1.0:
+          username: wellcometravis
+          password-env: DOCKER_HUB_PASSWORD
+      - docker-compose#v3.5.0:
+          run: tox
+          env:
+            - TOXENV=docker_build
+            - DOCKER_HUB_PASSWORD
