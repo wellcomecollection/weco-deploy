@@ -58,7 +58,7 @@ if __name__ == '__main__':
 
     docker("build", "--tag", local_image_name, ROOT)
 
-    if has_release and on_main:
+    if on_main:
         # Log in to Docker Hub & push.  Be careful about this subprocess call -- if it
         # errors, the default exception would print our password to stderr.
         # See https://alexwlchan.net/2018/05/beware-logged-errors/
@@ -68,6 +68,7 @@ if __name__ == '__main__':
                 "--username", "wellcometravis",
                 "--password", os.environ["DOCKER_HUB_PASSWORD"]
             )
+            subprocess.check_call("eval $(aws ecr get-login --no-include-email)", shell=True)
 
             for image_name in image_names:
                 docker("tag", local_image_name, image_name)
