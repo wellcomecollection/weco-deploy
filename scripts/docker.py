@@ -68,7 +68,6 @@ if __name__ == '__main__':
                 "--username", "wellcometravis",
                 "--password", os.environ["DOCKER_HUB_PASSWORD"]
             )
-            subprocess.check_call("eval $(aws ecr get-login --no-include-email)", shell=True)
 
             for image_name in image_names:
                 docker("tag", local_image_name, image_name)
