@@ -18,4 +18,7 @@ RUN pip install --upgrade pip awscli setuptools tox
 VOLUME /workdir
 WORKDIR /workdir
 
+# Git in docker thinks that the volume is "unsafe" unless we do this
+RUN git config --global --add safe.directory .
+
 ENTRYPOINT ["tox"]
