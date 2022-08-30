@@ -1,7 +1,8 @@
 import collections
 import typing
 
-from . import tags
+from . import models, tags
+from .ecr import get_ecr_image_digest
 from .iterators import chunked_iterable
 from .models import Project
 

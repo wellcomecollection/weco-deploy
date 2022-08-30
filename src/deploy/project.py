@@ -9,7 +9,6 @@ from . import ecs, iam, models
 from .ecr import EcrPrivate
 from .exceptions import ConfigError, WecoDeployError, NothingToReleaseError
 from .release_store import DynamoReleaseStore
-from .tags import parse_aws_tags
 
 DEFAULT_REGION_NAME = "eu-west-1"
 
@@ -212,7 +211,7 @@ class Project:
                 if task["lastStatus"] != "RUNNING":
                     printv("")
                     print(f"Task {task_id} in {serv['service_name']} has the wrong status:")
-                    printv(f"  expected: RUNNING")
+                    printv( "  expected: RUNNING")
                     printv(f"  actual:   {task['lastStatus']}")
                     is_up_to_date = False
 
