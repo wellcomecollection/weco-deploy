@@ -112,29 +112,20 @@ def find_service_arns_for_release(
     return result
 
 
-def deploy_service(session, *, cluster_arn, service_arn, deployment_label):
+def deploy_service(session, *, cluster_arn, service_arn):
     """
     Triggers a deployment of a given service.
     """
     ecs_client = session.client("ecs")
 
     resp = ecs_client.update_service(
-        cluster=cluster_arn,
-        service=service_arn,
-        forceNewDeployment=True
-    )
-
-    print(f"tagging {cluster_arn}  {service_arn} with label {deployment_label}")
-
-    ecs_client.tag_resource(
-        resourceArn=service_arn,
-        tags=tags.to_aws_tags({"deployment:label": deployment_label})
+        cluster=cluster_arn, service=service_arn, forceNewDeployment=True
     )
 
     return {
         "cluster_arn": resp["service"]["clusterArn"],
         "service_arn": resp["service"]["serviceArn"],
-        "deployment_id": resp["service"]["deployments"][0]["id"]
+        "deployment_id": resp["service"]["deployments"][0]["id"],
     }
 
 

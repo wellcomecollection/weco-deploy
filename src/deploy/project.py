@@ -317,7 +317,7 @@ class Project:
         ecs_services_deployed = {}
 
         # Memoize service deployments to prevent multiple deployments
-        def _ecs_deploy(service, deployment_label):
+        def _ecs_deploy(service):
             cluster_arn = service["clusterArn"]
             service_arn = service["serviceArn"]
 
@@ -326,7 +326,6 @@ class Project:
                     self.session,
                     cluster_arn=cluster_arn,
                     service_arn=service_arn,
-                    deployment_label=deployment_label
                 )
 
             return ecs_services_deployed[service_arn]
@@ -354,10 +353,7 @@ class Project:
                 ecs_deployments = []
             else:
                 ecs_deployments = [
-                    _ecs_deploy(
-                        service=service,
-                        deployment_label=release['release_id']
-                    )
+                    _ecs_deploy(service)
                     for service in matched_services.get(image_id, {}).values()
                 ]
 
