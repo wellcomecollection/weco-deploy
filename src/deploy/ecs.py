@@ -204,7 +204,7 @@ def find_ecs_services_for_release(
     return matched_services
 
 
-def get_ecs_service_spec(session, *, cluster, service_name) -> models.ServiceSpec:
+def get_ecs_service_spec(session, *, cluster, service_name) -> models.TaskSpec:
     """
     What are the containers we expect to be running in tasks that
     are launched in this service?
@@ -229,9 +229,9 @@ def get_ecs_service_spec(session, *, cluster, service_name) -> models.ServiceSpe
 
     images = {
         c["name"]: models.DockerImageSpec(
-            uri=c["image"], digest=get_ecr_image_digest(sess, image_uri=c["image"])
+            uri=c["image"], digest=get_ecr_image_digest(session, image_uri=c["image"])
         )
         for c in task_resp["taskDefinition"]["containerDefinitions"]
     }
 
-    return models.ServiceSpec(task_definition=task_definition, images=images)
+    return models.TaskSpec(task_definition=task_definition, images=images)

@@ -1,5 +1,6 @@
 import datetime
 import functools
+import typing
 
 import cattr
 import yaml
@@ -49,6 +50,41 @@ class Projects:
         )
 
 
+def compare_image_specs(
+    service_name: str,
+    task_id: str,
+    expected_images: typing.Dict[str, models.DockerImageSpec],
+    actual_images: typing.Dict[str, models.DockerImageSpec],
+):
+    """
+    Print a summary of the differences in the expected/actual images.
+
+    This is meant for human-readability.
+    """
+    assert expected_images != actual_images
+
+    print("")
+    print(f"Task {task_id} in {service_name} has the wrong containers:")
+
+    for name, actual_spec in actual_images.items():
+        try:
+            expected_image_spec = expected_images[name]
+            if expected_image_spec.uri != actual_spec.uri:
+                print(f"- {name}: wrong URI")
+                print(f"    expected: {expected_image_spec.uri}")
+                print(f"    actual:   {actual_spec.uri}")
+            if expected_image_spec.digest != actual_spec.digest:
+                print(f"- {name}: wrong image digest")
+                print(f"    expected: {expected_image_spec.digest}")
+                print(f"    actual:   {actual_spec.digest}")
+        except KeyError:
+            print(f"- {name}: unexpected container running")
+
+    for name in expected_images:
+        if name not in actual_images:
+            print(f"- {name}: expected container, but wasn't found")
+
+
 class Project:
     def __init__(self, project_id, config, release_store):
         self.id = project_id
@@ -95,6 +131,98 @@ class Project:
             "description": description,
             "details": details
         }
+
+    def has_up_to_date_tasks(self, release, environment_id, verbose=False):
+        """
+        Checks whether all the running tasks in the project are using
+        the correct versions of the images.
+        """
+        # Get a list of all the services that are affected by this change.
+        #
+        # NOTE: weco-deploy only ever deploys within a single ECS cluster,
+        # so we could simplify this if we specify the cluster name upfront --
+        # but for now, listing all the services is the way to go.
+        service_descriptions = ecs.describe_services(self.session)
+
+        ecs_services = ecs.find_ecs_services_for_release(
+            project=self._underlying,
+            service_descriptions=service_descriptions,
+            release=release,
+            environment_id=environment_id,
+        )
+
+        affected_services = []
+
+        for _, services in ecs_services.items():
+            for serv in services.values():
+                affected_services.append(
+                    {
+                        "cluster": serv["clusterArn"],
+                        "service_name": serv["serviceName"],
+                        "desired_count": serv["desiredCount"],
+                    }
+                )
+
+        # Now get the service spec for each of these services.
+        #
+        # This tells us what containers we expect to have deployed as
+        # part of this service.
+        for serv in affected_services:
+            serv["spec"] = ecs.get_ecs_service_spec(
+                self.session, cluster=serv["cluster"], service_name=serv["service_name"]
+            )
+
+        # Now loop through all these services, inspect the running tasks,
+        # and check if they match the service spec.
+        is_up_to_date = True
+
+        def printv(str):
+            if verbose:
+                print(str)
+
+        for serv in affected_services:
+            running_tasks = ecs.list_tasks_in_service(
+                self.session, cluster=serv["cluster"], service_name=serv["service_name"]
+            )
+
+            for task in running_tasks:
+                actual_images = {
+                    container["name"]: models.DockerImageSpec(
+                        uri=container["image"],
+                        digest=container.get("imageDigest", "<none>"),
+                    )
+                    for container in task["containers"]
+                }
+
+                expected_images = serv["spec"].images
+
+                if actual_images != expected_images:
+                    if verbose:
+                        compare_image_specs(
+                            service_name=serv["service_name"],
+                            task_id=task["taskArn"].split("/")[-1],
+                            actual_images=actual_images,
+                            expected_images=expected_images,
+                        )
+
+                    is_up_to_date = False
+
+                if task["lastStatus"] != "RUNNING":
+                    printv("")
+                    printv(f"Task in {serv['service_name']} has the wrong status:")
+                    printv(f"Wanted:   RUNNING")
+                    printv(f"Actual:   {task['lastStatus']}")
+                    printv(f"Task ARN: {task_arn}")
+                    is_up_to_date = False
+
+            if len(running_tasks) < serv["desired_count"]:
+                printv("")
+                printv(f"Not running enough tasks in {serv['service_name']}:")
+                printv(f"Wanted: {desired_task_count}")
+                printv(f"Actual: {len(tasks)}")
+                is_up_to_date = False
+
+        return is_up_to_date
 
     def is_release_deployed(self, release, environment_id, verbose=False):
         """

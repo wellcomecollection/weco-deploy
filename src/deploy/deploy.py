@@ -311,10 +311,10 @@ def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval
     release_id = release["release_id"]
 
     click.echo("")
-    click.echo(click.style(f"Checking deployment of {release_id} to {environment_id}", fg="yellow"))
+    click.echo(click.style(f"Checking deployment of services in {project.id} (environment={environment_id})", fg="yellow"))
     click.echo(click.style(f"Allowing {wait_for_seconds}s for deployment.", fg="yellow"))
 
-    while not project.is_release_deployed(release, environment_id, verbose):
+    while not project.has_up_to_date_tasks(release, environment_id, verbose):
         total_time_waited = int(time.perf_counter() - start_timer)
 
         exceeded_wait_time = total_time_waited >= wait_for_seconds

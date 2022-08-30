@@ -65,6 +65,9 @@ class DockerImageSpec:
 
 
 @attr.s
-class ServiceSpec:
+class TaskSpec:
+    """
+    Describes the state of a task running in an ECS service.
+    """
     task_definition = attr.ib()
     images: typing.Dict[str, DockerImageSpec] = attr.ib()
