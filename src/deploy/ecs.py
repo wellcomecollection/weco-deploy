@@ -202,3 +202,36 @@ def find_ecs_services_for_release(
                 pass
 
     return matched_services
+
+
+def get_ecs_service_spec(session, *, cluster, service_name) -> models.ServiceSpec:
+    """
+    What are the containers we expect to be running in tasks that
+    are launched in this service?
+    """
+    ecs_client = session.client("ecs")
+
+    # First get the task definition ARN for this service
+    service_resp = ecs_client.describe_services(
+        cluster=cluster, services=[service_name]
+    )
+
+    if len(service_resp["services"]) != 1:
+        raise NoMatchingServiceError(
+            f"Could not find service with cluster={cluster}, service={service_name}"
+        )
+
+    task_definition = service_resp["services"][0]["taskDefinition"]
+
+    # Then look up the container URIs and corresponding image digest
+    # specified in the task definition.
+    task_resp = ecs_client.describe_task_definition(taskDefinition=task_definition)
+
+    images = {
+        c["name"]: models.DockerImageSpec(
+            uri=c["image"], digest=get_ecr_image_digest(sess, image_uri=c["image"])
+        )
+        for c in task_resp["taskDefinition"]["containerDefinitions"]
+    }
+
+    return models.ServiceSpec(task_definition=task_definition, images=images)

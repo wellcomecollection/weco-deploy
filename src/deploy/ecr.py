@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
 import base64
+import functools
 import json
 import os
+import re
 
 from botocore.exceptions import ClientError
 
@@ -303,3 +305,32 @@ def get_ref_tags_for_image(ecr_client, *, repository_name, tag):
         )
 
     return ref_tags
+
+
+@functools.lru_cache
+def get_ecr_image_digest(sess, *, image_uri):
+    ecr_client = sess.client("ecr")
+
+    # e.g. 760097843905.dkr.ecr.eu-west-1.amazonaws.com/uk.ac.wellcome/nginx_apigw:f1188c2a7df01663dd96c99b26666085a4192167
+    m = re.match(
+        r"^(?P<registry_id>[0-9]+)"
+        r"\.dkr\.ecr\.eu-west-1\.amazonaws.com/"
+        r"(?P<repository_name>[^:]+)"
+        r":"
+        r"(?P<image_tag>[a-z0-9\.-_]+)",
+        image_uri,
+    )
+
+    if m is None:
+        raise ValueError(f"Could not parse ECR image URI: {image_uri}")
+
+    resp = ecr_client.describe_images(
+        registryId=m.group("registry_id"),
+        repositoryName=m.group("repository_name"),
+        imageIds=[{"imageTag": m.group("image_tag")}],
+    )
+
+    if len(resp["imageDetails"]) != 1:
+        raise NoSuchImageError(f"Could not find ECR image with URI {image_uri}")
+
+    return resp["imageDetails"][0]["imageDigest"]

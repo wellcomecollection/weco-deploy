@@ -59,7 +59,7 @@ class ProjectList:
 
 
 @attr.s
-class ContainerSpec:
+class DockerImageSpec:
     uri = attr.ib()
     digest = attr.ib()
 
@@ -67,4 +67,4 @@ class ContainerSpec:
 @attr.s
 class ServiceSpec:
     task_definition = attr.ib()
-    containers: typing.Dict[str, ContainerSpec] = attr.ib()
+    images: typing.Dict[str, DockerImageSpec] = attr.ib()
