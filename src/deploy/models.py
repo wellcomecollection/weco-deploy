@@ -56,3 +56,15 @@ class ProjectList:
         with open(path) as infile:
             yaml_text = infile.read()
         return ProjectList.from_text(yaml_text=yaml_text)
+
+
+@attr.s
+class ContainerSpec:
+    uri = attr.ib()
+    digest = attr.ib()
+
+
+@attr.s
+class ServiceSpec:
+    task_definition = attr.ib()
+    containers: typing.Dict[str, ContainerSpec] = attr.ib()
