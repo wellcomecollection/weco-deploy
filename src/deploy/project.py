@@ -196,11 +196,13 @@ class Project:
 
                 expected_images = serv["spec"].images
 
+                task_id = task["taskArn"].split("/")[-1]
+
                 if actual_images != expected_images:
                     if verbose:
                         compare_image_specs(
                             service_name=serv["service_name"],
-                            task_id=task["taskArn"].split("/")[-1],
+                            task_id=task_id,
                             actual_images=actual_images,
                             expected_images=expected_images,
                         )
@@ -209,17 +211,16 @@ class Project:
 
                 if task["lastStatus"] != "RUNNING":
                     printv("")
-                    printv(f"Task in {serv['service_name']} has the wrong status:")
-                    printv(f"Wanted:   RUNNING")
-                    printv(f"Actual:   {task['lastStatus']}")
-                    printv(f"Task ARN: {task_arn}")
+                    print(f"Task {task_id} in {serv['service_name']} has the wrong status:")
+                    printv(f"  expected: RUNNING")
+                    printv(f"  actual:   {task['lastStatus']}")
                     is_up_to_date = False
 
             if len(running_tasks) < serv["desired_count"]:
                 printv("")
                 printv(f"Not running enough tasks in {serv['service_name']}:")
-                printv(f"Wanted: {desired_task_count}")
-                printv(f"Actual: {len(tasks)}")
+                printv(f"  expected: {serv['desired_count']}")
+                printv(f"  actual:   {len(running_tasks)}")
                 is_up_to_date = False
 
         return is_up_to_date
