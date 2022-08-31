@@ -1,7 +1,6 @@
 import pytest
 
 from deploy.ecs import (
-    deploy_service,
     describe_services,
     find_ecs_services_for_release,
     find_matching_service,
@@ -13,7 +12,6 @@ from deploy.ecs import (
     NoMatchingServiceError,
 )
 from deploy.models import ImageRepository, Project, Service
-from deploy.tags import parse_aws_tags
 
 
 @pytest.fixture(scope="session")
