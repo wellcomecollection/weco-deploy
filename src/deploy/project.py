@@ -1,14 +1,14 @@
 import datetime
 import functools
+import typing
 
 import cattr
 import yaml
 
 from . import ecs, iam, models
-from .ecr import EcrPrivate
+from .ecr import EcrPrivate, get_ecr_image_description, parse_ecr_image_uri
 from .exceptions import ConfigError, WecoDeployError, NothingToReleaseError
 from .release_store import DynamoReleaseStore
-from .tags import parse_aws_tags
 
 DEFAULT_REGION_NAME = "eu-west-1"
 
@@ -49,6 +49,62 @@ class Projects:
         )
 
 
+def compare_image_specs(
+    sess,
+    service_name: str,
+    task_id: str,
+    expected_images: typing.Dict[str, models.DockerImageSpec],
+    actual_images: typing.Dict[str, models.DockerImageSpec],
+):
+    """
+    Print a summary of the differences in the expected/actual images.
+
+    This is meant for human-readability.
+    """
+    assert expected_images != actual_images
+
+    print("")
+    print(f"{service_name}: task {task_id} has the wrong containers:")
+
+    for name, actual_spec in actual_images.items():
+        try:
+            expected_spec = expected_images[name]
+            if expected_spec.uri != actual_spec.uri:
+                print(f"- {name}: wrong URI")
+                print(f"    expected: {expected_spec.uri}")
+                print(f"    actual:   {actual_spec.uri}")
+
+            if expected_spec.digest != actual_spec.digest:
+                expected_image = parse_ecr_image_uri(expected_spec.uri)
+                actual_image = parse_ecr_image_uri(actual_spec.uri)
+
+                expected_description = get_ecr_image_description(
+                    sess,
+                    registry_id=expected_image["registry_id"],
+                    repository_name=expected_image["repository_name"],
+                    image_digest=expected_spec.digest
+                )
+
+                actual_description = get_ecr_image_description(
+                    sess,
+                    registry_id=actual_image["registry_id"],
+                    repository_name=actual_image["repository_name"],
+                    image_digest=actual_spec.digest
+                )
+
+                print(f"- {name}: wrong image digest")
+                print(f"    expected: {expected_description}")
+                print(f"              {expected_spec.digest}")
+                print(f"    actual:   {actual_description}")
+                print(f"              {actual_spec.digest}")
+        except KeyError:
+            print(f"- {name}: unexpected container running")
+
+    for name in expected_images:
+        if name not in actual_images:
+            print(f"- {name}: expected container, but wasn't found")
+
+
 class Project:
     def __init__(self, project_id, config, release_store):
         self.id = project_id
@@ -65,6 +121,10 @@ class Project:
             role_arn=self.role_arn,
             region_name=self.region_name
         )
+
+        # This tracks tasks whose state we've already reported as being
+        # not up-to-date; we don't need to log them again.
+        self._already_checked_tasks = set()
 
     @property
     @functools.lru_cache()
@@ -96,80 +156,104 @@ class Project:
             "details": details
         }
 
-    def is_release_deployed(self, release, environment_id, verbose=False):
+    def has_up_to_date_tasks(self, release, environment_id, verbose=False):
         """
-        Checks the `deployment:label` tag on a service matches the tags
-        on the tasks within those services. We check that the desiredCount
-        of tasks matches the running count of tasks.
+        Checks whether all the running tasks in the project are using
+        the correct versions of the images.
         """
-        expected_ecs_services = set()
-        for deployment in release['deployments']:
-            for details in deployment['details'].values():
-                for ecs_deployment in details['ecs_deployments']:
-                    expected_ecs_services.add(ecs_deployment['service_arn'])
-
+        # Get a list of all the services that are affected by this change.
+        #
+        # NOTE: weco-deploy only ever deploys within a single ECS cluster,
+        # so we could simplify this if we specify the cluster name upfront --
+        # but for now, listing all the services is the way to go.
         service_descriptions = ecs.describe_services(self.session)
 
         ecs_services = ecs.find_ecs_services_for_release(
             project=self._underlying,
             service_descriptions=service_descriptions,
             release=release,
-            environment_id=environment_id
+            environment_id=environment_id,
         )
+
+        affected_services = []
+
+        for _, services in ecs_services.items():
+            for serv in services.values():
+                affected_services.append(
+                    {
+                        "cluster": serv["clusterArn"],
+                        "service_name": serv["serviceName"],
+                        "desired_count": serv["desiredCount"],
+                    }
+                )
+
+        # Now get the service spec for each of these services.
+        #
+        # This tells us what containers we expect to have deployed as
+        # part of this service.
+        for serv in affected_services:
+            serv["spec"] = ecs.get_ecs_service_spec(
+                self.session, cluster=serv["cluster"], service_name=serv["service_name"]
+            )
+
+        # Now loop through all these services, inspect the running tasks,
+        # and check if they match the service spec.
+        is_up_to_date = True
 
         def printv(str):
             if verbose:
                 print(str)
 
-        is_deployed = True
+        for serv in affected_services:
+            running_tasks = ecs.list_tasks_in_service(
+                self.session, cluster=serv["cluster"], service_name=serv["service_name"]
+            )
 
-        for service_id, services in sorted(ecs_services.items()):
-            for service_resp in services.values():
-                service_arn = service_resp["serviceArn"]
-                if service_arn not in expected_ecs_services:
-                    printv(f"{service_id} was not deployed to {environment_id} as part of this release")
-                    continue
-                service_tags = parse_aws_tags(service_resp["tags"])
-                service_deployment_label = service_tags["deployment:label"]
-                desired_task_count = service_resp["desiredCount"]
+            for task in running_tasks:
+                actual_images = {
+                    container["name"]: models.DockerImageSpec(
+                        uri=container["image"],
+                        digest=container.get("imageDigest", "<none>"),
+                    )
+                    for container in task["containers"]
+                }
 
-                tasks = ecs.list_tasks_in_service(
-                    self.session,
-                    cluster_arn=service_resp["clusterArn"],
-                    service_name=service_resp["serviceName"],
-                )
+                expected_images = serv["spec"].images
 
-                for task in tasks:
-                    task_tags = parse_aws_tags(task["tags"])
-                    task_arn = task["taskArn"]
+                task_id = task["taskArn"].split("/")[-1]
 
-                    task_name = task_tags.get("deployment:service")
-                    deployment_label = task_tags.get("deployment:label")
+                if actual_images != expected_images:
+                    if verbose and task_id not in self._already_checked_tasks:
+                        compare_image_specs(
+                            self.session,
+                            service_name=serv["service_name"],
+                            task_id=task_id,
+                            actual_images=actual_images,
+                            expected_images=expected_images,
+                        )
 
-                    if deployment_label != service_deployment_label:
-                        printv("")
-                        printv(f"Task in {task_name} has the wrong deployment label:")
-                        printv(f"Wanted:   {service_deployment_label}")
-                        printv(f"Actual:   {deployment_label}")
-                        printv(f"Task ARN: {task_arn}")
-                        is_deployed = False
+                    if task_id in self._already_checked_tasks:
+                        printv(f"{serv['service_name']}: still waiting for task {task_id} to stop")
 
-                    if task["lastStatus"] != "RUNNING":
-                        printv("")
-                        printv(f"Task in {task_name} has the wrong status:")
-                        printv("Wanted:   RUNNING")
-                        printv(f"Actual:   {task['lastStatus']}")
-                        printv(f"Task ARN: {task_arn}")
-                        is_deployed = False
+                    self._already_checked_tasks.add(task_id)
 
-                if len(tasks) < desired_task_count:
+                    is_up_to_date = False
+
+                if task["lastStatus"] != "RUNNING":
                     printv("")
-                    printv(f"Not running the correct number of tasks in {service_arn}:")
-                    printv(f"Wanted: {desired_task_count}")
-                    printv(f"Actual: {len(tasks)}")
-                    is_deployed = False
+                    printv(f"{serv['service_name']}: task {task_id} has the wrong status:")
+                    printv("  expected: RUNNING")
+                    printv(f"  actual:   {task['lastStatus']}")
+                    is_up_to_date = False
 
-        return is_deployed
+            if len(running_tasks) < serv["desired_count"]:
+                printv("")
+                printv(f"{serv['service_name']}: Not running enough tasks:")
+                printv(f"  expected: {serv['desired_count']}")
+                printv(f"  actual:   {len(running_tasks)}")
+                is_up_to_date = False
+
+        return is_up_to_date
 
     def get_images(self, from_label):
         """
@@ -263,7 +347,7 @@ class Project:
         ecs_services_deployed = {}
 
         # Memoize service deployments to prevent multiple deployments
-        def _ecs_deploy(service, deployment_label):
+        def _ecs_deploy(service):
             cluster_arn = service["clusterArn"]
             service_arn = service["serviceArn"]
 
@@ -272,7 +356,6 @@ class Project:
                     self.session,
                     cluster_arn=cluster_arn,
                     service_arn=service_arn,
-                    deployment_label=deployment_label
                 )
 
             return ecs_services_deployed[service_arn]
@@ -300,10 +383,7 @@ class Project:
                 ecs_deployments = []
             else:
                 ecs_deployments = [
-                    _ecs_deploy(
-                        service=service,
-                        deployment_label=release['release_id']
-                    )
+                    _ecs_deploy(service)
                     for service in matched_services.get(image_id, {}).values()
                 ]
 

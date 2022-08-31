@@ -1,7 +1,8 @@
 import collections
 import typing
 
-from . import tags
+from . import models, tags
+from .ecr import get_ecr_image_digest
 from .iterators import chunked_iterable
 from .models import Project
 
@@ -112,33 +113,24 @@ def find_service_arns_for_release(
     return result
 
 
-def deploy_service(session, *, cluster_arn, service_arn, deployment_label):
+def deploy_service(session, *, cluster_arn, service_arn):
     """
     Triggers a deployment of a given service.
     """
     ecs_client = session.client("ecs")
 
     resp = ecs_client.update_service(
-        cluster=cluster_arn,
-        service=service_arn,
-        forceNewDeployment=True
-    )
-
-    print(f"tagging {cluster_arn}  {service_arn} with label {deployment_label}")
-
-    ecs_client.tag_resource(
-        resourceArn=service_arn,
-        tags=tags.to_aws_tags({"deployment:label": deployment_label})
+        cluster=cluster_arn, service=service_arn, forceNewDeployment=True
     )
 
     return {
         "cluster_arn": resp["service"]["clusterArn"],
         "service_arn": resp["service"]["serviceArn"],
-        "deployment_id": resp["service"]["deployments"][0]["id"]
+        "deployment_id": resp["service"]["deployments"][0]["id"],
     }
 
 
-def list_tasks_in_service(session, *, cluster_arn, service_name):
+def list_tasks_in_service(session, *, cluster, service_name):
     """
     Given the name of a service, return a list of tasks running within
     the service.
@@ -149,7 +141,7 @@ def list_tasks_in_service(session, *, cluster_arn, service_name):
 
     paginator = ecs_client.get_paginator("list_tasks")
     for page in paginator.paginate(
-        cluster=cluster_arn, serviceName=service_name
+        cluster=cluster, serviceName=service_name
     ):
         task_arns.extend(page["taskArns"])
 
@@ -158,7 +150,7 @@ def list_tasks_in_service(session, *, cluster_arn, service_name):
     # we'd ever have more than that, hence not handling it properly.
     if task_arns:
         resp = ecs_client.describe_tasks(
-            cluster=cluster_arn,
+            cluster=cluster,
             tasks=task_arns,
             include=["TAGS"]
         )
@@ -202,3 +194,36 @@ def find_ecs_services_for_release(
                 pass
 
     return matched_services
+
+
+def get_ecs_service_spec(session, *, cluster, service_name) -> models.TaskSpec:
+    """
+    What are the containers we expect to be running in tasks that
+    are launched in this service?
+    """
+    ecs_client = session.client("ecs")
+
+    # First get the task definition ARN for this service
+    service_resp = ecs_client.describe_services(
+        cluster=cluster, services=[service_name]
+    )
+
+    if len(service_resp["services"]) != 1:
+        raise NoMatchingServiceError(
+            f"Could not find service with cluster={cluster}, service={service_name}"
+        )
+
+    task_definition = service_resp["services"][0]["taskDefinition"]
+
+    # Then look up the container URIs and corresponding image digest
+    # specified in the task definition.
+    task_resp = ecs_client.describe_task_definition(taskDefinition=task_definition)
+
+    images = {
+        c["name"]: models.DockerImageSpec(
+            uri=c["image"], digest=get_ecr_image_digest(session, image_uri=c["image"])
+        )
+        for c in task_resp["taskDefinition"]["containerDefinitions"]
+    }
+
+    return models.TaskSpec(task_definition=task_definition, images=images)

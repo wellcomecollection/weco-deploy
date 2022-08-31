@@ -1,7 +1,6 @@
 import pytest
 
 from deploy.ecs import (
-    deploy_service,
     describe_services,
     find_ecs_services_for_release,
     find_matching_service,
@@ -13,7 +12,6 @@ from deploy.ecs import (
     NoMatchingServiceError,
 )
 from deploy.models import ImageRepository, Project, Service
-from deploy.tags import parse_aws_tags
 
 
 @pytest.fixture(scope="session")
@@ -217,55 +215,6 @@ def test_find_service_arns_for_release(ecs_client, ecs_stack):
     }
 
 
-def test_deploy_service(session, ecs_stack):
-    resp1 = deploy_service(
-        session,
-        cluster_arn="arn:aws:ecs:eu-west-1:012345678910:cluster/cluster1",
-        service_arn="arn:aws:ecs:eu-west-1:012345678910:service/service1a",
-        deployment_label="testing"
-    )
-
-    assert resp1["cluster_arn"] == "arn:aws:ecs:eu-west-1:012345678910:cluster/cluster1"
-    assert resp1["service_arn"] == "arn:aws:ecs:eu-west-1:012345678910:service/service1a"
-
-    ecs_client = session.client("ecs")
-    describe_resp = ecs_client.describe_services(
-        cluster="arn:aws:ecs:eu-west-1:012345678910:cluster/cluster1",
-        services=["arn:aws:ecs:eu-west-1:012345678910:service/service1a"],
-        include=["TAGS"]
-    )
-    tags = parse_aws_tags(describe_resp["services"][0]["tags"])
-
-    assert tags == {
-        "deployment:label": "testing"
-    }
-
-    # Now deploy a second time, with a different label, and verify the
-    # deployment label is updated.
-
-    resp2 = deploy_service(
-        session,
-        cluster_arn="arn:aws:ecs:eu-west-1:012345678910:cluster/cluster1",
-        service_arn="arn:aws:ecs:eu-west-1:012345678910:service/service1a",
-        deployment_label="testing_again"
-    )
-
-    assert resp2["cluster_arn"] == "arn:aws:ecs:eu-west-1:012345678910:cluster/cluster1"
-    assert resp2["service_arn"] == "arn:aws:ecs:eu-west-1:012345678910:service/service1a"
-
-    ecs_client = session.client("ecs")
-    describe_resp = ecs_client.describe_services(
-        cluster="arn:aws:ecs:eu-west-1:012345678910:cluster/cluster1",
-        services=["arn:aws:ecs:eu-west-1:012345678910:service/service1a"],
-        include=["TAGS"]
-    )
-    tags = parse_aws_tags(describe_resp["services"][0]["tags"])
-
-    assert tags == {
-        "deployment:label": "testing_again"
-    }
-
-
 def test_list_tasks_in_service(session, ecs_stack):
     # Annoyingly, there's no way for the StartTask API to start tasks in
     # a named service, so we'll never find anything useful here.
@@ -276,7 +225,7 @@ def test_list_tasks_in_service(session, ecs_stack):
 
     resp = list_tasks_in_service(
         session,
-        cluster_arn="arn:aws:ecs:eu-west-1:012345678910:cluster/cluster1",
+        cluster="arn:aws:ecs:eu-west-1:012345678910:cluster/cluster1",
         service_name="service1a"
     )
     assert resp == []

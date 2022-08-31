@@ -11,7 +11,7 @@ from tabulate import tabulate
 
 from . import ecs, git, iam
 from .exceptions import ConfigError, WecoDeployError, NothingToReleaseError
-from .pretty_printing import pprint_date
+from .pretty_printing import pprint_date, pprint_duration
 from .project import Projects
 from .version_check import warn_if_not_latest_version, current_version
 
@@ -304,6 +304,19 @@ def confirm_deploy(ctx, release_id, environment_id, confirmation_wait_for, confi
     )
 
 
+def format_seconds(seconds):
+    if seconds < 60:
+        return f'{seconds}s'
+    else:
+        minutes = seconds // 60
+        remaining_seconds = seconds % 60
+
+        if remaining_seconds == 0:
+            return f'{minutes}m'
+        else:
+            return f'{minutes}m {remaining_seconds}s'
+
+
 def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval, verbose):
     total_time_waited = 0
     start_timer = time.perf_counter()
@@ -311,21 +324,38 @@ def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval
     release_id = release["release_id"]
 
     click.echo("")
-    click.echo(click.style(f"Checking deployment of {release_id} to {environment_id}", fg="yellow"))
-    click.echo(click.style(f"Allowing {wait_for_seconds}s for deployment.", fg="yellow"))
+    click.echo(
+        click.style(
+            f"Checking deployment of {release_id} to {environment_id}", fg="yellow"
+        )
+    )
+    click.echo(
+        click.style(
+            f"Allowing {pprint_duration(wait_for_seconds)} for deployment.", fg="yellow"
+        )
+    )
 
-    while not project.is_release_deployed(release, environment_id, verbose):
+    while not project.has_up_to_date_tasks(release, environment_id, verbose):
         total_time_waited = int(time.perf_counter() - start_timer)
 
         exceeded_wait_time = total_time_waited >= wait_for_seconds
 
         if exceeded_wait_time:
             click.echo("")
-            click.echo(click.style(f"Deployment of {release_id} to {environment_id} failed", fg="red"))
-            click.echo(click.style(f"Deployment time exceeded {wait_for_seconds}s", fg="red"))
+            click.echo(
+                click.style(
+                    f"Deployment of {release_id} to {environment_id} failed", fg="red"
+                )
+            )
+            click.echo(
+                click.style(
+                    f"Deployment time exceeded {pprint_duration(wait_for_seconds)}",
+                    fg="red",
+                )
+            )
             sys.exit(1)
 
-        retry_message = f"Trying again in {interval}s (waited {total_time_waited}s)."
+        retry_message = f"Trying again in {pprint_duration(interval)} (waited {pprint_duration(total_time_waited)} so far)."
         click.echo(click.style(retry_message, fg="yellow"))
 
         time.sleep(interval)

@@ -56,3 +56,18 @@ class ProjectList:
         with open(path) as infile:
             yaml_text = infile.read()
         return ProjectList.from_text(yaml_text=yaml_text)
+
+
+@attr.s
+class DockerImageSpec:
+    uri = attr.ib()
+    digest = attr.ib()
+
+
+@attr.s
+class TaskSpec:
+    """
+    Describes the state of a task running in an ECS service.
+    """
+    task_definition = attr.ib()
+    images: typing.Dict[str, DockerImageSpec] = attr.ib()

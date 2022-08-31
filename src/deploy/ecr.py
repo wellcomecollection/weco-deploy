@@ -1,14 +1,16 @@
 from abc import ABC, abstractmethod
 import base64
+import functools
 import json
 import os
+import re
 
 from botocore.exceptions import ClientError
 
 from . import iam
 from .exceptions import EcrError
 from .commands import cmd
-from .git import repo_root
+from .git import repo_root, log
 
 
 DEFAULT_NAMESPACE = "uk.ac.wellcome"
@@ -303,3 +305,79 @@ def get_ref_tags_for_image(ecr_client, *, repository_name, tag):
         )
 
     return ref_tags
+
+
+@functools.lru_cache
+def parse_ecr_image_uri(image_uri):
+    # e.g. 760097843905.dkr.ecr.eu-west-1.amazonaws.com/uk.ac.wellcome/nginx_apigw:f1188c2a7df01663dd96c99b26666085a4192167
+    m = re.match(
+        r"^(?P<registry_id>[0-9]+)"
+        r"\.dkr\.ecr\.eu-west-1\.amazonaws.com/"
+        r"(?P<repository_name>[^:]+)"
+        r":"
+        r"(?P<image_tag>[a-z0-9\.-_]+)",
+        image_uri,
+    )
+
+    if m is None:
+        raise ValueError(f"Could not parse ECR image URI: {image_uri}")
+
+    return m.groupdict()
+
+
+@functools.lru_cache
+def get_ecr_image_digest(sess, *, image_uri):
+    ecr_client = sess.client("ecr")
+
+    image = parse_ecr_image_uri(image_uri)
+
+    resp = ecr_client.describe_images(
+        registryId=image["registry_id"],
+        repositoryName=image["repository_name"],
+        imageIds=[{"imageTag": image["image_tag"]}],
+    )
+
+    if len(resp["imageDetails"]) != 1:
+        raise NoSuchImageError(f"Could not find ECR image with URI {image_uri}")
+
+    return resp["imageDetails"][0]["imageDigest"]
+
+
+@functools.lru_cache
+def get_ecr_image_description(sess, *, registry_id, repository_name, image_digest):
+    """
+    Given an image digest, returns a one-line description of the image.
+
+    This uses the `ref` tag to get the Git commit ID, then queries the
+    local Git repo to see if it can get a commit message.
+
+    """
+    if image_digest == '<none>':
+        return '<none>'
+
+    ecr_client = sess.client("ecr")
+
+    resp = ecr_client.describe_images(
+        registryId=registry_id,
+        repositoryName=repository_name,
+        imageIds=[{"imageDigest": image_digest}],
+    )
+
+    if len(resp["imageDetails"]) != 1:
+        return '<unknown commit>'
+
+    tags = resp["imageDetails"][0]["imageTags"]
+
+    # e.g. tags = ['ref.104e8005080336f95b607f766740937218fac683', 'latest']
+    try:
+        ref_tag = next(t for t in tags if t.startswith('ref'))
+    except StopIteration:
+        return '<unknown commit>'
+
+    commit_id = ref_tag.replace('ref.', '')
+    commit_message = log(commit_id)
+
+    if commit_message.startswith('fatal: bad object'):
+        return f'commit {commit_id[:7]}: <unknown message>'
+    else:
+        return f'commit {commit_id[:7]}: {commit_message}'
