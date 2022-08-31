@@ -231,8 +231,9 @@ class Project:
                             actual_images=actual_images,
                             expected_images=expected_images,
                         )
-                    elif verbose:
-                        print(f"{serv['service_name']}: still waiting for task {task_id} to stop")
+
+                    if task_id in self._already_checked_tasks:
+                        printv(f"{serv['service_name']}: still waiting for task {task_id} to stop")
 
                     self._already_checked_tasks.add(task_id)
 
@@ -240,7 +241,7 @@ class Project:
 
                 if task["lastStatus"] != "RUNNING":
                     printv("")
-                    print(f"{serv['service_name']}: task {task_id} has the wrong status:")
+                    printv(f"{serv['service_name']}: task {task_id} has the wrong status:")
                     printv("  expected: RUNNING")
                     printv(f"  actual:   {task['lastStatus']}")
                     is_up_to_date = False
