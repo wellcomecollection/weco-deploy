@@ -4,11 +4,18 @@ import subprocess
 from .commands import cmd
 
 
+def _fix_dubious_ownership():
+    # This stops a fatal "unsafe repository" error in Docker inside CI
+    return subprocess.check_call(['git', 'config', '--system', '--add', 'safe.directory', '*'])
+
+
 @functools.lru_cache()
 def log(commit_id, run_fetch=True):
     """
     Returns a one-line log for a given commit ID.
     """
+    _fix_dubious_ownership()
+
     try:
         # %s = subject, the first line of the commit
         # See https://git-scm.com/docs/pretty-formats
@@ -30,4 +37,7 @@ def repo_root():
     """
     Returns the path to the root of the repository.
     """
+    # This stops a fatal "unsafe repository" error in Docker inside CI
+    _fix_dubious_ownership()
+
     return cmd("git", "rev-parse", "--show-toplevel")
