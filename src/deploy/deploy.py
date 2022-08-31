@@ -304,6 +304,19 @@ def confirm_deploy(ctx, release_id, environment_id, confirmation_wait_for, confi
     )
 
 
+def format_seconds(seconds):
+    if seconds < 60:
+        return f'{seconds}s'
+    else:
+        minutes = seconds // 60
+        remaining_seconds = seconds % 60
+
+        if remaining_seconds == 0:
+            return f'{minutes}m'
+        else:
+            return f'{minutes}m {remaining_seconds}s'
+
+
 def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval, verbose):
     total_time_waited = 0
     start_timer = time.perf_counter()
@@ -325,7 +338,7 @@ def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval
             click.echo(click.style(f"Deployment time exceeded {wait_for_seconds}s", fg="red"))
             sys.exit(1)
 
-        retry_message = f"Trying again in {interval}s (waited {total_time_waited}s)."
+        retry_message = f"\n=== Trying again in {interval}s (waited {format_seconds(total_time_waited)} so far) ===\n"
         click.echo(click.style(retry_message, fg="yellow"))
 
         time.sleep(interval)
