@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.7.2 - 2022-08-31
+------------------
+
+Fix an error about "detected dubious ownership" when running Git in CI.
+
+------------------
 5.7.1 - 2022-08-31
 ------------------
 
