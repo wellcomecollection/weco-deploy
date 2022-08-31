@@ -211,7 +211,7 @@ class Project:
                 if task["lastStatus"] != "RUNNING":
                     printv("")
                     print(f"Task {task_id} in {serv['service_name']} has the wrong status:")
-                    printv( "  expected: RUNNING")
+                    printv("  expected: RUNNING")
                     printv(f"  actual:   {task['lastStatus']}")
                     is_up_to_date = False
 
