@@ -352,6 +352,9 @@ def get_ecr_image_description(sess, *, registry_id, repository_name, image_diges
     local Git repo to see if it can get a commit message.
 
     """
+    if image_digest == '<none>':
+        return '<none>'
+
     ecr_client = sess.client("ecr")
 
     resp = ecr_client.describe_images(
@@ -368,7 +371,7 @@ def get_ecr_image_description(sess, *, registry_id, repository_name, image_diges
     # e.g. tags = ['ref.104e8005080336f95b607f766740937218fac683', 'latest']
     try:
         ref_tag = next(t for t in tags if t.startswith('ref'))
-    except IndexError:
+    except StopIteration:
         return '<unknown commit>'
 
     commit_id = ref_tag.replace('ref.', '')
