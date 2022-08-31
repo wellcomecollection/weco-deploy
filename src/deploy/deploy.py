@@ -11,7 +11,7 @@ from tabulate import tabulate
 
 from . import ecs, git, iam
 from .exceptions import ConfigError, WecoDeployError, NothingToReleaseError
-from .pretty_printing import pprint_date
+from .pretty_printing import pprint_date, pprint_duration
 from .project import Projects
 from .version_check import warn_if_not_latest_version, current_version
 
@@ -311,8 +311,16 @@ def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval
     release_id = release["release_id"]
 
     click.echo("")
-    click.echo(click.style(f"Checking deployment of {release_id} to {environment_id}", fg="yellow"))
-    click.echo(click.style(f"Allowing {wait_for_seconds}s for deployment.", fg="yellow"))
+    click.echo(
+        click.style(
+            f"Checking deployment of {release_id} to {environment_id}", fg="yellow"
+        )
+    )
+    click.echo(
+        click.style(
+            f"Allowing {pprint_duration(wait_for_seconds)} for deployment.", fg="yellow"
+        )
+    )
 
     while not project.is_release_deployed(release, environment_id, verbose):
         total_time_waited = int(time.perf_counter() - start_timer)
@@ -321,11 +329,20 @@ def _confirm_deploy(project, release, environment_id, wait_for_seconds, interval
 
         if exceeded_wait_time:
             click.echo("")
-            click.echo(click.style(f"Deployment of {release_id} to {environment_id} failed", fg="red"))
-            click.echo(click.style(f"Deployment time exceeded {wait_for_seconds}s", fg="red"))
+            click.echo(
+                click.style(
+                    f"Deployment of {release_id} to {environment_id} failed", fg="red"
+                )
+            )
+            click.echo(
+                click.style(
+                    f"Deployment time exceeded {pprint_duration(wait_for_seconds)}",
+                    fg="red",
+                )
+            )
             sys.exit(1)
 
-        retry_message = f"Trying again in {interval}s (waited {total_time_waited}s)."
+        retry_message = f"Trying again in {pprint_duration(interval)} (waited {pprint_duration(total_time_waited)} so far)."
         click.echo(click.style(retry_message, fg="yellow"))
 
         time.sleep(interval)
