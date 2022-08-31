@@ -64,7 +64,7 @@ def compare_image_specs(
     assert expected_images != actual_images
 
     print("")
-    print(f"Task {task_id} in {service_name} has the wrong containers:")
+    print(f"{service_name}: task {task_id} has the wrong containers:")
 
     for name, actual_spec in actual_images.items():
         try:
@@ -232,7 +232,7 @@ class Project:
                             expected_images=expected_images,
                         )
                     elif verbose:
-                        print(f"Still waiting for task {task_id} in {serv['service_name']} to stop")
+                        print(f"{serv['service_name']}: still waiting for task {task_id} to stop")
 
                     self._already_checked_tasks.add(task_id)
 
@@ -240,14 +240,14 @@ class Project:
 
                 if task["lastStatus"] != "RUNNING":
                     printv("")
-                    print(f"Task {task_id} in {serv['service_name']} has the wrong status:")
+                    print(f"{serv['service_name']}: task {task_id} has the wrong status:")
                     printv("  expected: RUNNING")
                     printv(f"  actual:   {task['lastStatus']}")
                     is_up_to_date = False
 
             if len(running_tasks) < serv["desired_count"]:
                 printv("")
-                printv(f"Not running enough tasks in {serv['service_name']}:")
+                printv(f"{serv['service_name']}: Not running enough tasks:")
                 printv(f"  expected: {serv['desired_count']}")
                 printv(f"  actual:   {len(running_tasks)}")
                 is_up_to_date = False
