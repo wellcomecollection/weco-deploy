@@ -130,7 +130,7 @@ def deploy_service(session, *, cluster_arn, service_arn):
     }
 
 
-def list_tasks_in_service(session, *, cluster_arn, service_name):
+def list_tasks_in_service(session, *, cluster, service_name):
     """
     Given the name of a service, return a list of tasks running within
     the service.
@@ -141,7 +141,7 @@ def list_tasks_in_service(session, *, cluster_arn, service_name):
 
     paginator = ecs_client.get_paginator("list_tasks")
     for page in paginator.paginate(
-        cluster=cluster_arn, serviceName=service_name
+        cluster=cluster, serviceName=service_name
     ):
         task_arns.extend(page["taskArns"])
 
@@ -150,7 +150,7 @@ def list_tasks_in_service(session, *, cluster_arn, service_name):
     # we'd ever have more than that, hence not handling it properly.
     if task_arns:
         resp = ecs_client.describe_tasks(
-            cluster=cluster_arn,
+            cluster=cluster,
             tasks=task_arns,
             include=["TAGS"]
         )

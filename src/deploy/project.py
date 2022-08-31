@@ -6,7 +6,7 @@ import cattr
 import yaml
 
 from . import ecs, iam, models
-from .ecr import EcrPrivate
+from .ecr import EcrPrivate, get_ecr_image_description, parse_ecr_image_uri
 from .exceptions import ConfigError, WecoDeployError, NothingToReleaseError
 from .release_store import DynamoReleaseStore
 
@@ -50,6 +50,7 @@ class Projects:
 
 
 def compare_image_specs(
+    sess,
     service_name: str,
     task_id: str,
     expected_images: typing.Dict[str, models.DockerImageSpec],
@@ -67,15 +68,35 @@ def compare_image_specs(
 
     for name, actual_spec in actual_images.items():
         try:
-            expected_image_spec = expected_images[name]
-            if expected_image_spec.uri != actual_spec.uri:
+            expected_spec = expected_images[name]
+            if expected_spec.uri != actual_spec.uri:
                 print(f"- {name}: wrong URI")
-                print(f"    expected: {expected_image_spec.uri}")
+                print(f"    expected: {expected_spec.uri}")
                 print(f"    actual:   {actual_spec.uri}")
-            if expected_image_spec.digest != actual_spec.digest:
+
+            if expected_spec.digest != actual_spec.digest:
+                expected_image = parse_ecr_image_uri(expected_spec.uri)
+                actual_image = parse_ecr_image_uri(actual_spec.uri)
+
+                expected_description = get_ecr_image_description(
+                    sess,
+                    registry_id=expected_image["registry_id"],
+                    repository_name=expected_image["repository_name"],
+                    image_digest=expected_spec.digest
+                )
+
+                actual_description = get_ecr_image_description(
+                    sess,
+                    registry_id=actual_image["registry_id"],
+                    repository_name=actual_image["repository_name"],
+                    image_digest=actual_spec.digest
+                )
+
                 print(f"- {name}: wrong image digest")
-                print(f"    expected: {expected_image_spec.digest}")
-                print(f"    actual:   {actual_spec.digest}")
+                print(f"    expected: {expected_description}")
+                print(f"              {expected_spec.digest}")
+                print(f"    actual:   {actual_description}")
+                print(f"              {actual_spec.digest}")
         except KeyError:
             print(f"- {name}: unexpected container running")
 
@@ -200,6 +221,7 @@ class Project:
                 if actual_images != expected_images:
                     if verbose:
                         compare_image_specs(
+                            self.session,
                             service_name=serv["service_name"],
                             task_id=task_id,
                             actual_images=actual_images,
