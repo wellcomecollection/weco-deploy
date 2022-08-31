@@ -5,6 +5,14 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.7.1 - 2022-08-31
+------------------
+
+Bump the version of Python in the weco-deploy Docker image from 3.7 to 3.9.
+
+This should fix errors with `@functools.lru_cache`.
+
+------------------
 5.7.0 - 2022-08-31
 ------------------
 
