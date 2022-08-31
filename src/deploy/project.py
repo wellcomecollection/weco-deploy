@@ -122,6 +122,10 @@ class Project:
             region_name=self.region_name
         )
 
+        # This tracks tasks whose state we've already reported as being
+        # not up-to-date; we don't need to log them again.
+        self._already_checked_tasks = set()
+
     @property
     @functools.lru_cache()
     def ecr(self):
@@ -219,7 +223,7 @@ class Project:
                 task_id = task["taskArn"].split("/")[-1]
 
                 if actual_images != expected_images:
-                    if verbose:
+                    if verbose and task_id not in self._already_checked_tasks:
                         compare_image_specs(
                             self.session,
                             service_name=serv["service_name"],
@@ -227,6 +231,10 @@ class Project:
                             actual_images=actual_images,
                             expected_images=expected_images,
                         )
+                    elif verbose:
+                        print(f"Still waiting for task {task_id} in {serv['service_name']} to stop")
+
+                    self._already_checked_tasks.add(task_id)
 
                     is_up_to_date = False
 
