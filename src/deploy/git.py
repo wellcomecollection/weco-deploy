@@ -4,12 +4,16 @@ import subprocess
 from .commands import cmd
 
 
+@functools.lru_cache
 def _fix_dubious_ownership():
     # This stops a fatal "unsafe repository" error in Docker inside CI
-    return subprocess.check_call(['git', 'config', '--system', '--add', 'safe.directory', '*'])
+    try:
+        return subprocess.check_call(['git', 'config', '--system', '--add', 'safe.directory', '*'])
+    except subprocess.CalledProcessError as err:
+        print(f"Unable to call `git config --system --add safe.directory *`: {err}")
 
 
-@functools.lru_cache()
+@functools.lru_cache
 def log(commit_id, run_fetch=True):
     """
     Returns a one-line log for a given commit ID.
