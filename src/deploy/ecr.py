@@ -315,7 +315,7 @@ def parse_ecr_image_uri(image_uri):
         r"\.dkr\.ecr\.eu-west-1\.amazonaws.com/"
         r"(?P<repository_name>[^:]+)"
         r":"
-        r"(?P<image_tag>[a-z0-9\.-_]+)",
+        r"(?P<image_tag>[a-z0-9\.\-_]+)",
         image_uri,
     )
 

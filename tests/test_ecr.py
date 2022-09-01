@@ -167,3 +167,28 @@ def test_get_ref_tags_for_repositories(ecr_client, role_arn, region_name):
         "example_worker2": set(["ref.222"]),
         "example_worker3": set(),
     }
+
+
+@pytest.mark.parametrize(
+    "image_uri, expected_result",
+    [
+        (
+            "760097843905.dkr.ecr.eu-west-1.amazonaws.com/uk.ac.wellcome/nginx_apigw:f1188c2a7df01663dd96c99b26666085a4192167",
+            {
+                "registry_id": "760097843905",
+                "repository_name": "uk.ac.wellcome/nginx_apigw",
+                "image_tag": "f1188c2a7df01663dd96c99b26666085a4192167",
+            },
+        ),
+        (
+            "760097843905.dkr.ecr.eu-west-1.amazonaws.com/uk.ac.wellcome/id_minter:env.2022-08-24",
+            {
+                "registry_id": "760097843905",
+                "repository_name": "uk.ac.wellcome/id_minter",
+                "image_tag": "env.2022-08-24",
+            },
+        )
+    ],
+)
+def test_parse_ecr_image_uri(image_uri, expected_result):
+    assert ecr.parse_ecr_image_uri(image_uri) == expected_result
