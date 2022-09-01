@@ -5,6 +5,13 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.7.3 - 2022-09-01
+------------------
+
+Make the `git config --system --add safe.directory *` command we run to fix "unsafe repository" errors in CI a soft requirement.
+It may fail running locally; that's fine.
+
+------------------
 5.7.2 - 2022-08-31
 ------------------
 
