@@ -13,7 +13,7 @@ steps:
       - docker-compose#v3.5.0:
           run: tox
           env:
-            - TOXENV=py37
+            - TOXENV=py39
   - wait
   - label: "pypi publish"
     if: build.branch == "main"
