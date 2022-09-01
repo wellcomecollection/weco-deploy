@@ -5,6 +5,12 @@ Changelog
 This is a record of all releases of weco-deploy.
 
 ------------------
+5.7.4 - 2022-09-01
+------------------
+
+Fix a bug when parsing ECR image URIs with hyphens in the tags (e.g. `env.2022-09-01`).
+
+------------------
 5.7.3 - 2022-09-01
 ------------------
 
