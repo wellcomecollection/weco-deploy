@@ -1,7 +1,6 @@
 #!/usr/bin/env python
-# -*- encoding: utf-8
 """
-This script runs in Travis to build/publish our Docker images.
+This script runs in Buildkite to build/publish our Docker images.
 
 If this script runs in a pull request, it just checks the images can
 build successfully.
