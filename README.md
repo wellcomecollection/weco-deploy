@@ -1,6 +1,9 @@
 # weco-deploy
 
-[![Build status](https://badge.buildkite.com/f5f17766a1334f7445548b70ef2c6de1dbb6ba58c6d4ca7cd1.svg)](https://buildkite.com/wellcomecollection/deployment-cli-weco-deploy)
+> **Deprecated:** as of November 2022, we no longer use weco-deploy at Wellcome.
+> It is no longer actively developed or maintained.
+>
+> We have replaced it with a series of bash scripts using the AWS CLI, and in particular the `aws ecs wait` command.
 
 weco-deploy helps us deploy applications as Docker images within Amazon ECS.
 
